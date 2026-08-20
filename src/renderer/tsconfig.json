@@ -13,18 +13,12 @@
     "isolatedModules": true,
     "jsx": "preserve",
     "incremental": true,
-    "plugins": [{ "name": "next" }],
     "baseUrl": ".",
     "paths": {
-      "@shared/*": ["../../shared/*"],
-      "@renderer/*": ["./*"],
-      "@components/*": ["./components/*"],
-      "@hooks/*": ["./hooks/*"],
-      "@store/*": ["./store/*"],
-      "@lib/*": ["./lib/*"],
-      "@styles/*": ["./styles/*"]
+      "@shared/*": ["../shared/*"],
+      "@/*": ["./*"]
     }
   },
-  "include": [".", "../../shared/**/*"],
+  "include": ["./**/*", "../shared/**/*"],
   "exclude": ["node_modules"]
 }

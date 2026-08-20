@@ -12,7 +12,7 @@
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
-    "outDir": "dist/main",
+    "outDir": "dist",
     "rootDir": "src",
     "baseUrl": ".",
     "paths": {

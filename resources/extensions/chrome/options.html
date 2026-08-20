@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>G1DM Companion Settings</title>
+  <style>
+    body {
+      max-width: 600px;
+      margin: 40px auto;
+      padding: 24px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #090d16;
+      color: #f8fafc;
+    }
+    h1 { font-size: 18px; margin-bottom: 20px; color: #38bdf8; display: flex; align-items: center; gap: 8px; }
+    .card { background: #0f172a; border: 1px solid #1e293b; border-radius: 12px; padding: 18px; margin-bottom: 16px; font-size: 13px; }
+    label { display: block; font-weight: 600; margin-bottom: 6px; color: #cbd5e1; }
+    textarea, input[type="text"] {
+      width: 100%; padding: 10px; background: #090d16; border: 1px solid #334155;
+      border-radius: 8px; color: #f8fafc; font-family: monospace; font-size: 12px; box-sizing: border-box;
+    }
+    button {
+      padding: 10px 20px; background: #2563eb; color: white; border: none; border-radius: 8px;
+      font-weight: 600; cursor: pointer; float: right;
+    }
+    button:hover { background: #1d4ed8; }
+    .saved-msg { color: #34d399; font-size: 12px; margin-top: 10px; display: none; }
+  </style>
+</head>
+<body>
+  <h1>⚡ G1DM Companion Extension Settings</h1>
+
+  <div class="card">
+    <label>Intercepted File Extensions (comma-separated)</label>
+    <textarea id="extensionsInput" rows="4"></textarea>
+  </div>
+
+  <div class="card">
+    <label>Excluded Domains (never intercept downloads from these hosts)</label>
+    <textarea id="domainsInput" rows="3" placeholder="example.com, banking.com"></textarea>
+  </div>
+
+  <button id="saveBtn">Save Preferences</button>
+  <div id="savedMsg" class="saved-msg">✓ Settings saved successfully!</div>
+
+  <script src="options.js"></script>
+</body>
+</html>
