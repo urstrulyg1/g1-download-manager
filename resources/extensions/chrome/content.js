@@ -92,7 +92,7 @@
         badgeElement.innerHTML = `<span style="color: #10b981;">✓ Enqueued to G1DM</span>`;
         setTimeout(() => badgeElement?.remove(), 2500);
       } else {
-        window.open(`http://127.0.0.1:3000/#media?url=${encodeURIComponent(window.location.href)}`, '_blank');
+        window.open(`http://127.0.0.1:8055/#media?url=${encodeURIComponent(window.location.href)}`, '_blank');
       }
     });
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import * as http from 'http';
 
-const PORT = process.env.PORT || '3000';
+const PORT = process.env.PORT || '8055';
 const API_BASE = `http://127.0.0.1:${PORT}/api`;
 
 async function requestApi(endpoint: string, method: string = 'GET', body?: any): Promise<any> {

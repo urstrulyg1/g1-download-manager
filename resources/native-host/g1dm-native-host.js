@@ -6,7 +6,7 @@
 
 const http = require('http');
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 8055;
 const API_BASE = `http://127.0.0.1:${PORT}/api/v1`;
 
 function sendNativeMessage(msg) {
