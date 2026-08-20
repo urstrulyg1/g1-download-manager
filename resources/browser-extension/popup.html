@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { width: 320px; margin: 0; padding: 16px; font-family: system-ui, sans-serif; background: #0f172a; color: #f8fafc; }
+    h2 { margin: 0 0 12px 0; font-size: 16px; color: #3b82f6; display: flex; align-items: center; gap: 8px; }
+    .status { font-size: 12px; color: #94a3b8; margin-bottom: 16px; }
+    button { width: 100%; padding: 8px 12px; background: #2563eb; color: #fff; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; }
+    button:hover { background: #1d4ed8; }
+    .toggle-row { display: flex; justify-content: space-between; align-items: center; margin: 12px 0; font-size: 13px; }
+  </style>
+</head>
+<body>
+  <h2>⚡ G1DM Companion</h2>
+  <div class="status">Connected to G1DM Core Engine</div>
+  <div class="toggle-row">
+    <span>Automatic Interception</span>
+    <input type="checkbox" id="interceptToggle" checked>
+  </div>
+  <button id="openApp">Open Download Manager</button>
+  <script>
+    document.getElementById('openApp').addEventListener('click', () => {
+      chrome.tabs.create({ url: 'http://127.0.0.1:3000' });
+    });
+  </script>
+</body>
+</html>

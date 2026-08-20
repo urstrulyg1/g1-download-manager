@@ -1,0 +1,10 @@
+{
+  "name": "com.g1dm.native_host",
+  "description": "G1DM Internet Download Manager Native Host",
+  "path": "HOST_PATH",
+  "type": "stdio",
+  "allowed_origins": [
+    "chrome-extension://g1dm-companion-extension-id/",
+    "chrome-extension://*/"
+  ]
+}

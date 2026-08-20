@@ -1,0 +1,9 @@
+{
+  "name": "com.g1dm.native_host",
+  "description": "G1DM Internet Download Manager Native Host for Firefox",
+  "path": "HOST_PATH",
+  "type": "stdio",
+  "allowed_extensions": [
+    "g1dm-companion@g1dm.app"
+  ]
+}

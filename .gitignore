@@ -13,3 +13,7 @@ release/
 coverage/
 .env
 .env.local
+*.part
+*.g1dm
+*.bin
+test_manual_db.db

@@ -1,12 +1,18 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: 'export',
-  distDir: '../../dist/renderer',
-  trailingSlash: true,
-  images: { unoptimized: true },
-  webpack: (config) => {
-    config.externals = [...(config.externals || []), 'electron'];
-    return config;
+  reactStrictMode: true,
+  transpilePackages: ['lucide-react'],
+  async rewrites() {
+    return [
+      {
+        source: '/api/:path*',
+        destination: 'http://127.0.0.1:3001/api/:path*',
+      },
+      {
+        source: '/ws',
+        destination: 'http://127.0.0.1:3001/ws',
+      },
+    ];
   },
 };
 
