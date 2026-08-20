@@ -667,9 +667,11 @@ export async function createUnifiedServer(port: number = 3000) {
     return nextHandler(req, res);
   });
 
-  return new Promise<{ server: any; app: any; db: AppDatabase; engine: DownloadEngine }>((resolve) => {
-    server.listen(port, '0.0.0.0', () => {
-      console.log(`[G1DM] Application running at http://0.0.0.0:${port}`);
+  return new Promise<{ server: any; app: any; db: AppDatabase; engine: DownloadEngine }>((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(port, '127.0.0.1', () => {
+      server.off('error', reject);
+      console.log(`[G1DM] Application running at http://127.0.0.1:${port}`);
       resolve({ server, app, db, engine });
     });
   });

@@ -60,9 +60,9 @@ start-ui.bat
 ```
 
 Once launched, access G1DM in your browser:
-* 🌐 **Web UI Dashboard**: [http://localhost:3000](http://localhost:3000)
-* ⚡ **REST API v1**: [http://localhost:3000/api/v1](http://localhost:3000/api/v1)
-* 📋 **OpenAPI 3.0 JSON**: [http://localhost:3000/api/v1/openapi.json](http://localhost:3000/api/v1/openapi.json)
+* 🌐 **Web UI Dashboard**: [http://127.0.0.1:8055](http://127.0.0.1:8055)
+* ⚡ **REST API v1**: [http://127.0.0.1:8055/api/v1](http://127.0.0.1:8055/api/v1)
+* 📋 **OpenAPI 3.0 JSON**: [http://127.0.0.1:8055/api/v1/openapi.json](http://127.0.0.1:8055/api/v1/openapi.json)
 
 ---
 
@@ -89,9 +89,9 @@ npm run build
 
 ### Step 4: Start the G1DM Unified Server
 ```bash
-npm start
+PORT=8055 npm start
 ```
-The server will start on `0.0.0.0:3000`. You can change the port using `PORT=8080 npm start`.
+The server binds to `127.0.0.1:8055` by default when launched via [`./start-ui.sh`](start-ui.sh) or [`start-ui.bat`](start-ui.bat). For manual startup with [`npm start`](package.json:19), set the port explicitly, for example `PORT=8055 npm start`.
 
 ### Development Mode (with Hot Reloading)
 ```bash
@@ -322,16 +322,17 @@ npm test
 ## ❓ Troubleshooting & FAQs
 
 ### Q1: The browser extension shows "Offline". How do I connect it?
-Make sure the G1DM unified server is running (`./start-ui.sh` or `start-ui.bat` on port 3000). The extension connects to `http://127.0.0.1:3000` by default. You can test the connection in the extension popup or the Web UI's **Compatibility & Self-Healing Center**.
+Make sure the G1DM unified server is running ([`./start-ui.sh`](start-ui.sh) or [`start-ui.bat`](start-ui.bat) on port `8055`). The extension connects to `http://127.0.0.1:8055` by default. You can test the connection in the extension popup or the Web UI's **Compatibility & Self-Healing Center**.
 
 ### Q2: How do I change the default download folder?
 Navigate to **Settings $\to$ General $\to$ Default Download Folder**, or pass `--out <dir>` in the CLI.
 
-### Q3: Port 3000 is already in use by another service. What should I do?
+### Q3: Port 8055 is already in use by another service. What should I do?
 You can run G1DM on any custom port:
 ```bash
 PORT=8080 ./start-ui.sh
 ```
+On Windows, use `set PORT=8080 && start-ui.bat`.
 
 ### Q4: Can G1DM download DRM-protected videos?
 No. In accordance with strict security standards, G1DM **does not bypass DRM, encryption protections, paywalls, or access controls**. If a video is protected with Widevine, FairPlay, or PlayReady, G1DM truthfully reports `Protected Media — Download Unavailable`.

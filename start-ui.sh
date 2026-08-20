@@ -64,15 +64,15 @@ fi
 echo -e "${GREEN}✓ Build verified.${RESET}"
 
 # 4. Start G1DM Unified Server
-PORT=${PORT:-3000}
+PORT=${PORT:-8055}
 echo -e "\n${BLUE}[4/4] Starting G1DM Core Service on port ${PORT}...${RESET}"
+echo -e "${YELLOW}The service binds to 127.0.0.1 for local-only access.${RESET}"
 echo -e "${GREEN}${BOLD}"
-echo "  🚀 G1DM is live and ready!"
-echo "  🌐 Local Access:    http://localhost:${PORT}"
-echo "  🌐 Network Access:  http://0.0.0.0:${PORT}"
-echo "  ⚡ API Endpoint:    http://0.0.0.0:${PORT}/api/v1"
-echo "  📋 OpenAPI Docs:    http://0.0.0.0:${PORT}/api/v1/openapi.json"
+echo "  🚀 G1DM is ready to start."
+echo "  🌐 Local Access:    http://127.0.0.1:${PORT}"
+echo "  ⚡ API Endpoint:    http://127.0.0.1:${PORT}/api/v1"
+echo "  📋 OpenAPI Docs:    http://127.0.0.1:${PORT}/api/v1/openapi.json"
 echo -e "${RESET}"
 echo -e "${YELLOW}Press Ctrl+C to stop the G1DM server.${RESET}\n"
 
-exec node dist/main/server.js
+exec env PORT="${PORT}" node dist/main/server.js
