@@ -37,7 +37,7 @@ export class BrowserIntegrationService {
     // Write background.js
     const backgroundJs = `
 // G1DM Browser Companion Extension Background Service Worker
-const G1DM_API_PORT = 3001;
+const G1DM_API_PORT = 8055;
 
 chrome.runtime.onInstalled.addListener(() => {
   chrome.contextMenus.create({
@@ -61,7 +61,7 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
     }
   } else if (info.menuItemId === "g1dm-download-page") {
     if (tab && tab.url) {
-      chrome.tabs.create({ url: "http://127.0.0.1:3000/#batch?url=" + encodeURIComponent(tab.url) });
+      chrome.tabs.create({ url: "http://127.0.0.1:8055/#batch?url=" + encodeURIComponent(tab.url) });
     }
   }
 });
@@ -117,7 +117,7 @@ async function sendToG1DM(url, filename) {
   <button id="openApp">Open Download Manager</button>
   <script>
     document.getElementById('openApp').addEventListener('click', () => {
-      chrome.tabs.create({ url: 'http://127.0.0.1:3000' });
+      chrome.tabs.create({ url: 'http://127.0.0.1:8055' });
     });
   </script>
 </body>

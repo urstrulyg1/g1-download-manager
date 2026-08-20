@@ -1,5 +1,5 @@
 // G1DM Chrome/Chromium Companion Extension Background Service Worker
-const G1DM_PORT = 3000;
+const G1DM_PORT = 8055;
 const G1DM_API_BASE = `http://127.0.0.1:${G1DM_PORT}/api/v1`;
 
 const DEFAULT_EXTENSIONS = [
