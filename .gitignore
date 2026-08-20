@@ -1,0 +1,15 @@
+node_modules/
+dist/
+release/
+.next/
+*.log
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+.DS_Store
+*.partial
+*.tmp
+coverage/
+.env
+.env.local
