@@ -63,16 +63,79 @@ else
 fi
 echo -e "${GREEN}✓ Build verified.${RESET}"
 
+URL="http://127.0.0.1:${PORT:-8055}"
+OPEN_BROWSER_CMD=""
+BROWSER_NAMES=()
+BROWSER_CMDS=()
+AUTO_CONFIGURED_BROWSERS=()
+MANUAL_BROWSERS=()
+
+add_browser_option() {
+    BROWSER_NAMES+=("$1")
+    BROWSER_CMDS+=("$2")
+}
+
+add_auto_configured_browser() {
+    AUTO_CONFIGURED_BROWSERS+=("$1")
+}
+
+add_manual_browser() {
+    MANUAL_BROWSERS+=("$1")
+}
+
+if [ -x "resources/native-host/install-host.sh" ]; then
+    if ./resources/native-host/install-host.sh >/tmp/g1dm-native-host.log 2>&1; then
+        [ -d "/Applications/Google Chrome.app" ] && add_auto_configured_browser "Google Chrome"
+        [ -d "/Applications/Firefox.app" ] && add_auto_configured_browser "Firefox"
+        [ -d "/Applications/Microsoft Edge.app" ] && add_auto_configured_browser "Microsoft Edge"
+    else
+        echo -e "${YELLOW}Native host setup reported an issue; see /tmp/g1dm-native-host.log${RESET}"
+    fi
+fi
+
+if command -v open >/dev/null 2>&1; then
+    add_browser_option "Default browser" "open"
+    [ -d "/Applications/Google Chrome.app" ] && add_browser_option "Google Chrome" "open -a 'Google Chrome'"
+    [ -d "/Applications/Safari.app" ] && add_browser_option "Safari" "open -a 'Safari'"
+    [ -d "/Applications/Firefox.app" ] && add_browser_option "Firefox" "open -a 'Firefox'"
+    [ -d "/Applications/Microsoft Edge.app" ] && add_browser_option "Microsoft Edge" "open -a 'Microsoft Edge'"
+    [ -d "/Applications/Safari.app" ] && add_manual_browser "Safari"
+fi
+
+if [ ${#AUTO_CONFIGURED_BROWSERS[@]} -gt 0 ]; then
+    echo -e "${GREEN}Configured native-host integration for: ${AUTO_CONFIGURED_BROWSERS[*]}${RESET}"
+fi
+if [ ${#MANUAL_BROWSERS[@]} -gt 0 ]; then
+    echo -e "${YELLOW}Manual extension enablement still required for: ${MANUAL_BROWSERS[*]}${RESET}"
+fi
+
+if [ ${#BROWSER_NAMES[@]} -gt 0 ]; then
+    echo -e "\n${BLUE}Detected browsers:${RESET}"
+    for i in "${!BROWSER_NAMES[@]}"; do
+        printf "  %d) %s\n" "$((i + 1))" "${BROWSER_NAMES[$i]}"
+    done
+    printf "  %d) Do not open a browser\n" "$(( ${#BROWSER_NAMES[@]} + 1 ))"
+    printf "Choose a browser to open G1DM [%d]: " "$(( ${#BROWSER_NAMES[@]} + 1 ))"
+    read -r BROWSER_CHOICE
+    if [[ "$BROWSER_CHOICE" =~ ^[0-9]+$ ]] && [ "$BROWSER_CHOICE" -ge 1 ] && [ "$BROWSER_CHOICE" -le ${#BROWSER_NAMES[@]} ]; then
+        OPEN_BROWSER_CMD="${BROWSER_CMDS[$((BROWSER_CHOICE - 1))]}"
+    fi
+fi
+
 # 4. Start G1DM Unified Server
 PORT=${PORT:-8055}
 echo -e "\n${BLUE}[4/4] Starting G1DM Core Service on port ${PORT}...${RESET}"
 echo -e "${YELLOW}The service binds to 127.0.0.1 for local-only access.${RESET}"
 echo -e "${GREEN}${BOLD}"
 echo "  🚀 G1DM is ready to start."
-echo "  🌐 Local Access:    http://127.0.0.1:${PORT}"
-echo "  ⚡ API Endpoint:    http://127.0.0.1:${PORT}/api/v1"
-echo "  📋 OpenAPI Docs:    http://127.0.0.1:${PORT}/api/v1/openapi.json"
+echo "  🌐 Local Access:    ${URL}"
+echo "  ⚡ API Endpoint:    ${URL}/api/v1"
+echo "  📋 OpenAPI Docs:    ${URL}/api/v1/openapi.json"
 echo -e "${RESET}"
+if [ -n "$OPEN_BROWSER_CMD" ]; then
+    echo -e "${GREEN}Opening ${URL} in ${BROWSER_NAMES[$((BROWSER_CHOICE - 1))]}...${RESET}"
+    eval "$OPEN_BROWSER_CMD '$URL'" >/dev/null 2>&1 &
+fi
 echo -e "${YELLOW}Press Ctrl+C to stop the G1DM server.${RESET}\n"
 
 exec env PORT="${PORT}" node dist/main/server.js

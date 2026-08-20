@@ -69,18 +69,59 @@ if not exist "dist\main\" (
 echo [OK] Build verified.
 echo.
 
-REM 4. Start G1DM Unified Server
+if exist "resources\native-host\install-host.bat" (
+    call resources\native-host\install-host.bat >nul
+    echo [OK] Configured native-host integration for available browsers.
+)
+
 if "%PORT%"=="" set PORT=8055
+set URL=http://127.0.0.1:%PORT%
+set /a BROWSER_COUNT=0
+
+set /a BROWSER_COUNT+=1
+set "BROWSER_NAME_!BROWSER_COUNT!=Default browser"
+set "BROWSER_CMD_!BROWSER_COUNT!=start """
+
+where chrome >nul 2>nul
+if %errorlevel% equ 0 (
+    set /a BROWSER_COUNT+=1
+    set "BROWSER_NAME_!BROWSER_COUNT!=Google Chrome"
+    set "BROWSER_CMD_!BROWSER_COUNT!=start "" chrome"
+)
+where msedge >nul 2>nul
+if %errorlevel% equ 0 (
+    set /a BROWSER_COUNT+=1
+    set "BROWSER_NAME_!BROWSER_COUNT!=Microsoft Edge"
+    set "BROWSER_CMD_!BROWSER_COUNT!=start "" msedge"
+)
+where firefox >nul 2>nul
+if %errorlevel% equ 0 (
+    set /a BROWSER_COUNT+=1
+    set "BROWSER_NAME_!BROWSER_COUNT!=Firefox"
+    set "BROWSER_CMD_!BROWSER_COUNT!=start "" firefox"
+)
+
+echo Detected browsers:
+for /L %%i in (1,1,%BROWSER_COUNT%) do call echo   %%i^) %%BROWSER_NAME_%%i%%
+set /a SKIP_OPTION=%BROWSER_COUNT%+1
+echo   !SKIP_OPTION!^) Do not open a browser
+set /p BROWSER_CHOICE=Choose a browser to open G1DM [!SKIP_OPTION!]:
+
+REM 4. Start G1DM Unified Server
 echo [4/4] Starting G1DM Core Service on port %PORT%...
 echo The service binds to 127.0.0.1 for local-only access.
 echo.
 echo   ===============================================================
 echo   G1DM is ready to start.
-echo   Local Access:    http://127.0.0.1:%PORT%
-echo   API Endpoint:    http://127.0.0.1:%PORT%/api/v1
-echo   OpenAPI Docs:    http://127.0.0.1:%PORT%/api/v1/openapi.json
+echo   Local Access:    %URL%
+echo   API Endpoint:    %URL%/api/v1
+echo   OpenAPI Docs:    %URL%/api/v1/openapi.json
 echo   ===============================================================
 echo.
+if defined BROWSER_CHOICE if %BROWSER_CHOICE% geq 1 if %BROWSER_CHOICE% leq %BROWSER_COUNT% (
+    call echo Opening %URL% in %%BROWSER_NAME_%BROWSER_CHOICE%%%...
+    call %%BROWSER_CMD_%BROWSER_CHOICE%%% %URL%
+)
 echo Press Ctrl+C to stop the G1DM server.
 echo.
 

@@ -40,7 +40,7 @@
 
 ## ⚡ One-Click Quick Start
 
-G1DM includes automated bootstrap scripts that verify prerequisites, install dependencies, compile the application, and start the unified server.
+G1DM includes automated bootstrap scripts that verify prerequisites, install dependencies, compile the application, configure supported browser native-host integrations, prompt for a browser to open, and start the unified server.
 
 ### 1. Linux & macOS
 
@@ -58,6 +58,11 @@ Double-click `start-ui.bat` or run it from Command Prompt / PowerShell:
 ```cmd
 start-ui.bat
 ```
+
+When you launch either script, G1DM automatically:
+* configures the available native-host integrations supported by the bundled installer scripts
+* detects installed browsers and prompts you to choose which browser to open
+* starts the local-only service on [http://127.0.0.1:8055](http://127.0.0.1:8055)
 
 Once launched, access G1DM in your browser:
 * 🌐 **Web UI Dashboard**: [http://127.0.0.1:8055](http://127.0.0.1:8055)
@@ -104,6 +109,8 @@ npm run dev
 
 G1DM includes companion extension packages for all major browsers located in the `resources/extensions/` directory.
 
+The startup launchers ([`start-ui.sh`](start-ui.sh) and [`start-ui.bat`](start-ui.bat)) automatically run the bundled native-host installers for supported browsers before starting the service. This configures native messaging for supported local browsers, but it does **not** silently install every browser extension for you.
+
 ```text
 resources/
 ├── extensions/
@@ -116,6 +123,8 @@ resources/
 ---
 
 ### 1. Google Chrome, Brave, and Chromium
+
+When launched via [`start-ui.sh`](start-ui.sh) or [`start-ui.bat`](start-ui.bat), native-host integration is configured automatically where supported by the bundled installer.
 
 1. Open your browser and navigate to:
    * **Chrome**: `chrome://extensions/`
@@ -133,6 +142,8 @@ resources/
 
 ### 2. Microsoft Edge
 
+When launched via [`start-ui.bat`](start-ui.bat), native-host integration is configured automatically on Windows by the bundled installer.
+
 1. Open Microsoft Edge and navigate to `edge://extensions/`.
 2. Enable **Developer mode** in the left sidebar.
 3. Click **Load unpacked** and select the directory:
@@ -143,6 +154,8 @@ resources/
 ---
 
 ### 3. Mozilla Firefox
+
+When launched via [`start-ui.sh`](start-ui.sh) or [`start-ui.bat`](start-ui.bat), native-host integration is configured automatically where supported by the bundled installer.
 
 1. Open Firefox and navigate to `about:debugging#/runtime/this-firefox`.
 2. Click **Load Temporary Add-on...**.
@@ -155,6 +168,8 @@ resources/
 
 ### 4. Apple Safari (macOS)
 
+Safari still requires manual packaging and enablement. The launcher can open Safari, but Safari extension packaging must still be completed manually.
+
 1. Ensure Xcode and Command Line Tools are installed on your Mac.
 2. Run the Apple Safari Web Extension Converter:
    ```bash
@@ -165,6 +180,8 @@ resources/
 ---
 
 ### 5. Registering Native Messaging Hosts (Bidirectional IPC)
+
+If you use [`start-ui.sh`](start-ui.sh) or [`start-ui.bat`](start-ui.bat), this registration step is attempted automatically for the browsers supported by the installer scripts. Use the manual commands below only if you need to re-run or troubleshoot native-host setup.
 
 To enable native messaging communication (instant download interception and link capture):
 
