@@ -21,7 +21,7 @@ import { BrowserIntegrationService } from './browser/BrowserIntegrationService';
 import { ClipboardMonitor } from './clipboard/ClipboardMonitor';
 import { SystemMetrics } from '../shared/types';
 
-export async function createUnifiedServer(port: number = 3000) {
+export async function createUnifiedServer(port: number = 8055) {
   const isDev = process.env.NODE_ENV !== 'production';
   const rendererDir = path.join(process.cwd(), 'src', 'renderer');
 
@@ -734,5 +734,5 @@ function collectSystemMetrics(db: AppDatabase, engine: DownloadEngine, networkQu
 }
 
 if (require.main === module) {
-  createUnifiedServer(parseInt(process.env.PORT || '3000', 10));
+  createUnifiedServer(parseInt(process.env.PORT || '8055', 10));
 }
