@@ -287,7 +287,7 @@ export interface LinkBatchCandidate {
 
 export interface AppSettings {
   general: {
-    theme: 'dark' | 'light' | 'system';
+    theme: 'dark' | 'light' | 'oled' | 'system';
     accentColor: string;
     language: string;
     defaultDownloadDir: string;

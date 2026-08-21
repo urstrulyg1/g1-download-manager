@@ -5,6 +5,25 @@
 :root {
   --background: #090d16;
   --foreground: #f8fafc;
+  --panel-bg: rgba(15, 23, 42, 0.8);
+  --card-bg: rgba(30, 41, 59, 0.5);
+  --border-color: rgba(255, 255, 255, 0.08);
+}
+
+html.light, .light {
+  --background: #f8fafc;
+  --foreground: #0f172a;
+  --panel-bg: rgba(255, 255, 255, 0.9);
+  --card-bg: rgba(241, 245, 249, 0.85);
+  --border-color: rgba(0, 0, 0, 0.08);
+}
+
+html.oled, .oled {
+  --background: #000000;
+  --foreground: #ffffff;
+  --panel-bg: rgba(0, 0, 0, 0.95);
+  --card-bg: rgba(10, 10, 10, 0.9);
+  --border-color: rgba(255, 255, 255, 0.12);
 }
 
 body {
@@ -12,6 +31,7 @@ body {
   color: var(--foreground);
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
   overflow: hidden;
+  transition: background-color 0.25s ease, color 0.25s ease;
 }
 
 /* Custom Sleek Scrollbar */
@@ -33,19 +53,137 @@ body {
   background: #475569;
 }
 
+.light ::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+}
+
+.light ::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
 /* Glassmorphism Panels */
 .glass-panel {
-  background: rgba(15, 23, 42, 0.75);
+  background: var(--panel-bg);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border-color);
 }
 
 .glass-card {
-  background: rgba(30, 41, 59, 0.5);
+  background: var(--card-bg);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border-color);
+}
+
+/* -------------------------------------------------------------
+   LIGHT MODE COMPONENT THEME OVERRIDES
+   ------------------------------------------------------------- */
+.light header {
+  background-color: rgba(255, 255, 255, 0.95) !important;
+  border-color: #e2e8f0 !important;
+  color: #0f172a !important;
+}
+
+.light aside {
+  background-color: rgba(255, 255, 255, 0.95) !important;
+  border-color: #e2e8f0 !important;
+  color: #0f172a !important;
+}
+
+.light main {
+  background-color: #f8fafc !important;
+  color: #0f172a !important;
+}
+
+.light footer {
+  background-color: rgba(255, 255, 255, 0.95) !important;
+  border-color: #e2e8f0 !important;
+  color: #64748b !important;
+}
+
+.light .bg-slate-900,
+.light .bg-slate-900\/80,
+.light .bg-slate-900\/90 {
+  background-color: #ffffff !important;
+}
+
+.light .bg-slate-950,
+.light .bg-slate-950\/50,
+.light .bg-slate-950\/80,
+.light .bg-slate-950\/90 {
+  background-color: #f1f5f9 !important;
+}
+
+.light .bg-slate-800,
+.light .bg-slate-800\/80,
+.light .bg-slate-800\/90 {
+  background-color: #e2e8f0 !important;
+}
+
+.light .border-slate-800,
+.light .border-slate-700 {
+  border-color: #e2e8f0 !important;
+}
+
+.light .text-slate-100,
+.light .text-slate-200 {
+  color: #0f172a !important;
+}
+
+.light .text-slate-300 {
+  color: #334155 !important;
+}
+
+.light .text-slate-400 {
+  color: #64748b !important;
+}
+
+.light .text-slate-500 {
+  color: #94a3b8 !important;
+}
+
+.light table thead tr {
+  background-color: #f8fafc !important;
+  border-color: #e2e8f0 !important;
+  color: #475569 !important;
+}
+
+.light table tbody tr {
+  border-color: #f1f5f9 !important;
+}
+
+.light table tbody tr:hover {
+  background-color: #f1f5f9 !important;
+}
+
+.light input,
+.light select,
+.light textarea {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  border-color: #cbd5e1 !important;
+}
+
+.light input:focus,
+.light select:focus,
+.light textarea:focus {
+  border-color: #3b82f6 !important;
+}
+
+/* -------------------------------------------------------------
+   OLED PURE BLACK THEME OVERRIDES
+   ------------------------------------------------------------- */
+.oled,
+.oled body,
+.oled main,
+.oled header,
+.oled aside,
+.oled footer,
+.oled .bg-slate-950,
+.oled .bg-slate-900 {
+  background-color: #000000 !important;
+  border-color: #1e293b !important;
 }
 
 /* Vibrant Glow Effects */

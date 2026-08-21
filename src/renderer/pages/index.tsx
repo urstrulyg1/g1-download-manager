@@ -71,9 +71,26 @@ export default function Home() {
   useEffect(() => {
     if (settings) {
       if (settings.general.theme === 'light') setTheme('light');
+      else if (settings.general.theme === 'oled') setTheme('oled');
+      else setTheme('dark');
       if (settings.general.language) setLang(settings.general.language as Language);
     }
   }, [settings]);
+
+  // Sync document root class with active theme
+  useEffect(() => {
+    if (typeof document !== 'undefined') {
+      const root = document.documentElement;
+      root.classList.remove('light', 'dark', 'oled');
+      if (theme === 'light') {
+        root.classList.add('light');
+      } else if (theme === 'oled') {
+        root.classList.add('dark', 'oled');
+      } else {
+        root.classList.add('dark');
+      }
+    }
+  }, [theme]);
 
   // Global Keyboard Shortcuts (Ctrl+K, Ctrl+N, etc.)
   useEffect(() => {
