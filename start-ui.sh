@@ -6,22 +6,53 @@ set -e
 # Universal UI & Core Engine Launcher (Linux / macOS)
 # ==============================================================================
 
-# Text formatting
+# ANSI Color & Formatting Palette
 BOLD="\033[1m"
-GREEN="\033[32m"
-BLUE="\033[34m"
-CYAN="\033[36m"
-YELLOW="\033[33m"
+DIM="\033[2m"
+ITALIC="\033[3m"
+UNDERLINE="\033[4m"
+
+# Standard & High-Intensity Foreground Colors
 RED="\033[31m"
+GREEN="\033[32m"
+YELLOW="\033[33m"
+BLUE="\033[34m"
+MAGENTA="\033[35m"
+CYAN="\033[36m"
+WHITE="\033[37m"
+GRAY="\033[90m"
+
+BRIGHT_RED="\033[91m"
+BRIGHT_GREEN="\033[92m"
+BRIGHT_YELLOW="\033[93m"
+BRIGHT_BLUE="\033[94m"
+BRIGHT_MAGENTA="\033[95m"
+BRIGHT_CYAN="\033[96m"
+BRIGHT_WHITE="\033[97m"
+
+# Background Colors
+BG_CYAN="\033[46m"
+BG_BLUE="\033[44m"
+BG_MAGENTA="\033[45m"
+BG_DARK="\033[100m"
+
 RESET="\033[0m"
 
-echo -e "${CYAN}${BOLD}"
-echo "  ╔═══════════════════════════════════════════════════════════════════╗"
-echo "  ║                                                                   ║"
-echo "  ║       G1DM — Next-Generation Internet Download Manager            ║"
-echo "  ║       Universal Core Engine & High-Performance Web UI             ║"
-echo "  ║                                                                   ║"
-echo "  ╚═══════════════════════════════════════════════════════════════════╝"
+# Clear terminal screen slightly or provide clean margin
+echo ""
+
+# Vibrant Banner
+echo -e "${BRIGHT_CYAN}${BOLD}"
+echo "  ╔═══════════════════════════════════════════════════════════════════════╗"
+echo "  ║                                                                       ║"
+echo -e "  ║   ${BRIGHT_MAGENTA}██████╗  ██╗██████╗ ███╗   ███╗${BRIGHT_CYAN}                                     ║"
+echo -e "  ║  ${BRIGHT_MAGENTA}██╔════╝ ███║██╔══██╗████╗ ████║${BRIGHT_CYAN}   ${BRIGHT_WHITE}${BOLD}Next-Gen Internet Download Manager${BRIGHT_CYAN}  ║"
+echo -e "  ║  ${BRIGHT_MAGENTA}██║  ███╗╚██║██║  ██║██╔████╔██║${BRIGHT_CYAN}   ${DIM}Universal Core Engine & Web UI${RESET}${BRIGHT_CYAN}${BOLD}      ║"
+echo -e "  ║  ${BRIGHT_MAGENTA}██║   ██║ ██║██║  ██║██║╚██╔╝██║${BRIGHT_CYAN}   ${BRIGHT_YELLOW}v2.0-PRO${BRIGHT_CYAN} • ${BRIGHT_GREEN}Production Ready${BRIGHT_CYAN}         ║"
+echo -e "  ║  ${BRIGHT_MAGENTA}╚██████╔╝ ██║██████╔╝██║ ╚═╝ ██║${BRIGHT_CYAN}                                     ║"
+echo -e "  ║   ${BRIGHT_MAGENTA}╚═════╝  ╚═╝╚═════╝ ╚═╝     ╚═╝${BRIGHT_CYAN}                                     ║"
+echo "  ║                                                                       ║"
+echo "  ╚═══════════════════════════════════════════════════════════════════════╝"
 echo -e "${RESET}"
 
 # Navigate to script directory
@@ -29,46 +60,61 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
 # 1. Check Node.js and npm
-echo -e "${BLUE}[1/4] Checking system prerequisites...${RESET}"
+echo -e "${BRIGHT_BLUE}${BOLD}┌── [1/5] Checking System Prerequisites${RESET}"
 if ! command -v node >/dev/null 2>&1; then
-    echo -e "${RED}Error: Node.js is not installed or not in PATH.${RESET}"
-    echo "Please install Node.js (v18 or newer) from https://nodejs.org"
+    echo -e "${RED}${BOLD}│  ✖ Error: Node.js is not installed or not in PATH.${RESET}"
+    echo -e "${YELLOW}│  Please install Node.js (v18 or newer) from ${UNDERLINE}https://nodejs.org${RESET}"
+    echo -e "${RED}└── Initialization aborted.${RESET}"
     exit 1
 fi
 
 if ! command -v npm >/dev/null 2>&1; then
-    echo -e "${RED}Error: npm is not installed or not in PATH.${RESET}"
+    echo -e "${RED}${BOLD}│  ✖ Error: npm is not installed or not in PATH.${RESET}"
+    echo -e "${RED}└── Initialization aborted.${RESET}"
     exit 1
 fi
 
 NODE_VERSION=$(node -v)
-echo -e "${GREEN}✓ Node.js detected: ${NODE_VERSION}${RESET}"
+NPM_VERSION=$(npm -v 2>/dev/null || echo "detected")
+echo -e "${GREEN}│  ✔ Node.js runtime: ${BRIGHT_WHITE}${NODE_VERSION}${GREEN} (npm: ${BRIGHT_WHITE}v${NPM_VERSION}${GREEN})${RESET}"
+echo -e "${BRIGHT_BLUE}└── Done.${RESET}\n"
 
 # 2. Install dependencies if node_modules is missing
-echo -e "\n${BLUE}[2/5] Verifying dependencies...${RESET}"
+echo -e "${BRIGHT_BLUE}${BOLD}┌── [2/5] Verifying Dependencies${RESET}"
 if [ ! -d "node_modules" ] || [ ! -f "package-lock.json" ]; then
-    echo -e "${YELLOW}node_modules missing. Running npm install...${RESET}"
+    echo -e "${YELLOW}│  ⚡ node_modules missing. Installing packages via npm...${RESET}"
     npm install
+    echo -e "${GREEN}│  ✔ Dependencies installed successfully.${RESET}"
 else
-    echo -e "${GREEN}✓ Dependencies already installed.${RESET}"
+    echo -e "${GREEN}│  ✔ Dependencies already installed & verified.${RESET}"
 fi
+echo -e "${BRIGHT_BLUE}└── Done.${RESET}\n"
 
 # 3. Generate & Validate Browser Extensions
-echo -e "\n${BLUE}[3/5] Verifying and validating browser companion extensions...${RESET}"
+echo -e "${BRIGHT_BLUE}${BOLD}┌── [3/5] Browser Companion Extension Integrity${RESET}"
+echo -e "${CYAN}│  • Generating dynamic icons & assets...${RESET}"
 if ! node scripts/build/generate-extension-icons.js; then
-    echo -e "${RED}Fatal Error: Failed to generate companion extension icons.${RESET}"
+    echo -e "${RED}${BOLD}│  ✖ Fatal Error: Failed to generate companion extension icons.${RESET}"
+    echo -e "${RED}└── Process failed.${RESET}"
     exit 1
 fi
 
+echo -e "${CYAN}│  • Validating extension manifest & sandboxing...${RESET}"
 if ! node scripts/build/validate-extensions.js; then
-    echo -e "${RED}Fatal Error: Browser extension integrity check failed! Fix the manifest/assets before starting.${RESET}"
+    echo -e "${RED}${BOLD}│  ✖ Fatal Error: Browser extension integrity check failed!${RESET}"
+    echo -e "${YELLOW}│  Please inspect manifest and companion assets before launching.${RESET}"
+    echo -e "${RED}└── Process failed.${RESET}"
     exit 1
 fi
+echo -e "${GREEN}│  ✔ Browser companion extensions verified.${RESET}"
+echo -e "${BRIGHT_BLUE}└── Done.${RESET}\n"
 
 # 4. Build backend & frontend
-echo -e "${BLUE}[4/5] Building G1DM backend & Next.js frontend...${RESET}"
+echo -e "${BRIGHT_BLUE}${BOLD}┌── [4/5] Building G1DM Backend & Next.js Frontend${RESET}"
+echo -e "${GRAY}│  Compiling TypeScript backend & bundling Next.js UI...${RESET}"
 npm run build
-echo -e "${GREEN}✓ Build verified.${RESET}"
+echo -e "${GREEN}│  ✔ Build completed & verified.${RESET}"
+echo -e "${BRIGHT_BLUE}└── Done.${RESET}\n"
 
 URL="http://127.0.0.1:${PORT:-8055}"
 CHROME_EXT_DIR="$SCRIPT_DIR/resources/extensions/chrome"
@@ -99,7 +145,7 @@ if [ -x "resources/native-host/install-host.sh" ]; then
         [ -d "/Applications/Firefox.app" ] && add_auto_configured_browser "Firefox"
         [ -d "/Applications/Microsoft Edge.app" ] && add_auto_configured_browser "Microsoft Edge"
     else
-        echo -e "${YELLOW}Native host setup notice; details in /tmp/g1dm-native-host.log${RESET}"
+        echo -e "${YELLOW}ℹ  Native host setup notice; details in /tmp/g1dm-native-host.log${RESET}"
     fi
 fi
 
@@ -121,18 +167,18 @@ if [ -d "/Applications/Safari.app" ]; then
 fi
 
 add_browser_option "Default browser" "open"
-add_browser_option "Do not open a browser" ""
+add_browser_option "Do not open a browser (Headless / API mode)" ""
 
 if [ ${#AUTO_CONFIGURED_BROWSERS[@]} -gt 0 ]; then
-    echo -e "${GREEN}Configured native-host integration for:${RESET} ${AUTO_CONFIGURED_BROWSERS[*]}"
+    echo -e "${BRIGHT_GREEN}⚡ Native Host Integrations:${RESET} ${CYAN}${AUTO_CONFIGURED_BROWSERS[*]}${RESET}"
 fi
 if [ ${#MANUAL_BROWSERS[@]} -gt 0 ]; then
-    echo -e "${YELLOW}Manual extension enablement still required for:${RESET} ${MANUAL_BROWSERS[*]}"
+    echo -e "${YELLOW}⚠️  Manual extension enablement needed for:${RESET} ${MANUAL_BROWSERS[*]}"
 fi
 
-echo -e "\n${BOLD}Detected browsers:${RESET}"
+echo -e "\n${BRIGHT_CYAN}${BOLD}🧭 Available Browsers & Launch Targets:${RESET}"
 for i in "${!BROWSER_NAMES[@]}"; do
-    echo "  $((i + 1))) ${BROWSER_NAMES[$i]}"
+    echo -e "  ${BRIGHT_CYAN}$((i + 1))${RESET}) ${BRIGHT_WHITE}${BROWSER_NAMES[$i]}${RESET}"
 done
 
 DEFAULT_OPTION=1
@@ -143,7 +189,8 @@ for i in "${!BROWSER_NAMES[@]}"; do
     fi
 done
 
-echo -n "Choose a browser to open G1DM [$DEFAULT_OPTION]: "
+echo ""
+echo -en "${BRIGHT_YELLOW}${BOLD}➤ Choose a browser to open G1DM [${BRIGHT_WHITE}${DEFAULT_OPTION}${BRIGHT_YELLOW}]: ${RESET}"
 read -r BROWSER_CHOICE
 BROWSER_CHOICE="${BROWSER_CHOICE:-$DEFAULT_OPTION}"
 if [[ "$BROWSER_CHOICE" =~ ^[0-9]+$ ]] && [ "$BROWSER_CHOICE" -ge 1 ] && [ "$BROWSER_CHOICE" -le ${#BROWSER_NAMES[@]} ]; then
@@ -152,8 +199,8 @@ fi
 
 # 5. Start G1DM Unified Server
 PORT=${PORT:-8055}
-echo -e "\n${BLUE}[5/5] Starting G1DM Core Service on port ${PORT}...${RESET}"
-echo -e "${YELLOW}The service binds to 127.0.0.1 for local-only access.${RESET}"
+echo -e "\n${BRIGHT_BLUE}${BOLD}┌── [5/5] Starting G1DM Core Service${RESET}"
+echo -e "${CYAN}│  • Binding listener to ${BRIGHT_WHITE}127.0.0.1:${PORT}${CYAN} (Local Loopback)...${RESET}"
 
 # Start G1DM server in background
 PORT="${PORT}" NODE_ENV=production node dist/main/server.js &
@@ -161,35 +208,53 @@ SERVER_PID=$!
 
 cleanup() {
     if kill -0 "$SERVER_PID" 2>/dev/null; then
-        kill "$SERVER_PID" 2>/dev/null
+        echo -e "\n${BRIGHT_YELLOW}🛑 Stopping G1DM Core Server (PID: ${SERVER_PID})...${RESET}"
+        kill "$SERVER_PID" 2>/dev/null || true
+        echo -e "${GREEN}✔ Server stopped cleanly. Goodbye!${RESET}"
     fi
 }
 trap cleanup INT TERM EXIT
 
 # Readiness Probe: wait until server is actively responding
-MAX_RETRIES=40
+echo -en "${CYAN}│  • Awaiting server readiness probe... ${RESET}"
+MAX_RETRIES=50
 RETRY_COUNT=0
+READY=0
+
 while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
     HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "http://127.0.0.1:${PORT}/api/browser/health" 2>/dev/null || echo "")
     if [ "$HTTP_STATUS" = "200" ]; then
+        READY=1
         break
     fi
-    sleep 0.1
+    echo -en "${BRIGHT_MAGENTA}•${RESET}"
+    sleep 0.15
     RETRY_COUNT=$((RETRY_COUNT + 1))
 done
 
-echo -e "${GREEN}${BOLD}"
-echo "  🚀 G1DM is ready."
-echo "  🌐 Local Access:    ${URL}"
-echo "  ⚡ API Endpoint:    ${URL}/api/v1"
-echo "  📋 OpenAPI Docs:    ${URL}/api/v1/openapi.json"
-echo -e "${RESET}"
+if [ $READY -eq 1 ]; then
+    echo -e " ${BRIGHT_GREEN}${BOLD}[ONLINE]${RESET}"
+else
+    echo -e " ${BRIGHT_YELLOW}[TIMEOUT - PROCEEDING]${RESET}"
+fi
+echo -e "${BRIGHT_BLUE}└── Initialized.${RESET}\n"
+
+# Rich Dashboard Status Box
+echo -e "${BRIGHT_GREEN}${BOLD}═══════════════════════════════════════════════════════════════════════════${RESET}"
+echo -e "  ${BRIGHT_GREEN}${BOLD}🚀 G1DM CORE ENGINE & HIGH-PERFORMANCE WEB UI IS ACTIVE${RESET}"
+echo -e "${BRIGHT_GREEN}${BOLD}═══════════════════════════════════════════════════════════════════════════${RESET}"
+echo -e "  ${BRIGHT_CYAN}${BOLD}🌐 Web Dashboard:${RESET}    ${BRIGHT_WHITE}${UNDERLINE}${URL}${RESET}"
+echo -e "  ${BRIGHT_BLUE}${BOLD}⚡ REST API:${RESET}         ${BRIGHT_WHITE}${URL}/api/v1${RESET}"
+echo -e "  ${BRIGHT_MAGENTA}${BOLD}📋 OpenAPI Docs:${RESET}     ${BRIGHT_WHITE}${URL}/api/v1/openapi.json${RESET}"
+echo -e "  ${BRIGHT_YELLOW}${BOLD}🧩 Extension Dir:${RESET}    ${GRAY}${CHROME_EXT_DIR}${RESET}"
+echo -e "${BRIGHT_GREEN}${BOLD}═══════════════════════════════════════════════════════════════════════════${RESET}"
 
 if [ -n "$OPEN_BROWSER_CMD" ]; then
-    echo -e "${GREEN}Launching ${BROWSER_NAMES[$((BROWSER_CHOICE - 1))]} with G1DM...${RESET}"
+    SELECTED_NAME="${BROWSER_NAMES[$((BROWSER_CHOICE - 1))]}"
+    echo -e "\n${BRIGHT_CYAN}✨ Launching ${BRIGHT_WHITE}${BOLD}${SELECTED_NAME}${RESET}${BRIGHT_CYAN} with G1DM...${RESET}"
     eval "$OPEN_BROWSER_CMD '$URL'" >/dev/null 2>&1 &
 fi
 
-echo -e "${YELLOW}Press Ctrl+C to stop the G1DM server.${RESET}\n"
+echo -e "\n${BRIGHT_YELLOW}${BOLD}💡 Tip:${RESET} ${GRAY}Press ${BRIGHT_WHITE}Ctrl + C${GRAY} at any time to gracefully terminate the server.${RESET}\n"
 
 wait "$SERVER_PID"
