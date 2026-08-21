@@ -104,6 +104,9 @@ export class DownloadEngine extends EventEmitter {
     this.schedulerInterval = setInterval(() => {
       this.processQueues();
     }, 1000);
+    if (this.schedulerInterval && typeof this.schedulerInterval.unref === 'function') {
+      this.schedulerInterval.unref();
+    }
   }
 
   private processQueues(): void {
@@ -141,9 +144,15 @@ export class DownloadEngine extends EventEmitter {
 
       for (let i = 0; i < Math.min(queueSlots, queuedItems.length); i++) {
         const item = queuedItems[i];
+        const sm = this.stateMachines.get(item.id);
+        if (sm && !sm.canTransitionTo('DOWNLOADING') && !sm.canTransitionTo('STARTING')) {
+          continue;
+        }
         slotsLeft--;
         this.startDownload(item.id).catch((err) => {
-          console.error(`Failed to start queued download ${item.id}:`, err);
+          if (!this.isShuttingDown) {
+            console.error(`Failed to start queued download ${item.id}:`, err);
+          }
         });
       }
     }
@@ -354,6 +363,11 @@ export class DownloadEngine extends EventEmitter {
 
     if (!sm.canTransitionTo('DOWNLOADING')) {
       if (item.status === 'downloading') return;
+      if (sm.canTransitionTo('STARTING')) {
+        sm.transitionTo('STARTING', 'Worker initializing');
+      } else {
+        return;
+      }
     }
 
     sm.transitionTo('DOWNLOADING', 'Worker starting');
