@@ -40,6 +40,11 @@ import { EncryptedVault } from './security/EncryptedVault';
 import { ControlBot } from './remote/ControlBot';
 import { ThreatIntelService } from './security/ThreatIntelService';
 import { PowerGovernor } from './platform/PowerGovernor';
+import { TlsPolicy } from './security/TlsPolicy';
+import { RequestAuth } from './security/RequestAuth';
+import { UrlGuard } from './security/UrlGuard';
+import { PathGuard } from './security/PathGuard';
+import { redactSettings } from './security/Redact';
 
 export async function createUnifiedServer(port: number = 8055) {
   const isDev = process.env.NODE_ENV !== 'production';
@@ -66,6 +71,13 @@ export async function createUnifiedServer(port: number = 8055) {
   // Configure remote-control bot and power governor from persisted settings
   const applyRemoteAndPowerSettings = () => {
     const s = db.getSettings();
+    // Keep the TLS verification policy in sync with user settings.
+    TlsPolicy.setVerifySslCertificates(s.security?.verifySslCertificates !== false);
+    // Seed the path-traversal guard with all legitimate destination roots.
+    const allowedRoots = new Set<string>([s.general?.defaultDownloadDir]);
+    db.getCategories().forEach((c) => c.defaultDestination && allowedRoots.add(c.defaultDestination));
+    db.getQueues().forEach((q) => q.destinationDir && allowedRoots.add(q.destinationDir));
+    PathGuard.setAllowedRoots(Array.from(allowedRoots));
     ControlBot.configure(
       {
         enabled: s.remote?.telegramBotEnabled || !!s.remote?.discordWebhookUrl,
@@ -86,15 +98,51 @@ export async function createUnifiedServer(port: number = 8055) {
   }
 
   const app = express();
-  app.use(cors({ origin: '*' }));
+  app.use(
+    cors({
+      origin: (origin: string | undefined, cb: (err: Error | null, allow?: boolean) => void) => {
+        // No Origin header (curl, native host, same-host service workers).
+        if (!origin) return cb(null, true);
+        // Browser companion extensions (Chrome, Firefox, Safari).
+        if (/^(chrome|moz|safari-web)-extension:\/\//.test(origin)) return cb(null, true);
+        // Local / loopback origins.
+        if (/^https?:\/\/(127\.0\.0\.1|localhost|\[::1\])(:\d+)?$/.test(origin)) return cb(null, true);
+        // Same-origin app (LAN / preview) — reflect the request origin.
+        return cb(null, false);
+      },
+    })
+  );
   app.use(express.json({ limit: '10mb' }));
+
+  // Authentication for the control plane (remote clients require an API key
+  // when one is configured).
+  RequestAuth.setApiKeyProvider(() => db.getSettings().security?.apiKey || undefined);
+  app.use(RequestAuth.middleware());
+  if (!RequestAuth.isRemoteAuthEnabled()) {
+    console.warn(
+      '[G1DM] ⚠️  No API key configured — remote (non-loopback) access to the ' +
+        'dashboard and API is currently unauthenticated. Set the G1DM_API_KEY ' +
+        'environment variable (or Security → API Key in Settings) to require authentication.'
+    );
+  }
 
   const server = createServer(app);
   const wss = new WebSocketServer({ server, path: '/ws' });
 
   const clients = new Set<WebSocket>();
 
-  wss.on('connection', (ws) => {
+  wss.on('connection', (ws, req) => {
+    // Apply the same remote-access policy to WebSocket upgrades.
+    const remote = (req.socket?.remoteAddress || '').replace(/^::ffff:/, '');
+    const isLoopback = remote === '127.0.0.1' || remote === '::1';
+    if (!isLoopback && RequestAuth.isRemoteAuthEnabled()) {
+      const header = req.headers['authorization'] || req.headers['x-g1dm-key'];
+      const supplied = typeof header === 'string' ? header.replace(/^Bearer\s+/i, '').trim() : '';
+      if (!RequestAuth.isValidKey(supplied)) {
+        ws.close(4001, 'Unauthorized');
+        return;
+      }
+    }
     clients.add(ws);
     ws.on('close', () => clients.delete(ws));
   });
@@ -174,6 +222,13 @@ export async function createUnifiedServer(port: number = 8055) {
     const metrics = collectSystemMetrics(db, engine, networkQualitySvc);
     broadcast('metrics_tick', metrics);
   }, 1000);
+
+  // Validate a user-supplied URL before the backend fetches it (SSRF guard).
+  // Local / private addresses are allowed for actual downloads (NAS, dev
+  // servers), but NOT for server-side content proxies.
+  const assertPublicUrl = async (url: string) => {
+    await UrlGuard.assertSafePublicUrl(url);
+  };
 
   // --- REST Routes ---
 
@@ -441,10 +496,12 @@ export async function createUnifiedServer(port: number = 8055) {
   app.post('/api/media/playlist/parse', async (req, res) => {
     try {
       const { url } = req.body;
+      if (!url) return res.status(400).json({ error: 'URL required' });
+      await assertPublicUrl(url);
       const parsed = await PlaylistBatchGrabber.parsePlaylist(url);
       res.json(parsed);
     } catch (err: any) {
-      res.status(500).json({ error: err.message });
+      res.status(400).json({ error: err.message });
     }
   });
 
@@ -475,29 +532,36 @@ export async function createUnifiedServer(port: number = 8055) {
   app.post('/api/media/tracks/extract', async (req, res) => {
     try {
       const { url } = req.body;
+      if (!url) return res.status(400).json({ error: 'URL required' });
+      await assertPublicUrl(url);
       const tracks = await MultiTrackExtractor.extractTracks(url);
       res.json(tracks);
     } catch (err: any) {
-      res.status(500).json({ error: err.message });
+      res.status(400).json({ error: err.message });
     }
   });
 
   app.post('/api/media/transcode', async (req, res) => {
     try {
-      const result = await MediaTranscoder.transcode(req.body);
+      const body = { ...req.body };
+      if (body.sourceFilePath) {
+        body.sourceFilePath = PathGuard.assertSafeLocalPath(body.sourceFilePath);
+      }
+      const result = await MediaTranscoder.transcode(body);
       res.json(result);
     } catch (err: any) {
-      res.status(500).json({ error: err.message });
+      res.status(400).json({ error: err.message });
     }
   });
 
   app.post('/api/media/metadata/inject', async (req, res) => {
     try {
       const { filePath, metadata } = req.body;
-      const ok = await MetadataInjector.injectMetadata(filePath, metadata);
+      const safePath = PathGuard.assertSafeLocalPath(filePath);
+      const ok = await MetadataInjector.injectMetadata(safePath, metadata);
       res.json({ success: ok });
     } catch (err: any) {
-      res.status(500).json({ error: err.message });
+      res.status(400).json({ error: err.message });
     }
   });
 
@@ -542,10 +606,11 @@ export async function createUnifiedServer(port: number = 8055) {
   app.post('/api/archive/auto-extract', async (req, res) => {
     try {
       const { filePath, passwords, deleteOriginalArchive } = req.body;
-      const result = await AutoExtractor.extractArchive(filePath, passwords, deleteOriginalArchive);
+      const safePath = PathGuard.assertSafeLocalPath(filePath);
+      const result = await AutoExtractor.extractArchive(safePath, passwords, deleteOriginalArchive);
       res.json(result);
     } catch (err: any) {
-      res.status(500).json({ error: err.message });
+      res.status(400).json({ error: err.message });
     }
   });
 
@@ -567,20 +632,22 @@ export async function createUnifiedServer(port: number = 8055) {
   app.post('/api/storage/cloud/upload', async (req, res) => {
     try {
       const { filePath, target } = req.body;
-      const result = await CloudSyncManager.uploadToCloud(filePath, target);
+      const safePath = PathGuard.assertSafeLocalPath(filePath);
+      const result = await CloudSyncManager.uploadToCloud(safePath, target);
       res.json(result);
     } catch (err: any) {
-      res.status(500).json({ error: err.message });
+      res.status(400).json({ error: err.message });
     }
   });
 
   app.post('/api/storage/dropbox/process', async (req, res) => {
     try {
       const { filePath } = req.body;
-      const count = await DropBoxWatcher.processDropFile(filePath, engine);
+      const safePath = PathGuard.assertSafeLocalPath(filePath);
+      const count = await DropBoxWatcher.processDropFile(safePath, engine);
       res.json({ count });
     } catch (err: any) {
-      res.status(500).json({ error: err.message });
+      res.status(400).json({ error: err.message });
     }
   });
 
@@ -598,10 +665,11 @@ export async function createUnifiedServer(port: number = 8055) {
   app.post('/api/security/vault/store', async (req, res) => {
     try {
       const { filePath } = req.body;
-      const item = await EncryptedVault.encryptAndStoreFile(filePath);
+      const safePath = PathGuard.assertSafeLocalPath(filePath);
+      const item = await EncryptedVault.encryptAndStoreFile(safePath);
       res.json(item);
     } catch (err: any) {
-      res.status(500).json({ error: err.message });
+      res.status(400).json({ error: err.message });
     }
   });
 
@@ -754,10 +822,11 @@ export async function createUnifiedServer(port: number = 8055) {
   app.post('/api/archive/analyze', async (req, res) => {
     try {
       const { filePath } = req.body;
-      const report = await ArchiveIntelligence.analyzeArchive(filePath);
+      const safePath = PathGuard.assertSafeLocalPath(filePath);
+      const report = await ArchiveIntelligence.analyzeArchive(safePath);
       res.json(report);
     } catch (err: any) {
-      res.status(500).json({ error: err.message });
+      res.status(400).json({ error: err.message });
     }
   });
 
@@ -768,10 +837,11 @@ export async function createUnifiedServer(port: number = 8055) {
     try {
       const { url } = req.body;
       if (!url) return res.status(400).json({ error: 'URL is required' });
+      await assertPublicUrl(url);
       const report = await DownloadBenchmark.runBenchmark(url, 1000);
       res.json(report);
     } catch (err: any) {
-      res.status(500).json({ error: err.message });
+      res.status(400).json({ error: err.message });
     }
   });
 
@@ -856,11 +926,12 @@ export async function createUnifiedServer(port: number = 8055) {
     try {
       const { url } = req.body;
       if (!url) return res.status(400).json({ error: 'URL required' });
+      await assertPublicUrl(url);
       const { SecureMediaDetector } = await import('./media/SecureMediaDetector');
       const analysis = await SecureMediaDetector.analyze(url);
       res.json(analysis);
     } catch (err: any) {
-      res.status(500).json({ error: err.message });
+      res.status(400).json({ error: err.message });
     }
   });
 
@@ -904,10 +975,11 @@ export async function createUnifiedServer(port: number = 8055) {
     try {
       const { url } = req.body;
       if (!url) return res.status(400).json({ error: 'URL required' });
+      await assertPublicUrl(url);
       const result = await MediaDetector.detectMedia(url);
       res.json(result);
     } catch (err: any) {
-      res.status(500).json({ error: err.message });
+      res.status(400).json({ error: err.message });
     }
   });
 
@@ -936,11 +1008,12 @@ export async function createUnifiedServer(port: number = 8055) {
     try {
       const { url } = req.body;
       if (!url) return res.status(400).json({ error: 'URL required' });
+      await assertPublicUrl(url);
       const { CloudLinkResolver } = await import('./media/CloudLinkResolver');
       const resolved = CloudLinkResolver.resolve(url);
       res.json(resolved);
     } catch (err: any) {
-      res.status(500).json({ error: err.message });
+      res.status(400).json({ error: err.message });
     }
   });
 
@@ -949,12 +1022,16 @@ export async function createUnifiedServer(port: number = 8055) {
     try {
       const { primaryUrl, mirrors } = req.body;
       if (!primaryUrl) return res.status(400).json({ error: 'primaryUrl required' });
+      await assertPublicUrl(primaryUrl);
+      for (const m of (mirrors || []).slice(0, 32)) {
+        await assertPublicUrl(m);
+      }
       const { MultiMirrorSwarmEngine } = await import('./engine/MultiMirrorSwarmEngine');
       const swarm = new MultiMirrorSwarmEngine(primaryUrl, mirrors || []);
       const probed = await swarm.probeAllMirrors();
       res.json({ mirrors: probed });
     } catch (err: any) {
-      res.status(500).json({ error: err.message });
+      res.status(400).json({ error: err.message });
     }
   });
 
@@ -963,10 +1040,14 @@ export async function createUnifiedServer(port: number = 8055) {
     try {
       const { input } = req.body;
       if (!input) return res.status(400).json({ error: 'Input required' });
+      const trimmed = String(input).trim();
+      if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+        await assertPublicUrl(trimmed);
+      }
       const candidates = await LinkBatchExtractor.extractFromUrlOrText(input);
       res.json(candidates);
     } catch (err: any) {
-      res.status(500).json({ error: err.message });
+      res.status(400).json({ error: err.message });
     }
   });
 
@@ -1038,7 +1119,7 @@ export async function createUnifiedServer(port: number = 8055) {
       downloads: db.getAllDownloads(),
       queues: db.getQueues(),
       categories: db.getCategories(),
-      settings: db.getSettings(),
+      settings: redactSettings(db.getSettings()),
       history: db.getHistory(),
       grabberProjects: db.getGrabberProjects(),
     };

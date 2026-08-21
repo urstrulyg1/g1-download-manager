@@ -64,6 +64,7 @@ export class AppDatabase {
       threatIntelEnabled: false,
       virusTotalApiKey: '',
       urlHausEnabled: true,
+      apiKey: '',
     },
     scheduler: {
       workingHoursEnabled: false,
@@ -492,6 +493,17 @@ export class AppDatabase {
       }
     }
 
+    // Save speed history (bounded in-memory ring buffer — cheap to rewrite).
+    if (item.speedHistory && item.speedHistory.length > 0) {
+      this.db.run('DELETE FROM speed_history WHERE downloadId = ?', [item.id]);
+      for (const point of item.speedHistory) {
+        this.db.run(
+          'INSERT INTO speed_history (downloadId, timestamp, speed) VALUES (?, ?, ?)',
+          [item.id, point.timestamp, point.speed]
+        );
+      }
+    }
+
     this.markDirty();
   }
 
@@ -550,6 +562,22 @@ export class AppDatabase {
       }
     }
 
+    const speedHistory: SpeedHistoryPoint[] = [];
+    if (this.db) {
+      const histRes = this.db.exec(
+        'SELECT timestamp, speed FROM speed_history WHERE downloadId = ? ORDER BY timestamp ASC',
+        [row.id]
+      );
+      if (histRes.length > 0) {
+        const cols = histRes[0].columns;
+        for (const hv of histRes[0].values) {
+          const hRow: any = {};
+          cols.forEach((c, i) => (hRow[c] = hv[i]));
+          speedHistory.push({ timestamp: Number(hRow.timestamp), speed: Number(hRow.speed) });
+        }
+      }
+    }
+
     return {
       id: row.id,
       url: row.url,
@@ -589,7 +617,7 @@ export class AppDatabase {
       checksum: row.checksumJson ? JSON.parse(row.checksumJson) : { algorithm: 'sha256', status: 'none' },
       logs: row.logsJson ? JSON.parse(row.logsJson) : [],
       segments,
-      speedHistory: [],
+      speedHistory,
     };
   }
 
@@ -873,13 +901,26 @@ export class AppDatabase {
     const res = this.db.exec('SELECT * FROM history ORDER BY date DESC');
     if (res.length === 0) return [];
     const columns = res[0].columns;
+
+    // Numeric columns stored in SQLite — coerce back to JS numbers/booleans
+    // so API consumers don't receive raw SQL values.
+    const intColumns = new Set(['date', 'durationMs', 'fileSize']);
+    const realColumns = new Set(['avgSpeed', 'peakSpeed']);
+
     return res[0].values.map((val) => {
       const row: any = {};
-      columns.forEach((c, i) => (row[c] = val[i]));
-      return {
-        ...row,
-        checksumVerified: row.checksumVerified === 1,
-      };
+      columns.forEach((c, i) => {
+        if (c === 'checksumVerified') {
+          row[c] = val[i] === 1;
+        } else if (intColumns.has(c)) {
+          row[c] = Number(val[i]);
+        } else if (realColumns.has(c)) {
+          row[c] = Number(val[i]);
+        } else {
+          row[c] = val[i];
+        }
+      });
+      return row;
     });
   }
 

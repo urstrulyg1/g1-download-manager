@@ -1,5 +1,6 @@
 import * as https from 'https';
 import * as dgram from 'dgram';
+import { TlsPolicy } from '../security/TlsPolicy';
 
 export interface QuicCapabilityResult {
   host: string;
@@ -32,7 +33,7 @@ export class QuicDiagnostics {
           {
             method: 'HEAD',
             timeout: timeoutMs,
-            rejectUnauthorized: false,
+            rejectUnauthorized: TlsPolicy.rejectUnauthorized(),
           },
           (res) => {
             const h = res.headers['alt-svc'];

@@ -11,6 +11,7 @@ import {
   AnalyzedAudioTrack,
 } from './VideoResolutionEngine';
 import { ProbeService } from '../engine/ProbeService';
+import { TlsPolicy } from '../security/TlsPolicy';
 
 export interface ComprehensiveMediaAnalysis {
   title: string;
@@ -393,7 +394,7 @@ export class SecureMediaDetector {
             'Accept': '*/*',
           },
           timeout: timeoutMs,
-          rejectUnauthorized: false,
+          rejectUnauthorized: TlsPolicy.rejectUnauthorized(),
         },
         (res) => {
           if (

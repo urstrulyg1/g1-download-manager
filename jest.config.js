@@ -11,4 +11,11 @@ module.exports = {
     '^.+\\.tsx?$': ['ts-jest', { tsconfig: 'tsconfig.json' }],
   },
   testTimeout: 30000,
+  collectCoverageFrom: [
+    'src/main/**/*.ts',
+    'src/shared/**/*.ts',
+    '!src/main/cli/**',
+    '!src/main/server.ts',
+  ],
+  coveragePathIgnorePatterns: ['/node_modules/', '/dist/'],
 };

@@ -4,6 +4,7 @@ import { EventEmitter } from 'events';
 import { DownloadItem, SegmentInfo } from '../../shared/types';
 import { TokenBucketRateLimiter } from './RateLimiter';
 import { DynamicSegmentScheduler, DetailedSegmentState } from './DynamicSegmentScheduler';
+import { TlsPolicy } from '../security/TlsPolicy';
 
 export class Http2Downloader extends EventEmitter {
   private item: DownloadItem;
@@ -55,7 +56,7 @@ export class Http2Downloader extends EventEmitter {
 
       // Establish multiplexed HTTP/2 session
       this.session = http2.connect(parsed.origin, {
-        rejectUnauthorized: false,
+        rejectUnauthorized: TlsPolicy.rejectUnauthorized(),
       });
 
       this.session.on('error', (err) => {

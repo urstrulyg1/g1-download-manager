@@ -205,6 +205,11 @@ export class DownloadEngine extends EventEmitter {
     filename = PathSanitizer.sanitizeFilename(filename);
 
     const finalPath = this.resolveFileCollision(destDir, filename, settings.downloads.fileCollisionAction);
+    if (finalPath === null) {
+      throw new Error(
+        `Skipped: "${filename}" already exists in ${destDir} (file collision action is set to "skip").`
+      );
+    }
     const resolvedFilename = path.basename(finalPath);
     const tempPath = `${finalPath}.part`;
     const stateFilePath = `${finalPath}.g1dm`;
@@ -311,12 +316,22 @@ export class DownloadEngine extends EventEmitter {
     return item;
   }
 
-  private resolveFileCollision(dir: string, filename: string, action: 'rename' | 'overwrite' | 'skip' | 'ask'): string {
+  private resolveFileCollision(
+    dir: string,
+    filename: string,
+    action: 'rename' | 'overwrite' | 'skip' | 'ask'
+  ): string | null {
     const originalPath = path.join(dir, filename);
     if (!fs.existsSync(originalPath) || action === 'overwrite') {
       return originalPath;
     }
 
+    if (action === 'skip') {
+      // A file with the same name already exists — do not download.
+      return null;
+    }
+
+    // 'rename' and 'ask' (headless fallback) both produce a unique name.
     const ext = path.extname(filename);
     const base = path.basename(filename, ext);
     let counter = 1;

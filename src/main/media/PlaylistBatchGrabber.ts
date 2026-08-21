@@ -1,4 +1,4 @@
-import { AppDatabase } from '../db/Database';
+import { execFile } from 'child_process';
 import { DownloadEngine } from '../engine/DownloadEngine';
 
 export interface PlaylistTrack {
@@ -18,46 +18,89 @@ export interface PlaylistResult {
   tracks: PlaylistTrack[];
 }
 
+interface YtDlpEntry {
+  id?: string;
+  title?: string;
+  url?: string;
+  webpage_url?: string;
+  duration?: number;
+  uploader?: string;
+  artist?: string;
+  height?: number;
+}
+
+/**
+ * Playlist extraction backed by `yt-dlp` (YouTube, Vimeo, SoundCloud, and
+ * many other sites). No longer fabricates placeholder tracks — when yt-dlp is
+ * not installed it raises a descriptive error so callers can surface a clear
+ * message instead of silently enqueuing garbage.
+ */
 export class PlaylistBatchGrabber {
+  public static isYtDlpAvailable(): Promise<boolean> {
+    return new Promise((resolve) => {
+      execFile('yt-dlp', ['--version'], (err) => resolve(!err));
+    });
+  }
+
   public static async parsePlaylist(playlistUrl: string): Promise<PlaylistResult> {
-    const isYoutube = playlistUrl.includes('youtube.com') || playlistUrl.includes('youtu.be');
-    const isSoundcloud = playlistUrl.includes('soundcloud.com');
-    const isVimeo = playlistUrl.includes('vimeo.com');
-
-    const cleanTitle = isYoutube
-      ? 'YouTube Playlist Items'
-      : isSoundcloud
-      ? 'SoundCloud Track Collection'
-      : isVimeo
-      ? 'Vimeo Showcase'
-      : 'Extracted Batch Collection';
-
-    // Simulated parse/extractor logic supporting playlist URLs
-    const tracks: PlaylistTrack[] = [];
-    const sampleCount = 5;
-
-    for (let i = 1; i <= sampleCount; i++) {
-      const numStr = String(i).padStart(2, '0');
-      const title = `Track ${numStr} - ${cleanTitle}`;
-      const ext = isSoundcloud ? 'mp3' : 'mp4';
-      const filename = `${numStr} - ${title.replace(/[^a-zA-Z0-9_-]/g, '_')}.${ext}`;
-
-      tracks.push({
-        trackNumber: i,
-        title,
-        url: `${playlistUrl}#item_${i}`,
-        durationSec: 180 + i * 15,
-        resolution: isSoundcloud ? undefined : '1080p',
-        filename,
-      });
+    if (!(await this.isYtDlpAvailable())) {
+      throw new Error(
+        'Playlist extraction requires yt-dlp, which is not installed. ' +
+          'Install it (e.g. `pip install yt-dlp`) and try again.'
+      );
     }
 
+    const raw = await new Promise<string>((resolve, reject) => {
+      execFile(
+        'yt-dlp',
+        ['-J', '--flat-playlist', '--no-warnings', playlistUrl],
+        { maxBuffer: 64 * 1024 * 1024 },
+        (err, stdout) => {
+          if (err) reject(new Error(err.message || 'yt-dlp failed to parse the playlist'));
+          else resolve(stdout);
+        }
+      );
+    });
+
+    let parsed: { title?: string; entries?: YtDlpEntry[] };
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      throw new Error('yt-dlp returned invalid JSON');
+    }
+
+    const entries = parsed.entries || [];
+    const tracks: PlaylistTrack[] = entries
+      .map((entry, idx) => {
+        const url = entry.webpage_url || entry.url || `${playlistUrl}#item_${idx + 1}`;
+        const title = entry.title || `Item ${idx + 1}`;
+        const filename = this.buildFilename(title, url, idx);
+        return {
+          trackNumber: idx + 1,
+          title,
+          url,
+          durationSec: entry.duration,
+          artist: entry.artist || entry.uploader,
+          resolution: entry.height ? `${entry.height}p` : undefined,
+          filename,
+        };
+      })
+      .filter((t) => t.url.startsWith('http'));
+
     return {
-      playlistTitle: cleanTitle,
+      playlistTitle: parsed.title || 'Extracted Playlist',
       sourceUrl: playlistUrl,
       totalTracks: tracks.length,
       tracks,
     };
+  }
+
+  private static buildFilename(title: string, url: string, idx: number): string {
+    const safe = title.replace(/[^a-zA-Z0-9 _-]/g, '').trim().slice(0, 120) || `item_${idx + 1}`;
+    const numStr = String(idx + 1).padStart(2, '0');
+    const isAudio = /soundcloud\.com/i.test(url);
+    const ext = isAudio ? 'mp3' : 'mp4';
+    return `${numStr} - ${safe}.${ext}`;
   }
 
   public static async enqueuePlaylist(

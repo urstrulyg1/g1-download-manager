@@ -1,7 +1,7 @@
 # G1DM — Next-Generation Internet Download Manager
 ### Commercial-Grade, Autonomous, Multi-Threaded Download Platform & Media Intelligence Engine
 
-**G1DM** is a real, production-grade, next-generation Internet Download Manager built with TypeScript, Node.js, and React / Next.js. It features a coordinated **Parallel Transfer Fabric**, **Dynamic Segmentation**, **Work-Stealing**, **HTTP/3 / QUIC**, **Adaptive Concurrency**, **Live HLS / DASH Video Resolution Intelligence**, **Browser Self-Healing**, and an automated test suite of **206 tests across 82 suites**.
+**G1DM** is a real, production-grade, next-generation Internet Download Manager built with TypeScript, Node.js, and React / Next.js. It features a coordinated **Parallel Transfer Fabric**, **Dynamic Segmentation**, **Work-Stealing**, **HTTP/3 / QUIC**, **Adaptive Concurrency**, **Live HLS / DASH Video Resolution Intelligence**, **Browser Self-Healing**, and an automated test suite of **281 tests across 93 suites**.
 
 ---
 
@@ -20,7 +20,7 @@
    * [Registering Native Messaging Hosts](#5-registering-native-messaging-hosts-bidirectional-ipc)
 5. [Command-Line Interface (CLI) Guide](#-command-line-interface-cli-guide)
 6. [REST API & OpenAPI 3.0 Documentation](#-rest-api--openapi-30-documentation)
-7. [Running the 206-Test Verification Suite](#-running-the-206-test-verification-suite)
+7. [Running the 281-Test Verification Suite](#-running-the-281-test-verification-suite)
 8. [Architecture & Subsystems](#-architecture--subsystems)
 9. [Troubleshooting & FAQs](#-troubleshooting--faqs)
 
@@ -265,9 +265,9 @@ G1DM provides a versioned REST API (`/api/v1`) with full OpenAPI 3.0 specificati
 
 ---
 
-## 🧪 Running the 206-Test Verification Suite
+## 🧪 Running the 281-Test Verification Suite
 
-G1DM maintains **206 automated unit, integration, adversarial, chaos, and property-based tests across 82 test suites** with a 100% pass rate.
+G1DM maintains **281 automated unit, integration, adversarial, chaos, and property-based tests across 93 test suites** with a 100% pass rate.
 
 To run the complete test suite:
 
@@ -353,6 +353,14 @@ On Windows, use `set PORT=8080 && start-ui.bat`.
 
 ### Q4: Can G1DM download DRM-protected videos?
 No. In accordance with strict security standards, G1DM **does not bypass DRM, encryption protections, paywalls, or access controls**. If a video is protected with Widevine, FairPlay, or PlayReady, G1DM truthfully reports `Protected Media — Download Unavailable`.
+
+### Q5: Is remote (LAN / Tailscale) access secure?
+The server binds to `0.0.0.0` so local-network clients and the mobile PWA can reach it. Loopback requests (the web UI and browser extension) never require authentication. To protect remote access, set an API key:
+
+* **Environment variable:** `G1DM_API_KEY=your-secret ./start-ui.sh`
+* **Settings → Security → Remote Access API Key** in the web UI.
+
+Once a key is configured, non-loopback clients must send `Authorization: Bearer <key>` on every REST/WebSocket request. For additional hardening, TLS certificate verification is now honoured by default (see **Settings → Security → Verify SSL Certificates**), secrets are redacted from exports/diagnostics, and server-side URL fetches are protected against SSRF.
 
 ---
 

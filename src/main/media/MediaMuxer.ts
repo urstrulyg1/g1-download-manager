@@ -1,12 +1,20 @@
 import * as fs from 'fs';
-import { exec } from 'child_process';
+import * as path from 'path';
+import * as os from 'os';
+import { execFile } from 'child_process';
 
+/**
+ * Segment muxing.
+ *
+ * When ffmpeg is available, segments are concatenated with the concat demuxer
+ * (proper container-aware muxing). Otherwise it falls back to raw byte
+ * concatenation, which is correct for plain transport-stream segments but not
+ * for containers that carry headers per file.
+ */
 export class MediaMuxer {
   public static async isFFmpegAvailable(): Promise<boolean> {
     return new Promise((resolve) => {
-      exec('ffmpeg -version', (err) => {
-        resolve(!err);
-      });
+      execFile('ffmpeg', ['-version'], (err) => resolve(!err));
     });
   }
 
@@ -14,19 +22,66 @@ export class MediaMuxer {
     sourceSegmentFiles: string[],
     targetFilePath: string
   ): Promise<void> {
-    // If FFmpeg is not available or raw concatenation is sufficient
-    const output = fs.createWriteStream(targetFilePath, { flags: 'w' });
+    const existing = sourceSegmentFiles.filter((f) => fs.existsSync(f));
+    if (existing.length === 0) {
+      return;
+    }
 
-    for (const segFile of sourceSegmentFiles) {
-      if (fs.existsSync(segFile)) {
-        const buf = fs.readFileSync(segFile);
-        output.write(buf);
+    if (existing.length > 1 && (await this.isFFmpegAvailable())) {
+      try {
+        await this.remuxWithFfmpeg(existing, targetFilePath);
+        return;
+      } catch {
+        // Fall through to byte concatenation on ffmpeg failure.
       }
     }
 
-    await new Promise<void>((resolve, reject) => {
-      output.end(() => resolve());
+    await this.concatBytes(existing, targetFilePath);
+  }
+
+  private static remuxWithFfmpeg(segments: string[], targetFilePath: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const listPath = path.join(
+        os.tmpdir(),
+        `g1dm_concat_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.txt`
+      );
+      const listContent = segments
+        .map((f) => `file '${f.replace(/'/g, "'\\''")}'`)
+        .join('\n');
+      fs.writeFileSync(listPath, listContent, 'utf8');
+
+      execFile(
+        'ffmpeg',
+        ['-y', '-f', 'concat', '-safe', '0', '-i', listPath, '-c', 'copy', targetFilePath],
+        { maxBuffer: 64 * 1024 * 1024 },
+        (err) => {
+          fs.rmSync(listPath, { force: true });
+          if (err) reject(new Error(err.message || 'ffmpeg concat failed'));
+          else resolve();
+        }
+      );
+    });
+  }
+
+  private static concatBytes(segments: string[], targetFilePath: string): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
+      const output = fs.createWriteStream(targetFilePath, { flags: 'w' });
+
+      let i = 0;
+      const writeNext = () => {
+        if (i >= segments.length) {
+          output.end(() => resolve());
+          return;
+        }
+        const segFile = segments[i++];
+        const reader = fs.createReadStream(segFile);
+        reader.on('error', reject);
+        reader.on('end', writeNext);
+        reader.pipe(output, { end: false });
+      };
+
       output.on('error', reject);
+      writeNext();
     });
   }
 }

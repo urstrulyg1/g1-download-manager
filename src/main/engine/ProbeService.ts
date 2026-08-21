@@ -8,6 +8,7 @@ import { HttpsProxyAgent } from 'https-proxy-agent';
 import { SocksProxyAgent } from 'socks-proxy-agent';
 import { ServerCapabilities, DownloadAuth, ProxyConfig } from '../../shared/types';
 import { MaliciousLinkScanner, UrlSafetyScanResult } from '../security/MaliciousLinkScanner';
+import { TlsPolicy } from '../security/TlsPolicy';
 
 export interface ProbeResult {
   filename: string;
@@ -235,7 +236,7 @@ export class ProbeService {
         headers,
         timeout: timeoutMs,
         agent,
-        rejectUnauthorized: false,
+        rejectUnauthorized: TlsPolicy.rejectUnauthorized(),
       };
 
       const probeResponse = await new Promise<{

@@ -118,9 +118,24 @@ export interface ArchiveEntry {
   isEncrypted: boolean;
 }
 
+export type ArchiveType =
+  | 'zip'
+  | 'jar'
+  | 'apk'
+  | 'tar'
+  | 'tar.gz'
+  | 'tgz'
+  | 'gz'
+  | 'bz2'
+  | 'xz'
+  | 'zst'
+  | '7z'
+  | 'rar'
+  | 'iso';
+
 export interface ArchiveInfo {
   isArchive: boolean;
-  archiveType?: 'zip' | 'tar' | 'tar.gz';
+  archiveType?: ArchiveType;
   entryCount: number;
   totalUncompressedSize: number;
   files: ArchiveEntry[];
@@ -320,6 +335,7 @@ export interface AppSettings {
     threatIntelEnabled: boolean;
     virusTotalApiKey: string;
     urlHausEnabled: boolean;
+    apiKey: string;
   };
   scheduler: {
     workingHoursEnabled: boolean;

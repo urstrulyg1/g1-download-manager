@@ -7,6 +7,7 @@ import { DiagnosticCheckResult } from '../../shared/types';
 import { AppDatabase } from '../db/Database';
 import { DownloadEngine } from '../engine/DownloadEngine';
 import { StorageManager } from '../storage/StorageManager';
+import { redactSettings } from '../security/Redact';
 
 export class DiagnosticsService {
   public static async runAllDiagnostics(db: AppDatabase, engine: DownloadEngine): Promise<DiagnosticCheckResult[]> {
@@ -240,13 +241,7 @@ export class DiagnosticsService {
 
   public static generateRedactedReport(db: AppDatabase, engine: DownloadEngine, results: DiagnosticCheckResult[]): string {
     const settings = db.getSettings();
-    const cleanSettings = JSON.parse(JSON.stringify(settings));
-
-    // Redact private fields
-    if (cleanSettings.network) {
-      if (cleanSettings.network.proxyPassword) cleanSettings.network.proxyPassword = '***REDACTED***';
-      if (cleanSettings.network.proxyUsername) cleanSettings.network.proxyUsername = '***REDACTED***';
-    }
+    const cleanSettings = redactSettings(settings);
 
     const report = {
       product: 'G1DM — Next-Generation Internet Download Manager',

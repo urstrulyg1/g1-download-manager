@@ -460,6 +460,27 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, lang, onSa
                 </label>
               </div>
 
+              <div className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800 space-y-2">
+                <label className="text-slate-400 mb-1 block">
+                  Remote Access API Key (optional — requires authentication for non-loopback clients)
+                </label>
+                <input
+                  type="password"
+                  placeholder="Leave empty to keep LAN access open"
+                  value={formData.security.apiKey}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      security: { ...formData.security, apiKey: e.target.value },
+                    })
+                  }
+                  className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-slate-200 font-mono"
+                />
+                <p className="text-xs text-slate-500">
+                  When set, remote clients must send <span className="font-mono">Authorization: Bearer &lt;key&gt;</span>.
+                </p>
+              </div>
+
               <h3 className="text-sm font-bold text-white border-b border-slate-800 pb-2 pt-2">Cloud Threat Intelligence</h3>
               <div className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800 space-y-3">
                 <label className="flex items-center gap-2 text-slate-300 cursor-pointer">

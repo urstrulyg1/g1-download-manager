@@ -1,5 +1,6 @@
 import * as http from 'http';
 import * as https from 'https';
+import { TlsPolicy } from '../security/TlsPolicy';
 
 export interface InspectedVideoMetadata {
   container: 'MP4' | 'WebM' | 'MKV' | 'MPEG-TS' | 'Unknown';
@@ -139,7 +140,7 @@ export class VideoInspector {
             'Accept': '*/*',
           },
           timeout: timeoutMs,
-          rejectUnauthorized: false,
+          rejectUnauthorized: TlsPolicy.rejectUnauthorized(),
         },
         (res) => {
           if (
