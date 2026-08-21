@@ -2,19 +2,19 @@
 setlocal enabledelayedexpansion
 
 REM ==============================================================================
-REM G1DM — Next-Generation Production-Grade Internet Download Manager
-REM Universal UI & Core Engine Launcher (Windows)
+REM  G1DM — Next-Generation Internet Download Manager
+REM  Universal Launcher  ·  Windows
 REM ==============================================================================
 
-title G1DM — Internet Download Manager Core Service
+title G1DM — Internet Download Manager
 
-REM Initialize ANSI Color Sequences for Modern Windows Terminal / cmd.exe
+REM ── ANSI colours (works in Windows Terminal and modern cmd.exe) ───────────────
 for /f %%a in ('echo prompt $E ^| cmd') do set "ESC=%%a"
 
-set "RESET=%ESC%[0m"
+set "R=%ESC%[0m"
 set "BOLD=%ESC%[1m"
 set "DIM=%ESC%[2m"
-set "UNDERLINE=%ESC%[4m"
+set "UL=%ESC%[4m"
 
 set "RED=%ESC%[91m"
 set "GREEN=%ESC%[92m"
@@ -24,180 +24,297 @@ set "MAGENTA=%ESC%[95m"
 set "CYAN=%ESC%[96m"
 set "WHITE=%ESC%[97m"
 set "GRAY=%ESC%[90m"
+set "BGREEN=%ESC%[92m"
+set "BCYAN=%ESC%[96m"
+set "BYELLOW=%ESC%[93m"
+set "BMAGENTA=%ESC%[95m"
+set "BBLUE=%ESC%[94m"
+set "BWHITE=%ESC%[97m"
 
+REM ── Banner ────────────────────────────────────────────────────────────────────
 echo.
-echo %CYAN%%BOLD%  ╔═════════════════════════════════════════════════════════════════════════╗%RESET%
-echo %CYAN%%BOLD%  ║                                                                         ║%RESET%
-echo   %CYAN%%BOLD%║   %MAGENTA%██████╗   ██╗ ██████╗  ███╗   ███╗                                    %CYAN%║%RESET%
-echo   %CYAN%%BOLD%║  %MAGENTA%██╔════╝  ███║ ██╔══██╗ ████╗ ████║   %WHITE%%BOLD%Next-Gen Internet Download Mgr   %CYAN%║%RESET%
-echo   %CYAN%%BOLD%║  %MAGENTA%██║  ███╗  ██║ ██║  ██║ ██╔████╔██║   %DIM%Universal Core Engine & Web UI   %RESET%%CYAN%%BOLD%║%RESET%
-echo   %CYAN%%BOLD%║  %MAGENTA%██║   ██║  ██║ ██║  ██║ ██║╚██╔╝██║   %YELLOW%v2.0-PRO%CYAN% • %GREEN%Production Ready      %CYAN%║%RESET%
-echo   %CYAN%%BOLD%║  %MAGENTA%╚██████╔╝  ██║ ██████╔╝ ██║ ╚═╝ ██║   %GRAY%High-Performance Core Engine     %CYAN%║%RESET%
-echo   %CYAN%%BOLD%║   %MAGENTA%╚═════╝   ╚═╝ ╚═════╝  ╚═╝     ╚═╝                                    %CYAN%║%RESET%
-echo %CYAN%%BOLD%  ║                                                                         ║%RESET%
-echo %CYAN%%BOLD%  ╚═════════════════════════════════════════════════════════════════════════╝%RESET%
+echo %BCYAN%%BOLD%  ^╔═══════════════════════════════════════════════════════════════════════^╗%R%
+echo %BCYAN%%BOLD%  ^║                                                                       ^║%R%
+echo   %BCYAN%%BOLD%^║  %BMAGENTA%^█^█^█^█^█^█^╗  ^█^╗ ^█^█^█^█^█^█^╗  ^█^█^█^╗   ^█^█^█^╗                                   %BCYAN%^║%R%
+echo   %BCYAN%%BOLD%^║  %BMAGENTA%^█^█^╔^═^═^═^═^╝ ^█^█^█^║ ^█^█^╔^═^═^█^█^╗ ^█^█^█^█^╗ ^█^█^█^█^║  %BWHITE%%BOLD%Next-Gen Internet Download Mgr  %BCYAN%^║%R%
+echo   %BCYAN%%BOLD%^║  %BMAGENTA%^█^█^║ ^█^█^█^╗  ^█^║ ^█^█^║  ^█^█^║ ^█^█^╔^█^█^█^█^╔^█^█^║  %DIM%Universal Core Engine ^& Web UI  %R%%BCYAN%%BOLD%^║%R%
+echo   %BCYAN%%BOLD%^║  %BMAGENTA%^█^█^║  ^█^█^║  ^█^║ ^█^█^║  ^█^█^║ ^█^█^║^╚^█^█^╔^╝^█^█^║  %BYELLOW%v2.0-PRO%BCYAN% · %BGREEN%Production Ready     %BCYAN%^║%R%
+echo   %BCYAN%%BOLD%^║  %BMAGENTA%^╚^█^█^█^█^█^█^╔^╝  ^█^║ ^█^█^█^█^█^█^╔^╝ ^█^█^║ ^╚^═^╝ ^█^█^║  %GRAY%High-Performance Core Engine    %BCYAN%^║%R%
+echo   %BCYAN%%BOLD%^║   %BMAGENTA%^╚^═^═^═^═^═^╝   ^╚^═^╝ ^╚^═^═^═^═^═^╝  ^╚^═^╝     ^╚^═^╝                                  %BCYAN%^║%R%
+echo %BCYAN%%BOLD%  ^║                                                                       ^║%R%
+echo %BCYAN%%BOLD%  ^╚═══════════════════════════════════════════════════════════════════════^╝%R%
 echo.
 
+REM ── Move to script directory ──────────────────────────────────────────────────
 cd /d "%~dp0"
 
-REM 1. Check Node.js and npm
-echo %BLUE%%BOLD%┌── [1/5] Checking System Prerequisites%RESET%
+REM ════════════════════════════════════════════════════════════════════════════
+REM  STEP 1 — System Prerequisites
+REM ════════════════════════════════════════════════════════════════════════════
+echo %BBLUE%%BOLD%┌── [1/5] System Prerequisites%R%
+
 where node >nul 2>nul
 if %errorlevel% neq 0 (
-    echo %RED%%BOLD%│  ✖ Error: Node.js is not installed or not in PATH.%RESET%
-    echo %YELLOW%│  Please install Node.js (v18 or newer) from https://nodejs.org%RESET%
-    echo %RED%└── Initialization aborted.%RESET%
-    pause
-    exit /b 1
+    echo %RED%%BOLD%│  ^✖  Node.js is not installed or not in PATH.%R%
+    echo %YELLOW%│     Install Node.js v18+ from https://nodejs.org%R%
+    echo %RED%└── Aborted.%R%
+    echo.
+    pause & exit /b 1
 )
 
 where npm >nul 2>nul
 if %errorlevel% neq 0 (
-    echo %RED%%BOLD%│  ✖ Error: npm is not installed or not in PATH.%RESET%
-    echo %RED%└── Initialization aborted.%RESET%
-    pause
-    exit /b 1
+    echo %RED%%BOLD%│  ^✖  npm is not installed or not in PATH.%R%
+    echo %RED%└── Aborted.%R%
+    echo.
+    pause & exit /b 1
 )
 
-for /f "tokens=*" %%v in ('node -v') do set NODE_VER=%%v
-echo %GREEN%│  ✔ Node.js runtime detected: %WHITE%%NODE_VER%%RESET%
-echo %BLUE%└── Done.%RESET%
+for /f "tokens=*" %%v in ('node -v 2^>nul') do set "NODE_VER=%%v"
+for /f "tokens=*" %%v in ('npm  -v 2^>nul') do set "NPM_VER=%%v"
+
+REM Check Node major version >= 18
+for /f "tokens=1 delims=." %%m in ("%NODE_VER:~1%") do set "NODE_MAJOR=%%m"
+if !NODE_MAJOR! lss 18 (
+    echo %YELLOW%│  ^⚠   Node.js !NODE_VER! detected — v18 or newer is recommended.%R%
+) else (
+    echo %GREEN%│  ^✔  Node.js %BWHITE%!NODE_VER!%GREEN%   ^(npm %BWHITE%v!NPM_VER!%GREEN%^)%R%
+)
+echo %BBLUE%└── Done.%R%
 echo.
 
-REM 2. Install dependencies if node_modules is missing
-echo %BLUE%%BOLD%┌── [2/5] Verifying Dependencies%RESET%
+REM ════════════════════════════════════════════════════════════════════════════
+REM  STEP 2 — Dependencies
+REM ════════════════════════════════════════════════════════════════════════════
+echo %BBLUE%%BOLD%┌── [2/5] Dependencies%R%
 if not exist "node_modules\" (
-    echo %YELLOW%│  ⚡ node_modules missing. Running npm install...%RESET%
+    echo %YELLOW%│  ^⚡  node_modules not found — running npm install...%R%
     call npm install
-    if %errorlevel% neq 0 (
-        echo %RED%%BOLD%│  ✖ Error: npm install failed.%RESET%
-        echo %RED%└── Initialization aborted.%RESET%
-        pause
-        exit /b %errorlevel%
+    if !errorlevel! neq 0 (
+        echo %RED%%BOLD%│  ^✖  npm install failed.%R%
+        echo %RED%└── Aborted.%R%
+        echo.
+        pause & exit /b 1
     )
-    echo %GREEN%│  ✔ Dependencies installed successfully.%RESET%
+    echo %GREEN%│  ^✔  Dependencies installed.%R%
 ) else (
-    echo %GREEN%│  ✔ Dependencies already installed ^& verified.%RESET%
+    echo %GREEN%│  ^✔  node_modules present ^& up to date.%R%
 )
-echo %BLUE%└── Done.%RESET%
+echo %BBLUE%└── Done.%R%
 echo.
 
-REM 3. Generate & Validate Browser Extensions
-echo %BLUE%%BOLD%┌── [3/5] Browser Companion Extension Integrity%RESET%
-echo %CYAN%│  • Generating companion extension icons...%RESET%
+REM ════════════════════════════════════════════════════════════════════════════
+REM  STEP 3 — Browser Extension Integrity
+REM ════════════════════════════════════════════════════════════════════════════
+echo %BBLUE%%BOLD%┌── [3/5] Browser Extension Integrity%R%
+
+echo %CYAN%│  • Generating icons ^& dynamic assets...%R%
 call node scripts\build\generate-extension-icons.js
-if %errorlevel% neq 0 (
-    echo %RED%%BOLD%│  ✖ Error: Failed to generate companion extension icons.%RESET%
-    echo %RED%└── Process failed.%RESET%
-    pause
-    exit /b %errorlevel%
+if !errorlevel! neq 0 (
+    echo %RED%%BOLD%│  ^✖  Failed to generate extension icons.%R%
+    echo %RED%└── Aborted.%R%
+    echo.
+    pause & exit /b 1
 )
-echo %CYAN%│  • Validating extension manifest ^& security assets...%RESET%
+
+echo %CYAN%│  • Validating manifest ^& sandbox permissions...%R%
 call node scripts\build\validate-extensions.js
-if %errorlevel% neq 0 (
-    echo %RED%%BOLD%│  ✖ Error: Browser extension validation failed! Check manifest and assets.%RESET%
-    echo %RED%└── Process failed.%RESET%
-    pause
-    exit /b %errorlevel%
+if !errorlevel! neq 0 (
+    echo %RED%%BOLD%│  ^✖  Extension integrity check failed — inspect manifest before launching.%R%
+    echo %RED%└── Aborted.%R%
+    echo.
+    pause & exit /b 1
 )
-echo %GREEN%│  ✔ Browser companion extensions verified.%RESET%
-echo %BLUE%└── Done.%RESET%
+
+echo %GREEN%│  ^✔  Companion extension verified ^& ready.%R%
+echo %BBLUE%└── Done.%R%
 echo.
 
-REM 4. Build backend & frontend
-echo %BLUE%%BOLD%┌── [4/5] Building G1DM Backend ^& Next.js Frontend%RESET%
-echo %GRAY%│  Compiling TypeScript backend ^& bundling Next.js UI...%RESET%
-if not exist "dist\main\" (
-    call npm run build
-    if %errorlevel% neq 0 (
-        echo %RED%%BOLD%│  ✖ Error: Build failed.%RESET%
-        echo %RED%└── Process failed.%RESET%
-        pause
-        exit /b %errorlevel%
-    )
-) else (
-    call npm run build:backend
+REM ════════════════════════════════════════════════════════════════════════════
+REM  STEP 4 — Build
+REM ════════════════════════════════════════════════════════════════════════════
+echo %BBLUE%%BOLD%┌── [4/5] Build  ^(TypeScript backend + Next.js frontend^)%R%
+echo %GRAY%│  Compiling — this may take a moment on first run...%R%
+call npm run build
+if !errorlevel! neq 0 (
+    echo %RED%%BOLD%│  ^✖  Build failed. See output above for details.%R%
+    echo %RED%└── Aborted.%R%
+    echo.
+    pause & exit /b 1
 )
-echo %GREEN%│  ✔ Build completed ^& verified.%RESET%
-echo %BLUE%└── Done.%RESET%
+echo %GREEN%│  ^✔  Build complete.%R%
+echo %BBLUE%└── Done.%R%
 echo.
 
+REM ── Native host setup ─────────────────────────────────────────────────────
 if exist "resources\native-host\install-host.bat" (
     call resources\native-host\install-host.bat >nul 2>nul
-    echo %GREEN%⚡ Native host integration configured for installed browsers.%RESET%
+    echo %GREEN%^⚡  Native host configured.%R%
+    echo.
 )
 
+REM ════════════════════════════════════════════════════════════════════════════
+REM  STEP 5 — Browser selection
+REM ════════════════════════════════════════════════════════════════════════════
 if "%PORT%"=="" set PORT=8055
-set URL=http://127.0.0.1:%PORT%
-set CHROME_EXT_DIR=%~dp0resources\extensions\chrome
+set "URL=http://127.0.0.1:%PORT%"
+set "CHROME_EXT_DIR=%~dp0resources\extensions\chrome"
 set /a BROWSER_COUNT=0
 
-set /a BROWSER_COUNT+=1
-set "BROWSER_NAME_!BROWSER_COUNT!=Default browser"
-set "BROWSER_CMD_!BROWSER_COUNT!=start """
+REM ── Probe real Chrome binary ──────────────────────────────────────────────
+set "CHROME_EXE="
+if exist "%ProgramFiles%\Google\Chrome\Application\chrome.exe" (
+    set "CHROME_EXE=%ProgramFiles%\Google\Chrome\Application\chrome.exe"
+) else if exist "%ProgramFiles(x86)%\Google\Chrome\Application\chrome.exe" (
+    set "CHROME_EXE=%ProgramFiles(x86)%\Google\Chrome\Application\chrome.exe"
+) else if exist "%LocalAppData%\Google\Chrome\Application\chrome.exe" (
+    set "CHROME_EXE=%LocalAppData%\Google\Chrome\Application\chrome.exe"
+)
+if defined CHROME_EXE (
+    set /a BROWSER_COUNT+=1
+    set "BROWSER_NAME_!BROWSER_COUNT!=Google Chrome  +  G1DM Extension"
+    set "BROWSER_TAG_!BROWSER_COUNT!=ext"
+    set "BROWSER_CMD_!BROWSER_COUNT!="!CHROME_EXE!" --load-extension="!CHROME_EXT_DIR!" --new-window"
+)
 
-where chrome >nul 2>nul
-if %errorlevel% equ 0 (
-    set /a BROWSER_COUNT+=1
-    set "BROWSER_NAME_!BROWSER_COUNT!=Google Chrome (with G1DM Extension)"
-    set "BROWSER_CMD_!BROWSER_COUNT!=start "" chrome --load-extension="%CHROME_EXT_DIR%""
+REM ── Probe real Edge binary ────────────────────────────────────────────────
+set "EDGE_EXE="
+if exist "%ProgramFiles(x86)%\Microsoft\Edge\Application\msedge.exe" (
+    set "EDGE_EXE=%ProgramFiles(x86)%\Microsoft\Edge\Application\msedge.exe"
+) else if exist "%ProgramFiles%\Microsoft\Edge\Application\msedge.exe" (
+    set "EDGE_EXE=%ProgramFiles%\Microsoft\Edge\Application\msedge.exe"
 )
-where msedge >nul 2>nul
-if %errorlevel% equ 0 (
+if defined EDGE_EXE (
     set /a BROWSER_COUNT+=1
-    set "BROWSER_NAME_!BROWSER_COUNT!=Microsoft Edge (with G1DM Extension)"
-    set "BROWSER_CMD_!BROWSER_COUNT!=start "" msedge --load-extension="%CHROME_EXT_DIR%""
+    set "BROWSER_NAME_!BROWSER_COUNT!=Microsoft Edge  +  G1DM Extension"
+    set "BROWSER_TAG_!BROWSER_COUNT!=ext"
+    set "BROWSER_CMD_!BROWSER_COUNT!="!EDGE_EXE!" --load-extension="!CHROME_EXT_DIR!" --new-window"
 )
-where brave >nul 2>nul
-if %errorlevel% equ 0 (
+
+REM ── Probe real Brave binary ───────────────────────────────────────────────
+set "BRAVE_EXE="
+if exist "%ProgramFiles%\BraveSoftware\Brave-Browser\Application\brave.exe" (
+    set "BRAVE_EXE=%ProgramFiles%\BraveSoftware\Brave-Browser\Application\brave.exe"
+) else if exist "%ProgramFiles(x86)%\BraveSoftware\Brave-Browser\Application\brave.exe" (
+    set "BRAVE_EXE=%ProgramFiles(x86)%\BraveSoftware\Brave-Browser\Application\brave.exe"
+) else if exist "%LocalAppData%\BraveSoftware\Brave-Browser\Application\brave.exe" (
+    set "BRAVE_EXE=%LocalAppData%\BraveSoftware\Brave-Browser\Application\brave.exe"
+)
+if defined BRAVE_EXE (
     set /a BROWSER_COUNT+=1
-    set "BROWSER_NAME_!BROWSER_COUNT!=Brave Browser (with G1DM Extension)"
-    set "BROWSER_CMD_!BROWSER_COUNT!=start "" brave --load-extension="%CHROME_EXT_DIR%""
+    set "BROWSER_NAME_!BROWSER_COUNT!=Brave Browser  +  G1DM Extension"
+    set "BROWSER_TAG_!BROWSER_COUNT!=ext"
+    set "BROWSER_CMD_!BROWSER_COUNT!="!BRAVE_EXE!" --load-extension="!CHROME_EXT_DIR!" --new-window"
 )
-where firefox >nul 2>nul
-if %errorlevel% equ 0 (
+
+REM ── Probe Firefox binary ──────────────────────────────────────────────────
+set "FIREFOX_EXE="
+if exist "%ProgramFiles%\Mozilla Firefox\firefox.exe" (
+    set "FIREFOX_EXE=%ProgramFiles%\Mozilla Firefox\firefox.exe"
+) else if exist "%ProgramFiles(x86)%\Mozilla Firefox\firefox.exe" (
+    set "FIREFOX_EXE=%ProgramFiles(x86)%\Mozilla Firefox\firefox.exe"
+)
+if defined FIREFOX_EXE (
     set /a BROWSER_COUNT+=1
     set "BROWSER_NAME_!BROWSER_COUNT!=Firefox"
-    set "BROWSER_CMD_!BROWSER_COUNT!=start "" firefox"
+    set "BROWSER_TAG_!BROWSER_COUNT!=plain"
+    set "BROWSER_CMD_!BROWSER_COUNT!="!FIREFOX_EXE!""
 )
 
-echo.
-echo %CYAN%%BOLD%🧭 Available Browsers ^& Launch Targets:%RESET%
+REM ── Fallback options ──────────────────────────────────────────────────────
+set /a BROWSER_COUNT+=1
+set "BROWSER_NAME_!BROWSER_COUNT!=Default system browser"
+set "BROWSER_TAG_!BROWSER_COUNT!=plain"
+set "BROWSER_CMD_!BROWSER_COUNT!=start "Open""
+
+set /a BROWSER_COUNT+=1
+set "BROWSER_NAME_!BROWSER_COUNT!=Headless / API-only mode ^(no browser^)"
+set "BROWSER_TAG_!BROWSER_COUNT!=headless"
+set "BROWSER_CMD_!BROWSER_COUNT!=__NONE__"
+
+REM ── Print browser menu ────────────────────────────────────────────────────
+echo %BCYAN%%BOLD%  ┌─ Browser Selection ─────────────────────────────────────────────────┐%R%
 for /L %%i in (1,1,%BROWSER_COUNT%) do (
-    call echo   %CYAN%%%i%RESET%^) %WHITE%%%BROWSER_NAME_%%i%%%RESET%
+    set "_TAG=!BROWSER_TAG_%%i!"
+    set "_NAME=!BROWSER_NAME_%%i!"
+    if "!_TAG!"=="ext"      set "_BADGE=%GREEN%%BOLD%[Extension]%R%"
+    if "!_TAG!"=="plain"    set "_BADGE=%CYAN%[Browser]  %R%"
+    if "!_TAG!"=="headless" set "_BADGE=%GRAY%[Headless] %R%"
+    echo   %BCYAN%%BOLD%^║%R%  %BYELLOW%%%i)%R%  !_BADGE!  %BWHITE%!_NAME!%R%
 )
-set /a SKIP_OPTION=%BROWSER_COUNT%+1
-echo   %CYAN%!SKIP_OPTION!%RESET%^) %GRAY%Do not open a browser (Headless / API mode)%RESET%
-echo.
-set /p BROWSER_CHOICE=%YELLOW%%BOLD%➤ Choose a browser to open G1DM [%WHITE%!SKIP_OPTION!%YELLOW%]: %RESET%
+echo %BCYAN%%BOLD%  └─────────────────────────────────────────────────────────────────────┘%R%
 
-REM 5. Start G1DM Unified Server
-echo.
-echo %BLUE%%BOLD%┌── [5/5] Starting G1DM Core Service on port %PORT%...%RESET%
-echo %CYAN%│  • Binding listener to %WHITE%127.0.0.1:%PORT%%CYAN% (Local-only access)...%RESET%
-echo %BLUE%└── Ready to launch.%RESET%
-echo.
-echo %GREEN%%BOLD%═══════════════════════════════════════════════════════════════════════════%RESET%
-echo   %GREEN%%BOLD%🚀 G1DM CORE ENGINE ^& HIGH-PERFORMANCE WEB UI IS READY%RESET%
-echo %GREEN%%BOLD%═══════════════════════════════════════════════════════════════════════════%RESET%
-echo   %CYAN%%BOLD%🌐 Web Dashboard:%RESET%    %WHITE%%UNDERLINE%%URL%%RESET%
-echo   %BLUE%%BOLD%⚡ REST API:%RESET%         %WHITE%%URL%/api/v1%RESET%
-echo   %MAGENTA%%BOLD%📋 OpenAPI Docs:%RESET%     %WHITE%%URL%/api/v1/openapi.json%RESET%
-echo   %YELLOW%%BOLD%🧩 Extension Dir:%RESET%    %GRAY%%CHROME_EXT_DIR%%RESET%
-echo %GREEN%%BOLD%═══════════════════════════════════════════════════════════════════════════%RESET%
-echo.
-
-if defined BROWSER_CHOICE if %BROWSER_CHOICE% geq 1 if %BROWSER_CHOICE% leq %BROWSER_COUNT% (
-    call echo %CYAN%✨ Launching %%BROWSER_NAME_%BROWSER_CHOICE%%% with G1DM...%RESET%
-    start /b cmd /c "timeout /t 1 /nobreak >nul & call %%BROWSER_CMD_%BROWSER_CHOICE%%% %URL%"
+REM Default = first extension browser, else last entry
+set /a DEFAULT_OPTION=%BROWSER_COUNT%
+for /L %%i in (1,1,%BROWSER_COUNT%) do (
+    if "!BROWSER_TAG_%%i!"=="ext" (
+        set /a DEFAULT_OPTION=%%i
+        goto :found_default
+    )
 )
+:found_default
 
-echo %YELLOW%%BOLD%💡 Tip:%RESET% %GRAY%Press %WHITE%Ctrl + C%GRAY% at any time to terminate the server.%RESET%
 echo.
+set /p BROWSER_CHOICE="%BYELLOW%%BOLD%  ➤  Choose an option [%BWHITE%!DEFAULT_OPTION!%BYELLOW%]: %R%"
+if "%BROWSER_CHOICE%"=="" set "BROWSER_CHOICE=!DEFAULT_OPTION!"
 
-set PORT=%PORT%
+REM ════════════════════════════════════════════════════════════════════════════
+REM  STEP 5 — Start G1DM server
+REM ════════════════════════════════════════════════════════════════════════════
+echo.
+echo %BBLUE%%BOLD%┌── [5/5] Starting G1DM Core Service%R%
+echo %CYAN%│  • Binding to %BWHITE%127.0.0.1:%PORT%%CYAN% ^(loopback only^)...%R%
+
+REM Start server in background; logs go to g1dm-server.log
 set NODE_ENV=production
-node dist\main\server.js
-if %errorlevel% neq 0 (
-    pause
+start /b "" cmd /c "node dist\main\server.js > g1dm-server.log 2>&1"
+
+REM ── Readiness probe ───────────────────────────────────────────────────────
+echo %CYAN%│  • Waiting for server...%R%
+set /a RETRY=0
+set "READY=0"
+:probe_loop
+    if !RETRY! geq 60 goto :probe_done
+    curl -s -o nul -w "%%{http_code}" "http://127.0.0.1:%PORT%/api/browser/health" 2>nul | findstr /x "200" >nul 2>nul
+    if !errorlevel! equ 0 ( set "READY=1" & goto :probe_done )
+    timeout /t 1 /nobreak >nul
+    set /a RETRY+=1
+    goto :probe_loop
+:probe_done
+if "!READY!"=="1" (
+    echo %GREEN%│  ^✔  Server online  %GRAY%^(HTTP 200 on /api/browser/health^)%R%
+) else (
+    echo %BYELLOW%│  ^⚠   Readiness timeout — proceeding. Check g1dm-server.log if UI fails to load.%R%
 )
+echo %BBLUE%└── Initialized.%R%
+echo.
+
+REM ── Status dashboard ──────────────────────────────────────────────────────
+echo %BGREEN%%BOLD%  ^╔═══════════════════════════════════════════════════════════════════════^╗%R%
+echo %BGREEN%%BOLD%  ^║           ^🚀  G1DM CORE ENGINE ^& WEB UI  ·  ACTIVE                   ^║%R%
+echo %BGREEN%%BOLD%  ^╠═══════════════════════════════════════════════════════════════════════^╣%R%
+echo %BGREEN%%BOLD%  ^║%R%  %BCYAN%%BOLD%^🌐  Web Dashboard%R%   %BWHITE%%UL%%URL%%R%
+echo %BGREEN%%BOLD%  ^║%R%  %BBLUE%%BOLD%^⚡  REST API%R%        %BWHITE%%URL%/api/v1%R%
+echo %BGREEN%%BOLD%  ^║%R%  %BMAGENTA%%BOLD%^📋  OpenAPI Docs%R%    %BWHITE%%URL%/api/v1/openapi.json%R%
+echo %BGREEN%%BOLD%  ^║%R%  %BYELLOW%%BOLD%^🧩  Extension%R%       %GRAY%%CHROME_EXT_DIR%%R%
+echo %BGREEN%%BOLD%  ^╚═══════════════════════════════════════════════════════════════════════^╝%R%
+echo.
+
+REM ── Launch browser ────────────────────────────────────────────────────────
+if defined BROWSER_CHOICE (
+    if !BROWSER_CHOICE! geq 1 if !BROWSER_CHOICE! leq !BROWSER_COUNT! (
+        set "_BCMD=!BROWSER_CMD_%BROWSER_CHOICE%!"
+        set "_BNAME=!BROWSER_NAME_%BROWSER_CHOICE%!"
+        if not "!_BCMD!"=="__NONE__" (
+            echo %BCYAN%  ^✨  Launching %BWHITE%%BOLD%!_BNAME!%R%%BCYAN%...%R%
+            start /b "" cmd /c "!_BCMD! "%URL%""
+        )
+    )
+)
+
+echo %GRAY%  ────────────────────────────────────────────────────────────────────────%R%
+echo   %BYELLOW%%BOLD%^💡%R%  %GRAY%Press %BWHITE%Ctrl + C%GRAY% to stop the server gracefully.%R%
+echo.
+
+REM ── Keep window alive — blocking call; Ctrl+C terminates ─────────────────
+node dist\main\server.js

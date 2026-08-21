@@ -1,285 +1,321 @@
 #!/usr/bin/env bash
-set -e
+set -euo pipefail
 
 # ==============================================================================
-# G1DM — Next-Generation Production-Grade Internet Download Manager
-# Universal UI & Core Engine Launcher (Linux / macOS)
+#  G1DM — Next-Generation Internet Download Manager
+#  Universal Launcher  ·  Linux / macOS
 # ==============================================================================
 
-# ANSI Color & Formatting Palette
-BOLD="\033[1m"
-DIM="\033[2m"
-ITALIC="\033[3m"
-UNDERLINE="\033[4m"
+# ── Color & formatting palette ────────────────────────────────────────────────
+BOLD="\033[1m";  DIM="\033[2m";  RESET="\033[0m";  UNDERLINE="\033[4m"
 
-# Standard & High-Intensity Foreground Colors
-RED="\033[31m"
-GREEN="\033[32m"
-YELLOW="\033[33m"
-BLUE="\033[34m"
-MAGENTA="\033[35m"
-CYAN="\033[36m"
-WHITE="\033[37m"
-GRAY="\033[90m"
+RED="\033[31m";   GREEN="\033[32m";  YELLOW="\033[33m"
+BLUE="\033[34m";  CYAN="\033[36m";   WHITE="\033[37m";  GRAY="\033[90m"
 
-BRIGHT_RED="\033[91m"
-BRIGHT_GREEN="\033[92m"
-BRIGHT_YELLOW="\033[93m"
-BRIGHT_BLUE="\033[94m"
-BRIGHT_MAGENTA="\033[95m"
-BRIGHT_CYAN="\033[96m"
+BRIGHT_RED="\033[91m";    BRIGHT_GREEN="\033[92m";   BRIGHT_YELLOW="\033[93m"
+BRIGHT_BLUE="\033[94m";   BRIGHT_MAGENTA="\033[95m"; BRIGHT_CYAN="\033[96m"
 BRIGHT_WHITE="\033[97m"
 
-# Background Colors
-BG_CYAN="\033[46m"
-BG_BLUE="\033[44m"
-BG_MAGENTA="\033[45m"
-BG_DARK="\033[100m"
+# ── Helper printers ───────────────────────────────────────────────────────────
+print_step()  { echo -e "${BRIGHT_BLUE}${BOLD}┌── $1${RESET}"; }
+print_ok()    { echo -e "${GREEN}│  ✔ $1${RESET}"; }
+print_info()  { echo -e "${CYAN}│  • $1${RESET}"; }
+print_warn()  { echo -e "${BRIGHT_YELLOW}│  ⚠  $1${RESET}"; }
+print_error() { echo -e "${BRIGHT_RED}${BOLD}│  ✖ $1${RESET}"; }
+print_done()  { echo -e "${BRIGHT_BLUE}└── Done.${RESET}\n"; }
+print_fail()  { echo -e "${BRIGHT_RED}└── Aborted.${RESET}\n"; }
+print_sep()   { echo -e "${GRAY}│${RESET}"; }
 
-RESET="\033[0m"
-
-# Clear terminal screen slightly or provide clean margin
+# ── Banner ────────────────────────────────────────────────────────────────────
+echo ""
+echo -e "${BRIGHT_CYAN}${BOLD}  ╔═══════════════════════════════════════════════════════════════════════╗${RESET}"
+echo -e "${BRIGHT_CYAN}${BOLD}  ║                                                                       ║${RESET}"
+echo -e "  ${BRIGHT_CYAN}${BOLD}║  ${BRIGHT_MAGENTA}██████╗  ██╗ ██████╗  ███╗   ███╗                                   ${BRIGHT_CYAN}║${RESET}"
+echo -e "  ${BRIGHT_CYAN}${BOLD}║  ${BRIGHT_MAGENTA}██╔════╝ ███║ ██╔══██╗ ████╗ ████║  ${BRIGHT_WHITE}${BOLD}Next-Gen Internet Download Mgr  ${BRIGHT_CYAN}║${RESET}"
+echo -e "  ${BRIGHT_CYAN}${BOLD}║  ${BRIGHT_MAGENTA}██║ ███╗  ██║ ██║  ██║ ██╔████╔██║  ${DIM}Universal Core Engine & Web UI  ${RESET}${BRIGHT_CYAN}${BOLD}║${RESET}"
+echo -e "  ${BRIGHT_CYAN}${BOLD}║  ${BRIGHT_MAGENTA}██║  ██║  ██║ ██║  ██║ ██║╚██╔╝██║  ${BRIGHT_YELLOW}v2.0-PRO${BRIGHT_CYAN} · ${BRIGHT_GREEN}Production Ready     ${BRIGHT_CYAN}║${RESET}"
+echo -e "  ${BRIGHT_CYAN}${BOLD}║  ${BRIGHT_MAGENTA}╚██████╔╝  ██║ ██████╔╝ ██║ ╚═╝ ██║  ${GRAY}High-Performance Core Engine    ${BRIGHT_CYAN}║${RESET}"
+echo -e "  ${BRIGHT_CYAN}${BOLD}║   ${BRIGHT_MAGENTA}╚═════╝   ╚═╝ ╚═════╝  ╚═╝     ╚═╝                                  ${BRIGHT_CYAN}║${RESET}"
+echo -e "${BRIGHT_CYAN}${BOLD}  ║                                                                       ║${RESET}"
+echo -e "${BRIGHT_CYAN}${BOLD}  ╚═══════════════════════════════════════════════════════════════════════╝${RESET}"
 echo ""
 
-# Vibrant Banner
-echo -e "${BRIGHT_CYAN}${BOLD}  ╔═════════════════════════════════════════════════════════════════════════╗${RESET}"
-echo -e "${BRIGHT_CYAN}${BOLD}  ║                                                                         ║${RESET}"
-echo -e "  ${BRIGHT_CYAN}${BOLD}║   ${BRIGHT_MAGENTA}██████╗   ██╗ ██████╗  ███╗   ███╗                                    ${BRIGHT_CYAN}║${RESET}"
-echo -e "  ${BRIGHT_CYAN}${BOLD}║  ${BRIGHT_MAGENTA}██╔════╝  ███║ ██╔══██╗ ████╗ ████║   ${BRIGHT_WHITE}${BOLD}Next-Gen Internet Download Mgr   ${BRIGHT_CYAN}║${RESET}"
-echo -e "  ${BRIGHT_CYAN}${BOLD}║  ${BRIGHT_MAGENTA}██║  ███╗  ██║ ██║  ██║ ██╔████╔██║   ${DIM}Universal Core Engine & Web UI   ${RESET}${BRIGHT_CYAN}${BOLD}║${RESET}"
-echo -e "  ${BRIGHT_CYAN}${BOLD}║  ${BRIGHT_MAGENTA}██║   ██║  ██║ ██║  ██║ ██║╚██╔╝██║   ${BRIGHT_YELLOW}v2.0-PRO${BRIGHT_CYAN} • ${BRIGHT_GREEN}Production Ready      ${BRIGHT_CYAN}║${RESET}"
-echo -e "  ${BRIGHT_CYAN}${BOLD}║  ${BRIGHT_MAGENTA}╚██████╔╝  ██║ ██████╔╝ ██║ ╚═╝ ██║   ${GRAY}High-Performance Core Engine     ${BRIGHT_CYAN}║${RESET}"
-echo -e "  ${BRIGHT_CYAN}${BOLD}║   ${BRIGHT_MAGENTA}╚═════╝   ╚═╝ ╚═════╝  ╚═╝     ╚═╝                                    ${BRIGHT_CYAN}║${RESET}"
-echo -e "${BRIGHT_CYAN}${BOLD}  ║                                                                         ║${RESET}"
-echo -e "${BRIGHT_CYAN}${BOLD}  ╚═════════════════════════════════════════════════════════════════════════╝${RESET}"
-
-# Navigate to script directory
+# ── Resolve script directory ──────────────────────────────────────────────────
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-# 1. Check Node.js and npm
-echo -e "${BRIGHT_BLUE}${BOLD}┌── [1/5] Checking System Prerequisites${RESET}"
-if ! command -v node >/dev/null 2>&1; then
-    echo -e "${RED}${BOLD}│  ✖ Error: Node.js is not installed or not in PATH.${RESET}"
-    echo -e "${YELLOW}│  Please install Node.js (v18 or newer) from ${UNDERLINE}https://nodejs.org${RESET}"
-    echo -e "${RED}└── Initialization aborted.${RESET}"
-    exit 1
-fi
+# ═══════════════════════════════════════════════════════════════════════════════
+#  STEP 1 — System Prerequisites
+# ═══════════════════════════════════════════════════════════════════════════════
+print_step "[1/5] System Prerequisites"
 
-if ! command -v npm >/dev/null 2>&1; then
-    echo -e "${RED}${BOLD}│  ✖ Error: npm is not installed or not in PATH.${RESET}"
-    echo -e "${RED}└── Initialization aborted.${RESET}"
-    exit 1
-fi
+_require_cmd() {
+    local cmd="$1" label="$2" hint="$3"
+    if ! command -v "$cmd" >/dev/null 2>&1; then
+        print_error "$label is not installed or not in PATH."
+        [ -n "$hint" ] && echo -e "${YELLOW}│       $hint${RESET}"
+        print_fail; exit 1
+    fi
+}
+
+_require_cmd node "Node.js" "Install Node.js v18+ from https://nodejs.org"
+_require_cmd npm  "npm"     ""
 
 NODE_VERSION=$(node -v)
-NPM_VERSION=$(npm -v 2>/dev/null || echo "detected")
-echo -e "${GREEN}│  ✔ Node.js runtime: ${BRIGHT_WHITE}${NODE_VERSION}${GREEN} (npm: ${BRIGHT_WHITE}v${NPM_VERSION}${GREEN})${RESET}"
-echo -e "${BRIGHT_BLUE}└── Done.${RESET}\n"
+NPM_VERSION=$(npm -v 2>/dev/null || echo "n/a")
 
-# 2. Install dependencies if node_modules is missing
-echo -e "${BRIGHT_BLUE}${BOLD}┌── [2/5] Verifying Dependencies${RESET}"
-if [ ! -d "node_modules" ] || [ ! -f "package-lock.json" ]; then
-    echo -e "${YELLOW}│  ⚡ node_modules missing. Installing packages via npm...${RESET}"
-    npm install
-    echo -e "${GREEN}│  ✔ Dependencies installed successfully.${RESET}"
+# Warn if Node.js is older than v18
+NODE_MAJOR=$(node -e "process.stdout.write(String(process.versions.node.split('.')[0]))" 2>/dev/null || echo "0")
+if [ "$NODE_MAJOR" -lt 18 ]; then
+    print_warn "Node.js ${NODE_VERSION} detected — v18 or newer is recommended."
 else
-    echo -e "${GREEN}│  ✔ Dependencies already installed & verified.${RESET}"
+    print_ok "Node.js ${BRIGHT_WHITE}${NODE_VERSION}${GREEN}  (npm ${BRIGHT_WHITE}v${NPM_VERSION}${GREEN})"
 fi
-echo -e "${BRIGHT_BLUE}└── Done.${RESET}\n"
+print_done
 
-# 3. Generate & Validate Browser Extensions
-echo -e "${BRIGHT_BLUE}${BOLD}┌── [3/5] Browser Companion Extension Integrity${RESET}"
-echo -e "${CYAN}│  • Generating dynamic icons & assets...${RESET}"
-if ! node scripts/build/generate-extension-icons.js; then
-    echo -e "${RED}${BOLD}│  ✖ Fatal Error: Failed to generate companion extension icons.${RESET}"
-    echo -e "${RED}└── Process failed.${RESET}"
-    exit 1
+# ═══════════════════════════════════════════════════════════════════════════════
+#  STEP 2 — Dependencies
+# ═══════════════════════════════════════════════════════════════════════════════
+print_step "[2/5] Dependencies"
+if [ ! -d "node_modules" ] || [ ! -f "package-lock.json" ]; then
+    print_info "node_modules not found — running ${BRIGHT_WHITE}npm install${CYAN}..."
+    if ! npm install; then
+        print_error "npm install failed."; print_fail; exit 1
+    fi
+    print_ok "Dependencies installed."
+else
+    print_ok "node_modules present & up to date."
+fi
+print_done
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  STEP 3 — Browser Extension Integrity
+# ═══════════════════════════════════════════════════════════════════════════════
+print_step "[3/5] Browser Extension Integrity"
+
+print_info "Generating icons & dynamic assets..."
+if ! node scripts/build/generate-extension-icons.js 2>&1 | sed 's/^/│     /'; then
+    print_error "Failed to generate extension icons."; print_fail; exit 1
 fi
 
-echo -e "${CYAN}│  • Validating extension manifest & sandboxing...${RESET}"
-if ! node scripts/build/validate-extensions.js; then
-    echo -e "${RED}${BOLD}│  ✖ Fatal Error: Browser extension integrity check failed!${RESET}"
-    echo -e "${YELLOW}│  Please inspect manifest and companion assets before launching.${RESET}"
-    echo -e "${RED}└── Process failed.${RESET}"
-    exit 1
+print_info "Validating manifest & sandbox permissions..."
+if ! node scripts/build/validate-extensions.js 2>&1 | sed 's/^/│     /'; then
+    print_error "Extension integrity check failed — inspect manifest before launching."
+    print_fail; exit 1
 fi
-echo -e "${GREEN}│  ✔ Browser companion extensions verified.${RESET}"
-echo -e "${BRIGHT_BLUE}└── Done.${RESET}\n"
 
-# 4. Build backend & frontend
-echo -e "${BRIGHT_BLUE}${BOLD}┌── [4/5] Building G1DM Backend & Next.js Frontend${RESET}"
-echo -e "${GRAY}│  Compiling TypeScript backend & bundling Next.js UI...${RESET}"
-npm run build
-echo -e "${GREEN}│  ✔ Build completed & verified.${RESET}"
-echo -e "${BRIGHT_BLUE}└── Done.${RESET}\n"
+print_ok "Companion extension verified & ready."
+print_done
 
-URL="http://127.0.0.1:${PORT:-8055}"
+# ═══════════════════════════════════════════════════════════════════════════════
+#  STEP 4 — Build
+# ═══════════════════════════════════════════════════════════════════════════════
+print_step "[4/5] Build  (TypeScript backend + Next.js frontend)"
+print_info "Compiling — this may take a moment on first run..."
+if ! npm run build 2>&1 | grep -E "^(error|warn|✓|Route|  )" | sed 's/^/│     /'; then
+    # grep exits 1 when no lines match; run build independently to capture real exit code
+    npm run build
+fi
+print_ok "Build complete."
+print_done
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  STEP 5 — Browser selection
+# ═══════════════════════════════════════════════════════════════════════════════
+PORT="${PORT:-8055}"
+URL="http://127.0.0.1:${PORT}"
 CHROME_EXT_DIR="$SCRIPT_DIR/resources/extensions/chrome"
-OPEN_BROWSER_CMD=""
+
 BROWSER_NAMES=()
 BROWSER_CMDS=()
-AUTO_CONFIGURED_BROWSERS=()
-MANUAL_BROWSERS=()
+BROWSER_TAGS=()   # "ext" | "plain" | "headless"
 
-add_browser_option() {
+_add_browser() {
+    # $1=name  $2=command  $3=tag
     BROWSER_NAMES+=("$1")
     BROWSER_CMDS+=("$2")
+    BROWSER_TAGS+=("$3")
 }
 
-add_auto_configured_browser() {
-    AUTO_CONFIGURED_BROWSERS+=("$1")
-}
-
-add_manual_browser() {
-    MANUAL_BROWSERS+=("$1")
-}
-
-# Verify and configure native host
+# ── Native-host silent setup ──────────────────────────────────────────────────
 if [ -x "resources/native-host/install-host.sh" ]; then
-    if ./resources/native-host/install-host.sh >/tmp/g1dm-native-host.log 2>&1; then
-        [ -d "/Applications/Google Chrome.app" ] && add_auto_configured_browser "Google Chrome"
-        [ -d "/Applications/Brave Browser.app" ] && add_auto_configured_browser "Brave Browser"
-        [ -d "/Applications/Firefox.app" ] && add_auto_configured_browser "Firefox"
-        [ -d "/Applications/Microsoft Edge.app" ] && add_auto_configured_browser "Microsoft Edge"
-    else
-        echo -e "${YELLOW}ℹ  Native host setup notice; details in /tmp/g1dm-native-host.log${RESET}"
+    ./resources/native-host/install-host.sh >/tmp/g1dm-native-host.log 2>&1 || true
+fi
+
+# ── Detect browsers (macOS) ───────────────────────────────────────────────────
+if [[ "$(uname -s)" == "Darwin" ]]; then
+    if [ -d "/Applications/Google Chrome.app" ]; then
+        _add_browser \
+            "Google Chrome  +  G1DM Extension" \
+            "'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' --load-extension='${CHROME_EXT_DIR}' --new-window" \
+            "ext"
+    fi
+    if [ -d "/Applications/Brave Browser.app" ]; then
+        _add_browser \
+            "Brave Browser  +  G1DM Extension" \
+            "'/Applications/Brave Browser.app/Contents/MacOS/Brave Browser' --load-extension='${CHROME_EXT_DIR}' --new-window" \
+            "ext"
+    fi
+    if [ -d "/Applications/Microsoft Edge.app" ]; then
+        _add_browser \
+            "Microsoft Edge  +  G1DM Extension" \
+            "'/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge' --load-extension='${CHROME_EXT_DIR}' --new-window" \
+            "ext"
+    fi
+    if [ -d "/Applications/Firefox.app" ]; then
+        _add_browser "Firefox" "open -a '/Applications/Firefox.app'" "plain"
+    fi
+    if [ -d "/Applications/Safari.app" ]; then
+        _add_browser "Safari" "open -a '/Applications/Safari.app'" "plain"
+    fi
+
+# ── Detect browsers (Linux) ───────────────────────────────────────────────────
+else
+    for _bin in google-chrome google-chrome-stable chromium chromium-browser; do
+        if command -v "$_bin" >/dev/null 2>&1; then
+            _add_browser \
+                "Google Chrome / Chromium  +  G1DM Extension" \
+                "${_bin} --load-extension='${CHROME_EXT_DIR}' --new-window" \
+                "ext"
+            break
+        fi
+    done
+    if command -v brave-browser >/dev/null 2>&1; then
+        _add_browser \
+            "Brave Browser  +  G1DM Extension" \
+            "brave-browser --load-extension='${CHROME_EXT_DIR}' --new-window" \
+            "ext"
+    fi
+    if command -v microsoft-edge >/dev/null 2>&1 || command -v microsoft-edge-stable >/dev/null 2>&1; then
+        _EDGE_BIN=$(command -v microsoft-edge-stable 2>/dev/null || command -v microsoft-edge)
+        _add_browser \
+            "Microsoft Edge  +  G1DM Extension" \
+            "${_EDGE_BIN} --load-extension='${CHROME_EXT_DIR}' --new-window" \
+            "ext"
+    fi
+    if command -v firefox >/dev/null 2>&1; then
+        _add_browser "Firefox" "firefox" "plain"
     fi
 fi
 
-# Determine browser options
-if [ -d "/Applications/Google Chrome.app" ]; then
-    add_browser_option "Google Chrome (with G1DM Extension)" "open -a '/Applications/Google Chrome.app' --args --load-extension='$CHROME_EXT_DIR'"
-elif [ -d "/Applications/Brave Browser.app" ]; then
-    add_browser_option "Brave Browser (with G1DM Extension)" "open -a '/Applications/Brave Browser.app' --args --load-extension='$CHROME_EXT_DIR'"
-elif [ -d "/Applications/Microsoft Edge.app" ]; then
-    add_browser_option "Microsoft Edge (with G1DM Extension)" "open -a '/Applications/Microsoft Edge.app' --args --load-extension='$CHROME_EXT_DIR'"
-fi
+_add_browser "Default system browser" "open" "plain"
+_add_browser "Headless / API-only mode (no browser)" "" "headless"
 
-if [ -d "/Applications/Firefox.app" ]; then
-    add_browser_option "Firefox" "open -a '/Applications/Firefox.app'"
-fi
-
-if [ -d "/Applications/Safari.app" ]; then
-    add_browser_option "Safari" "open -a '/Applications/Safari.app'"
-fi
-
-add_browser_option "Default browser" "open"
-add_browser_option "Do not open a browser (Headless / API mode)" ""
-
-if [ ${#AUTO_CONFIGURED_BROWSERS[@]} -gt 0 ]; then
-    echo -e "${BRIGHT_GREEN}⚡ Native Host Integrations:${RESET} ${CYAN}${AUTO_CONFIGURED_BROWSERS[*]}${RESET}"
-fi
-if [ ${#MANUAL_BROWSERS[@]} -gt 0 ]; then
-    echo -e "${YELLOW}⚠️  Manual extension enablement needed for:${RESET} ${MANUAL_BROWSERS[*]}"
-fi
-
-echo -e "\n${BRIGHT_CYAN}${BOLD}🧭 Available Browsers & Launch Targets:${RESET}"
+# ── Print browser menu ────────────────────────────────────────────────────────
+echo -e "${BRIGHT_CYAN}${BOLD}  ┌─ Browser Selection ─────────────────────────────────────────────────┐${RESET}"
 for i in "${!BROWSER_NAMES[@]}"; do
-    echo -e "  ${BRIGHT_CYAN}$((i + 1))${RESET}) ${BRIGHT_WHITE}${BROWSER_NAMES[$i]}${RESET}"
+    idx=$((i + 1))
+    tag="${BROWSER_TAGS[$i]}"
+    name="${BROWSER_NAMES[$i]}"
+    case "$tag" in
+        ext)      badge="${BRIGHT_GREEN}${BOLD}[Extension]${RESET}" ;;
+        plain)    badge="${CYAN}[Browser]${RESET}  " ;;
+        headless) badge="${GRAY}[Headless]${RESET} " ;;
+    esac
+    echo -e "  ${BRIGHT_CYAN}${BOLD}║${RESET}  ${BRIGHT_YELLOW}${idx})${RESET}  ${badge}  ${BRIGHT_WHITE}${name}${RESET}"
 done
+echo -e "${BRIGHT_CYAN}${BOLD}  └─────────────────────────────────────────────────────────────────────┘${RESET}"
 
-DEFAULT_OPTION=1
-for i in "${!BROWSER_NAMES[@]}"; do
-    if [ "${BROWSER_NAMES[$i]}" = "Google Chrome (with G1DM Extension)" ] || [ "${BROWSER_NAMES[$i]}" = "Default browser" ]; then
-        DEFAULT_OPTION=$((i + 1))
-        break
+# Find the best default (first extension-capable browser, else last option)
+DEFAULT_OPTION=${#BROWSER_NAMES[@]}
+for i in "${!BROWSER_TAGS[@]}"; do
+    if [ "${BROWSER_TAGS[$i]}" = "ext" ]; then
+        DEFAULT_OPTION=$((i + 1)); break
     fi
 done
 
 echo ""
-echo -en "${BRIGHT_YELLOW}${BOLD}➤ Choose a browser to open G1DM [${BRIGHT_WHITE}${DEFAULT_OPTION}${BRIGHT_YELLOW}]: ${RESET}"
+echo -en "${BRIGHT_YELLOW}${BOLD}  ➤  Choose an option [${BRIGHT_WHITE}${DEFAULT_OPTION}${BRIGHT_YELLOW}]: ${RESET}"
 read -r BROWSER_CHOICE
 BROWSER_CHOICE="${BROWSER_CHOICE:-$DEFAULT_OPTION}"
-if [[ "$BROWSER_CHOICE" =~ ^[0-9]+$ ]] && [ "$BROWSER_CHOICE" -ge 1 ] && [ "$BROWSER_CHOICE" -le ${#BROWSER_NAMES[@]} ]; then
+
+OPEN_BROWSER_CMD=""
+SELECTED_BROWSER_NAME=""
+if [[ "$BROWSER_CHOICE" =~ ^[0-9]+$ ]] \
+   && [ "$BROWSER_CHOICE" -ge 1 ] \
+   && [ "$BROWSER_CHOICE" -le "${#BROWSER_NAMES[@]}" ]; then
     OPEN_BROWSER_CMD="${BROWSER_CMDS[$((BROWSER_CHOICE - 1))]}"
+    SELECTED_BROWSER_NAME="${BROWSER_NAMES[$((BROWSER_CHOICE - 1))]}"
 fi
 
-# 5. Start G1DM Unified Server
-PORT=${PORT:-8055}
-echo -e "\n${BRIGHT_BLUE}${BOLD}┌── [5/5] Starting G1DM Core Service${RESET}"
-echo -e "${CYAN}│  • Binding listener to ${BRIGHT_WHITE}127.0.0.1:${PORT}${CYAN} (Local Loopback)...${RESET}"
+# ═══════════════════════════════════════════════════════════════════════════════
+#  STEP 5 — Start server
+# ═══════════════════════════════════════════════════════════════════════════════
+echo ""
+print_step "[5/5] Starting G1DM Core Service"
+print_info "Binding to ${BRIGHT_WHITE}127.0.0.1:${PORT}${CYAN} (loopback only)..."
 
-# Start G1DM server in background, in its own process group so kill -PGID works
+# ── Graceful shutdown ─────────────────────────────────────────────────────────
+_SHUTDOWN_DONE=0
+_do_shutdown() {
+    [ "$_SHUTDOWN_DONE" -eq 1 ] && return
+    _SHUTDOWN_DONE=1
+    echo -e "\n${BRIGHT_YELLOW}${BOLD}  🛑  Shutting down G1DM (PID ${SERVER_PID})...${RESET}"
+    kill -TERM "$SERVER_PID" 2>/dev/null || true
+    local waited=0
+    while kill -0 "$SERVER_PID" 2>/dev/null && [ $waited -lt 50 ]; do
+        sleep 0.1; waited=$((waited + 1))
+    done
+    if kill -0 "$SERVER_PID" 2>/dev/null; then
+        echo -e "${BRIGHT_YELLOW}  ⚠   Graceful timeout — force-killing...${RESET}"
+        kill -KILL "$SERVER_PID" 2>/dev/null || true
+    fi
+    echo -e "${BRIGHT_GREEN}  ✔   G1DM stopped cleanly. Goodbye!${RESET}\n"
+}
+trap '_do_shutdown; exit 0' INT TERM
+trap '_do_shutdown'          EXIT
+
+# ── Launch server ─────────────────────────────────────────────────────────────
 PORT="${PORT}" NODE_ENV=production node dist/main/server.js &
 SERVER_PID=$!
 
-# Track whether we have already run the shutdown sequence so the EXIT trap
-# (which fires after INT/TERM handlers return) doesn't double-print.
-_SHUTDOWN_DONE=0
-
-_do_shutdown() {
-    # Guard against re-entry (EXIT fires after INT/TERM handlers return).
-    [ "$_SHUTDOWN_DONE" -eq 1 ] && return
-    _SHUTDOWN_DONE=1
-
-    echo -e "\n${BRIGHT_YELLOW}🛑 Stopping G1DM Core Server (PID: ${SERVER_PID})...${RESET}"
-
-    # Send SIGTERM first — lets the Node process flush the DB.
-    kill -TERM "$SERVER_PID" 2>/dev/null || true
-
-    # Give it up to 5 seconds to exit gracefully.
-    local waited=0
-    while kill -0 "$SERVER_PID" 2>/dev/null && [ $waited -lt 50 ]; do
-        sleep 0.1
-        waited=$((waited + 1))
-    done
-
-    # Force-kill if it's still alive after the grace period.
-    if kill -0 "$SERVER_PID" 2>/dev/null; then
-        echo -e "${YELLOW}⚠  Force-killing unresponsive server...${RESET}"
-        kill -KILL "$SERVER_PID" 2>/dev/null || true
-    fi
-
-    echo -e "${GREEN}✔ G1DM stopped. Goodbye!${RESET}"
-}
-
-trap '_do_shutdown; exit 0' INT TERM
-trap '_do_shutdown'         EXIT
-
-# Readiness Probe: wait until server is actively responding
-echo -en "${CYAN}│  • Awaiting server readiness probe... ${RESET}"
-MAX_RETRIES=50
+# ── Animated readiness probe ──────────────────────────────────────────────────
+echo -en "${CYAN}│  • Waiting for server${RESET}"
+SPINNER=("⠋" "⠙" "⠹" "⠸" "⠼" "⠴" "⠦" "⠧" "⠇" "⠏")
+MAX_RETRIES=60
 RETRY_COUNT=0
 READY=0
-
 while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
-    HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "http://127.0.0.1:${PORT}/api/browser/health" 2>/dev/null || echo "")
+    HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+        "http://127.0.0.1:${PORT}/api/browser/health" 2>/dev/null || echo "000")
     if [ "$HTTP_STATUS" = "200" ]; then
-        READY=1
-        break
+        READY=1; break
     fi
-    echo -en "${BRIGHT_MAGENTA}•${RESET}"
+    echo -en " ${BRIGHT_MAGENTA}${SPINNER[$((RETRY_COUNT % ${#SPINNER[@]}))]}${RESET}"
     sleep 0.15
     RETRY_COUNT=$((RETRY_COUNT + 1))
 done
+echo ""
 
 if [ $READY -eq 1 ]; then
-    echo -e " ${BRIGHT_GREEN}${BOLD}[ONLINE]${RESET}"
+    print_ok "Server online  ${GRAY}(HTTP 200 on /api/browser/health)${RESET}"
 else
-    echo -e " ${BRIGHT_YELLOW}[TIMEOUT - PROCEEDING]${RESET}"
+    print_warn "Readiness timeout — proceeding anyway. Check logs if the UI does not load."
 fi
-echo -e "${BRIGHT_BLUE}└── Initialized.${RESET}\n"
 
-# Rich Dashboard Status Box
-echo -e "${BRIGHT_GREEN}${BOLD}═══════════════════════════════════════════════════════════════════════════${RESET}"
-echo -e "  ${BRIGHT_GREEN}${BOLD}🚀 G1DM CORE ENGINE & HIGH-PERFORMANCE WEB UI IS ACTIVE${RESET}"
-echo -e "${BRIGHT_GREEN}${BOLD}═══════════════════════════════════════════════════════════════════════════${RESET}"
-echo -e "  ${BRIGHT_CYAN}${BOLD}🌐 Web Dashboard:${RESET}    ${BRIGHT_WHITE}${UNDERLINE}${URL}${RESET}"
-echo -e "  ${BRIGHT_BLUE}${BOLD}⚡ REST API:${RESET}         ${BRIGHT_WHITE}${URL}/api/v1${RESET}"
-echo -e "  ${BRIGHT_MAGENTA}${BOLD}📋 OpenAPI Docs:${RESET}     ${BRIGHT_WHITE}${URL}/api/v1/openapi.json${RESET}"
-echo -e "  ${BRIGHT_YELLOW}${BOLD}🧩 Extension Dir:${RESET}    ${GRAY}${CHROME_EXT_DIR}${RESET}"
-echo -e "${BRIGHT_GREEN}${BOLD}═══════════════════════════════════════════════════════════════════════════${RESET}"
+echo -e "${BRIGHT_BLUE}└── Initialized.${RESET}"
+echo ""
 
+# ── Status dashboard ──────────────────────────────────────────────────────────
+echo -e "${BRIGHT_GREEN}${BOLD}  ╔═══════════════════════════════════════════════════════════════════════╗${RESET}"
+echo -e "${BRIGHT_GREEN}${BOLD}  ║            🚀  G1DM CORE ENGINE & WEB UI  ·  ACTIVE                  ║${RESET}"
+echo -e "${BRIGHT_GREEN}${BOLD}  ╠═══════════════════════════════════════════════════════════════════════╣${RESET}"
+echo -e "${BRIGHT_GREEN}${BOLD}  ║${RESET}  ${BRIGHT_CYAN}${BOLD}🌐  Web Dashboard${RESET}   ${BRIGHT_WHITE}${UNDERLINE}${URL}${RESET}"
+echo -e "${BRIGHT_GREEN}${BOLD}  ║${RESET}  ${BRIGHT_BLUE}${BOLD}⚡  REST API${RESET}        ${BRIGHT_WHITE}${URL}/api/v1${RESET}"
+echo -e "${BRIGHT_GREEN}${BOLD}  ║${RESET}  ${BRIGHT_MAGENTA}${BOLD}📋  OpenAPI Docs${RESET}    ${BRIGHT_WHITE}${URL}/api/v1/openapi.json${RESET}"
+echo -e "${BRIGHT_GREEN}${BOLD}  ║${RESET}  ${BRIGHT_YELLOW}${BOLD}🧩  Extension${RESET}       ${GRAY}${CHROME_EXT_DIR}${RESET}"
+echo -e "${BRIGHT_GREEN}${BOLD}  ╚═══════════════════════════════════════════════════════════════════════╝${RESET}"
+echo ""
+
+# ── Launch browser ────────────────────────────────────────────────────────────
 if [ -n "$OPEN_BROWSER_CMD" ]; then
-    SELECTED_NAME="${BROWSER_NAMES[$((BROWSER_CHOICE - 1))]}"
-    echo -e "\n${BRIGHT_CYAN}✨ Launching ${BRIGHT_WHITE}${BOLD}${SELECTED_NAME}${RESET}${BRIGHT_CYAN} with G1DM...${RESET}"
-    eval "$OPEN_BROWSER_CMD '$URL'" >/dev/null 2>&1 &
+    echo -e "${BRIGHT_CYAN}  ✨  Launching ${BRIGHT_WHITE}${BOLD}${SELECTED_BROWSER_NAME}${RESET}${BRIGHT_CYAN}...${RESET}"
+    eval "$OPEN_BROWSER_CMD \"$URL\"" >/dev/null 2>&1 &
 fi
 
-echo -e "\n${BRIGHT_YELLOW}${BOLD}💡 Tip:${RESET} ${GRAY}Press ${BRIGHT_WHITE}Ctrl + C${GRAY} at any time to gracefully terminate the server.${RESET}\n"
+echo -e "${GRAY}  ────────────────────────────────────────────────────────────────────────${RESET}"
+echo -e "  ${BRIGHT_YELLOW}${BOLD}💡${RESET}  ${GRAY}Press ${BRIGHT_WHITE}Ctrl + C${GRAY} to stop the server gracefully.${RESET}"
+echo ""
 
-# Wait for the server. When Ctrl+C (SIGINT) is pressed the shell delivers
-# SIGINT to this script; the trap calls _do_shutdown which sends SIGTERM to
-# the node child. wait then returns once the child exits.
+# ── Keep alive ────────────────────────────────────────────────────────────────
 wait "$SERVER_PID" 2>/dev/null || true
