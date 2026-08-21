@@ -147,7 +147,13 @@ export const Navbar: React.FC<NavbarProps> = ({
 
       {/* Center: Controls & Profile Selector */}
       <div className="flex items-center gap-2">
-        <Button size="sm" variant="primary" leftIcon={<Plus className="w-4 h-4" />} onClick={onOpenNewDownload}>
+        <Button
+          size="sm"
+          variant="primary"
+          leftIcon={<Plus className="w-4 h-4" />}
+          onClick={onOpenNewDownload}
+          title="Start a new download (Ctrl+N / ⌘N)"
+        >
           {t.newDownload}
         </Button>
 
@@ -156,6 +162,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           <button
             onClick={() => setShowProfileMenu(!showProfileMenu)}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-semibold transition-colors"
+            title={`Current Profile: ${currentProfile}. Click to switch performance profiles.`}
           >
             <Rocket className="w-3.5 h-3.5 text-cyan-400" />
             <span className="capitalize">{currentProfile}</span>
@@ -177,6 +184,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   className={`w-full text-left px-2.5 py-2 rounded-lg text-xs transition-colors flex flex-col ${
                     currentProfile === p.id ? 'bg-blue-600/30 border border-blue-500/40 text-white' : 'hover:bg-slate-800 text-slate-300'
                   }`}
+                  title={`${p.name}: ${p.description}`}
                 >
                   <div className="flex justify-between items-center font-bold">
                     <span>{p.name}</span>
@@ -191,7 +199,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
         <button
           onClick={() => api.resumeAll()}
-          title={t.resumeAll}
+          title="Resume all queued and paused downloads immediately"
           className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 active:scale-95 transition-all"
         >
           <Play className="w-3.5 h-3.5 text-emerald-400 fill-emerald-400" />
@@ -200,7 +208,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
         <button
           onClick={() => api.pauseAll()}
-          title={t.pauseAll}
+          title="Pause all currently active downloads"
           className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 active:scale-95 transition-all"
         >
           <Pause className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
@@ -212,6 +220,7 @@ export const Navbar: React.FC<NavbarProps> = ({
       <div className="flex items-center gap-2">
         <button
           onClick={onOpenCommandPalette}
+          title="Open Command Palette & Global Search (Ctrl+K / ⌘K)"
           className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-slate-400 hover:text-slate-200 text-xs transition-all"
         >
           <Search className="w-3.5 h-3.5" />
@@ -227,7 +236,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               ? 'bg-amber-500/20 border-amber-500/40 text-amber-300'
               : 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-400'
           }`}
-          title="Action Center"
+          title={alertCount > 0 ? `Action Center: ${alertCount} alert(s) require attention (Ctrl+Shift+D)` : "Action Center (Ctrl+Shift+D)"}
         >
           <Bell className="w-4 h-4" />
           {alertCount > 0 && (
@@ -240,6 +249,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         {/* Theme Switcher */}
         <button
           onClick={onThemeToggle}
+          title={`Toggle Theme (Current: ${theme.toUpperCase()})`}
           className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 transition-colors"
         >
           {theme === 'dark' || theme === 'oled' ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-blue-400" />}

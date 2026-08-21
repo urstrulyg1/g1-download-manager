@@ -457,16 +457,18 @@ export const DownloadsView: React.FC<DownloadsViewProps> = ({
                           {item.status === 'downloading' ? (
                             <button
                               onClick={() => api.pauseDownload(item.id)}
-                              className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-400"
-                              title="Pause"
+                              className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-400 active:scale-95 transition-all shadow-sm"
+                              title="Pause active download"
+                              aria-label="Pause active download"
                             >
                               <Pause className="w-3.5 h-3.5 fill-amber-400" />
                             </button>
                           ) : item.status === 'paused' || item.status === 'failed' ? (
                             <button
                               onClick={() => api.resumeDownload(item.id)}
-                              className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-emerald-400"
-                              title="Resume"
+                              className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-emerald-400 active:scale-95 transition-all shadow-sm"
+                              title="Resume download immediately"
+                              aria-label="Resume download immediately"
                             >
                               <Play className="w-3.5 h-3.5 fill-emerald-400" />
                             </button>
@@ -476,8 +478,9 @@ export const DownloadsView: React.FC<DownloadsViewProps> = ({
                           {(item.category === 'video' || item.category === 'audio' || item.filename?.match(/\.(mp4|mkv|webm|mov|ts|mp3|flac|wav|m4a)$/i)) && (
                             <button
                               onClick={() => setPreviewItem(item)}
-                              className="p-1.5 rounded-lg bg-slate-800 hover:bg-cyan-950 text-cyan-400 hover:text-cyan-300 border border-cyan-500/20"
-                              title="Play / Preview Stream"
+                              className="p-1.5 rounded-lg bg-slate-800 hover:bg-cyan-950 text-cyan-400 hover:text-cyan-300 border border-cyan-500/20 active:scale-95 transition-all shadow-sm"
+                              title="Live Video Preview — Watch and seek buffered stream via HTTP 206"
+                              aria-label="Live Video Preview"
                             >
                               <Film className="w-3.5 h-3.5" />
                             </button>
@@ -485,24 +488,27 @@ export const DownloadsView: React.FC<DownloadsViewProps> = ({
 
                           <button
                             onClick={() => api.restartDownload(item.id)}
-                            className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300"
-                            title="Restart from Beginning"
+                            className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 active:scale-95 transition-all shadow-sm"
+                            title="Restart download from beginning (Reset chunks)"
+                            aria-label="Restart download from beginning"
                           >
                             <RotateCcw className="w-3.5 h-3.5" />
                           </button>
 
                           <button
                             onClick={() => onSelectDownload(item)}
-                            className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-blue-400"
-                            title="View Inspector & Visualizer"
+                            className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-blue-400 active:scale-95 transition-all shadow-sm"
+                            title="Open Segment Visualizer, Logs & Details Inspector"
+                            aria-label="Open Details Inspector"
                           >
                             <Info className="w-3.5 h-3.5" />
                           </button>
 
                           <button
                             onClick={() => api.deleteDownload(item.id, false)}
-                            className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-950 text-slate-400 hover:text-rose-400"
-                            title="Delete Download"
+                            className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-950 text-slate-400 hover:text-rose-400 active:scale-95 transition-all shadow-sm"
+                            title="Remove download record from manager"
+                            aria-label="Remove download record"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
