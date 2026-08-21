@@ -19,11 +19,8 @@ import {
   Info,
   Layers,
   ArrowUpDown,
-<<<<<<< HEAD
   ShieldAlert,
-=======
   Film,
->>>>>>> origin/main
 } from 'lucide-react';
 import { DownloadItem, DownloadQueue, CategoryRule } from '../../shared/types';
 import { Language, translations } from '../lib/i18n';
