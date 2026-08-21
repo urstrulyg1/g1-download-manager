@@ -296,7 +296,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   }}
                   className={`w-full flex items-center justify-between px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                     activeView === 'downloads' && categoryFilter === cat.id
-                      ? 'bg-slate-800 text-white font-bold'
+                      ? 'bg-slate-800 text-slate-100 font-bold'
                       : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-200'
                   }`}
                 >

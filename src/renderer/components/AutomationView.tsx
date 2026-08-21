@@ -230,7 +230,7 @@ export const AutomationView: React.FC<AutomationViewProps> = ({ downloads, lang 
 
       {/* Create Rule Modal with Simulator */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4">
+        <div className="theme-overlay fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4">
           <form
             onSubmit={handleCreateRule}
             className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg shadow-2xl p-5 space-y-4 text-xs"

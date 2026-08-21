@@ -219,7 +219,7 @@ export const QueuesView: React.FC<QueuesViewProps> = ({ queues, downloads, lang,
 
       {/* Edit / Add Modal */}
       {isModalOpen && editingQueue && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
+        <div className="theme-overlay fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
           <form
             onSubmit={handleSave}
             className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg shadow-2xl p-5 space-y-4 text-xs"

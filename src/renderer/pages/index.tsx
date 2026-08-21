@@ -26,7 +26,15 @@ import { PowerFeaturesView } from '../components/PowerFeaturesView';
 import { ActionCenterDrawer } from '../components/ui/ActionCenterDrawer';
 import { InboxItem } from '../../main/engine/DownloadInbox';
 import { ProfileType } from '../../main/engine/DownloadProfiles';
-import { ViewMode } from '../design-system/tokens';
+import type { ThemeMode, ViewMode } from '../design-system/tokens';
+import {
+  applyTheme,
+  getStoredTheme,
+  isThemeMode,
+  resolveTheme,
+  storeTheme,
+  subscribeToSystemTheme,
+} from '../design-system/theme';
 import { Language } from '../lib/i18n';
 import { DownloadItem } from '../../shared/types';
 import { api } from '../lib/api';
@@ -49,7 +57,8 @@ export default function Home() {
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [queueFilter, setQueueFilter] = useState('all');
 
-  const [theme, setTheme] = useState<'dark' | 'light' | 'oled'>('dark');
+  const [theme, setTheme] = useState<ThemeMode>(() => getStoredTheme() || 'dark');
+  const [resolvedTheme, setResolvedTheme] = useState(() => resolveTheme(theme));
   const [lang, setLang] = useState<Language>('en');
   const [currentProfile, setCurrentProfile] = useState<ProfileType>('TURBO');
   const [viewMode, setViewMode] = useState<ViewMode>('advanced');
@@ -67,30 +76,63 @@ export default function Home() {
   const storageAlert = metrics ? metrics.storage.freeBytes < 2 * 1024 * 1024 * 1024 : false;
   const alertCount = (failedCount > 0 ? 1 : 0) + (storageAlert ? 1 : 0);
 
-  // Sync settings theme/lang
+  // Sync settings theme/lang. The server setting is authoritative after the
+  // initial connection, while localStorage is used only to avoid a first-paint
+  // flash before that request completes.
   useEffect(() => {
     if (settings) {
-      if (settings.general.theme === 'light') setTheme('light');
-      else if (settings.general.theme === 'oled') setTheme('oled');
-      else setTheme('dark');
+      const configuredTheme = isThemeMode(settings.general.theme) ? settings.general.theme : 'dark';
+      setTheme(configuredTheme);
+      storeTheme(configuredTheme);
       if (settings.general.language) setLang(settings.general.language as Language);
     }
   }, [settings]);
 
-  // Sync document root class with active theme
+  // Keep the document root and the app state in lockstep. System mode follows
+  // OS changes without requiring a reload.
   useEffect(() => {
-    if (typeof document !== 'undefined') {
-      const root = document.documentElement;
-      root.classList.remove('light', 'dark', 'oled');
-      if (theme === 'light') {
-        root.classList.add('light');
-      } else if (theme === 'oled') {
-        root.classList.add('dark', 'oled');
-      } else {
-        root.classList.add('dark');
-      }
-    }
+    const nextResolvedTheme = applyTheme(theme);
+    setResolvedTheme(nextResolvedTheme);
+
+    const themeColor = nextResolvedTheme === 'light' ? '#f8fafc' : nextResolvedTheme === 'oled' ? '#000000' : '#090d16';
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', themeColor);
+
+    if (theme !== 'system') return undefined;
+
+    return subscribeToSystemTheme((systemTheme) => {
+      setResolvedTheme(systemTheme);
+      applyTheme('system');
+      document.querySelector('meta[name="theme-color"]')?.setAttribute(
+        'content',
+        systemTheme === 'light' ? '#f8fafc' : '#090d16',
+      );
+    });
   }, [theme]);
+
+  const handleThemeChange = (nextTheme: ThemeMode) => {
+    setTheme(nextTheme);
+    storeTheme(nextTheme);
+
+    // The top-level switch is an immediate preference, so persist it as well
+    // when the engine settings are available. SettingsView still saves the
+    // complete form in one operation.
+    if (settings) {
+      const nextSettings = {
+        ...settings,
+        general: { ...settings.general, theme: nextTheme },
+      };
+      setSettings(nextSettings);
+      api.saveSettings(nextSettings).catch(() => {
+        // The local preference remains active if the backend is unavailable.
+      });
+    }
+  };
+
+  const cycleTheme = () => {
+    const cycle: ThemeMode[] = ['dark', 'oled', 'light'];
+    const currentIndex = cycle.indexOf(theme);
+    handleThemeChange(cycle[(currentIndex + 1) % cycle.length] || 'dark');
+  };
 
   // Global Keyboard Shortcuts (Ctrl+K, Ctrl+N, etc.)
   useEffect(() => {
@@ -141,21 +183,18 @@ export default function Home() {
     if (status) setStatusFilter(status);
   };
 
-  const themeClasses =
-    theme === 'oled'
-      ? 'bg-black text-slate-100'
-      : theme === 'dark'
-      ? 'dark bg-slate-950 text-slate-100'
-      : 'bg-slate-50 text-slate-900';
-
   return (
-    <div className={`min-h-screen ${themeClasses}`}>
+    <div
+      className={`theme-app min-h-screen ${resolvedTheme === 'oled' ? 'theme-oled' : ''}`}
+      data-active-theme={resolvedTheme}
+      suppressHydrationWarning
+    >
       {/* Top Navbar */}
       <Navbar
         lang={lang}
         onLanguageChange={setLang}
         theme={theme}
-        onThemeToggle={() => setTheme(theme === 'dark' ? 'oled' : theme === 'oled' ? 'light' : 'dark')}
+        onThemeToggle={cycleTheme}
         onOpenNewDownload={() => setIsAddModalOpen(true)}
         onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
         isConnected={isConnected}
@@ -340,7 +379,7 @@ export default function Home() {
         downloads={downloads}
         onNavigate={handleNavigate}
         onOpenNewDownload={() => setIsAddModalOpen(true)}
-        onThemeToggle={() => setTheme(theme === 'dark' ? 'oled' : theme === 'oled' ? 'light' : 'dark')}
+        onThemeToggle={cycleTheme}
         onSelectDownload={(item) => setSelectedDownload(item)}
         onSpeedLimitChange={handleSpeedLimitChange}
       />

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Settings,
   Save,
@@ -34,6 +34,12 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, lang, onSa
     'general' | 'downloads' | 'network' | 'browser' | 'security' | 'scheduler' | 'automation' | 'power' | 'remote' | 'backup'
   >('general');
   const [saved, setSaved] = useState(false);
+
+  // Settings arrive asynchronously from the engine. Keep the form in sync so
+  // opening the Settings view after the first render never leaves it blank.
+  useEffect(() => {
+    if (settings) setFormData(settings);
+  }, [settings]);
 
   if (!formData) return null;
 
@@ -154,6 +160,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, lang, onSa
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-200"
                   >
                     <option value="dark">Dark Theme</option>
+                    <option value="oled">OLED Black</option>
                     <option value="light">Light Theme</option>
                     <option value="system">System Default</option>
                   </select>
