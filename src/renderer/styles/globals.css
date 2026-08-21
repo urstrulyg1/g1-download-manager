@@ -385,6 +385,144 @@ html[data-theme='light'] [class~='bg-rose-950/50'] {
   background-color: rgb(244 63 94 / 0.1) !important;
 }
 
+/* -------------------------------------------------------------------------
+   Light-mode gradient remapping
+   Tailwind gradient utility classes are NOT covered by the bg-slate-* rules
+   above because they set --tw-gradient-from/via/to, not background-color.
+   Replace every dark-slate gradient surface with the light-mode card palette.
+   ------------------------------------------------------------------------- */
+
+/* from-slate-* → light surface */
+html[data-theme='light'] [class~='from-slate-800'],
+html[data-theme='light'] [class~='from-slate-900'],
+html[data-theme='light'] [class~='from-slate-950'] {
+  --tw-gradient-from: #ffffff !important;
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to, rgba(255,255,255,0)) !important;
+}
+
+/* via-slate-* → near-white midpoint */
+html[data-theme='light'] [class~='via-slate-800'],
+html[data-theme='light'] [class~='via-slate-900'],
+html[data-theme='light'] [class~='via-slate-950'] {
+  --tw-gradient-via: #f8fafc !important;
+  --tw-gradient-stops: var(--tw-gradient-from), #f8fafc, var(--tw-gradient-to, rgba(248,250,252,0)) !important;
+}
+
+/* to-slate-* / to-indigo-950 / to-indigo-900 → soft tinted end stop */
+html[data-theme='light'] [class~='to-slate-800'],
+html[data-theme='light'] [class~='to-slate-900'],
+html[data-theme='light'] [class~='to-slate-950'],
+html[data-theme='light'] [class~='to-indigo-950'],
+html[data-theme='light'] [class~='to-indigo-950/60'],
+html[data-theme='light'] [class~='to-indigo-900'] {
+  --tw-gradient-to: #eef2ff !important; /* indigo-50 — very subtle tint */
+}
+
+/* -------------------------------------------------------------------------
+   Light-mode: colored tint backgrounds
+   bg-blue-500/10, bg-blue-500/20 etc. are too faint on white; boost slightly.
+   ------------------------------------------------------------------------- */
+html[data-theme='light'] [class~='bg-blue-500/10']  { background-color: rgb(59 130 246 / 0.12) !important; }
+html[data-theme='light'] [class~='bg-blue-500/20']  { background-color: rgb(59 130 246 / 0.14) !important; }
+html[data-theme='light'] [class~='bg-blue-500/30']  { background-color: rgb(59 130 246 / 0.18) !important; }
+html[data-theme='light'] [class~='bg-cyan-500/10']  { background-color: rgb(6 182 212 / 0.12) !important; }
+html[data-theme='light'] [class~='bg-cyan-500/20']  { background-color: rgb(6 182 212 / 0.14) !important; }
+html[data-theme='light'] [class~='bg-emerald-500/10'] { background-color: rgb(16 185 129 / 0.12) !important; }
+html[data-theme='light'] [class~='bg-emerald-500/20'] { background-color: rgb(16 185 129 / 0.14) !important; }
+html[data-theme='light'] [class~='bg-amber-500/10']  { background-color: rgb(245 158 11 / 0.12) !important; }
+html[data-theme='light'] [class~='bg-amber-500/20']  { background-color: rgb(245 158 11 / 0.15) !important; }
+html[data-theme='light'] [class~='bg-rose-500/10']   { background-color: rgb(244 63 94 / 0.1) !important; }
+html[data-theme='light'] [class~='bg-rose-500/20']   { background-color: rgb(244 63 94 / 0.12) !important; }
+html[data-theme='light'] [class~='bg-purple-500/10'] { background-color: rgb(168 85 247 / 0.1) !important; }
+html[data-theme='light'] [class~='bg-purple-500/20'] { background-color: rgb(168 85 247 / 0.12) !important; }
+html[data-theme='light'] [class~='bg-indigo-500/10'] { background-color: rgb(99 102 241 / 0.1) !important; }
+html[data-theme='light'] [class~='bg-indigo-500/20'] { background-color: rgb(99 102 241 / 0.12) !important; }
+
+/* -------------------------------------------------------------------------
+   Light-mode: colored border tints — keep them visible but not garish
+   ------------------------------------------------------------------------- */
+html[data-theme='light'] [class~='border-blue-500/20'],
+html[data-theme='light'] [class~='border-blue-500/30'],
+html[data-theme='light'] [class~='border-blue-500/40'] { border-color: rgb(59 130 246 / 0.35) !important; }
+html[data-theme='light'] [class~='border-cyan-500/20'],
+html[data-theme='light'] [class~='border-cyan-500/30'] { border-color: rgb(6 182 212 / 0.35) !important; }
+html[data-theme='light'] [class~='border-emerald-500/20'],
+html[data-theme='light'] [class~='border-emerald-500/30'] { border-color: rgb(16 185 129 / 0.35) !important; }
+html[data-theme='light'] [class~='border-amber-500/20'],
+html[data-theme='light'] [class~='border-amber-500/30'] { border-color: rgb(245 158 11 / 0.35) !important; }
+html[data-theme='light'] [class~='border-rose-500/20'],
+html[data-theme='light'] [class~='border-rose-500/30'] { border-color: rgb(244 63 94 / 0.3) !important; }
+html[data-theme='light'] [class~='border-indigo-500/20'],
+html[data-theme='light'] [class~='border-indigo-500/30'] { border-color: rgb(99 102 241 / 0.3) !important; }
+html[data-theme='light'] [class~='border-purple-500/20'],
+html[data-theme='light'] [class~='border-purple-500/30'] { border-color: rgb(168 85 247 / 0.3) !important; }
+
+/* -------------------------------------------------------------------------
+   Light-mode: Navbar & Sidebar bg overrides
+   bg-slate-900/90 and bg-slate-900/95 are used directly on those containers.
+   The general remapping resolves them to white/near-white but at full opacity,
+   leaving the sidebar looking washed out. Restore a clean surface with border.
+   ------------------------------------------------------------------------- */
+html[data-theme='light'] [class~='bg-slate-900/95'],
+html[data-theme='light'] [class~='dark:bg-slate-950/95'] {
+  background-color: rgba(255, 255, 255, 0.97) !important;
+}
+
+html[data-theme='light'] [class~='bg-slate-900/90'],
+html[data-theme='light'] [class~='dark:bg-slate-950/90'] {
+  background-color: rgba(255, 255, 255, 0.95) !important;
+}
+
+/* -------------------------------------------------------------------------
+   Light-mode: G1DM brand gradient text (too faint on white)
+   from-blue-400 via-indigo-300 to-cyan-300 → richer dark blues
+   ------------------------------------------------------------------------- */
+html[data-theme='light'] [class~='from-blue-400'][class~='via-indigo-300'][class~='to-cyan-300'] {
+  --tw-gradient-from: #1d4ed8 !important;
+  --tw-gradient-via: #4338ca !important;
+  --tw-gradient-to: #0e7490 !important;
+  --tw-gradient-stops: var(--tw-gradient-from), #4338ca, var(--tw-gradient-to) !important;
+}
+
+/* -------------------------------------------------------------------------
+   Light-mode: shadow tints — dark-colored shadows look fine but are subtle on
+   a light surface. Keep them but reduce opacity slightly so they don't muddy.
+   ------------------------------------------------------------------------- */
+html[data-theme='light'] [class~='shadow-blue-600/30'],
+html[data-theme='light'] [class~='shadow-blue-500/25'] {
+  --tw-shadow-color: rgb(37 99 235 / 0.2) !important;
+}
+
+/* -------------------------------------------------------------------------
+   Light-mode: h-px dividers
+   bg-slate-800 used as a 1px vertical/horizontal rule looks like a strong dark
+   line in light mode. Remap to a gentle border tone.
+   ------------------------------------------------------------------------- */
+html[data-theme='light'] [class~='bg-slate-800'][class~='w-px'],
+html[data-theme='light'] [class~='bg-slate-800'][class~='h-px'] {
+  background-color: rgb(var(--theme-border-rgb) / 1) !important;
+}
+
+/* -------------------------------------------------------------------------
+   Light-mode: hover:bg-slate-800/60 sidebar item hover
+   ------------------------------------------------------------------------- */
+html[data-theme='light'] [class~='hover:bg-slate-800/60']:hover {
+  background-color: rgb(var(--theme-slate-800-rgb) / 0.5) !important;
+}
+
+/* -------------------------------------------------------------------------
+   Light-mode: inset/chart panels
+   bg-slate-950/80 chart backgrounds need a clean light inset surface.
+   Already covered by the general remapping to --theme-slate-950-rgb = 241 245 249
+   but the /80 opacity makes it appear as a washed blue. Make it fully opaque white.
+   ------------------------------------------------------------------------- */
+html[data-theme='light'] [class~='bg-slate-950/80'] {
+  background-color: #f1f5f9 !important;
+}
+html[data-theme='light'] [class~='bg-slate-950/60'] {
+  background-color: #f8fafc !important;
+}
+
 /* Form controls use a real input surface instead of inheriting a dark fill. */
 html[data-theme] input:not([type='checkbox']):not([type='radio']),
 html[data-theme] select,

@@ -92,7 +92,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   }
 
   return (
-    <div className="p-6 pt-6 pb-12 space-y-6 max-w-7xl mx-auto w-full">
+    <div className="p-6 pt-10 pb-12 space-y-6 max-w-7xl mx-auto w-full">
       {/* Hero Speed & Throughput Live Monitor Card */}
       <div className="relative rounded-2xl bg-gradient-to-br from-slate-900 via-slate-900 to-indigo-950/60 border border-slate-800 p-6 shadow-2xl overflow-hidden">
         <div className="absolute top-0 right-0 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
@@ -178,7 +178,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         {/* Downloading */}
         <button
           onClick={() => onNavigate('downloads', 'downloading')}
-          className="p-4 rounded-xl bg-slate-900/80 hover:bg-slate-800/80 border border-slate-800 hover:border-cyan-500/40 transition-all text-left group shadow-lg"
+          className="p-4 rounded-xl bg-slate-900/80 hover:bg-slate-800/80 border border-slate-800 hover:border-cyan-500/50 shadow-lg shadow-cyan-500/10 hover:shadow-xl hover:shadow-cyan-500/25 transition-all duration-200 text-left group active:scale-95"
         >
           <div className="flex items-center justify-between text-cyan-400 mb-2">
             <Loader2 className={`w-5 h-5 ${activeDownloads.length > 0 ? 'animate-spin' : ''}`} />
@@ -191,7 +191,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         {/* Queued */}
         <button
           onClick={() => onNavigate('downloads', 'queued')}
-          className="p-4 rounded-xl bg-slate-900/80 hover:bg-slate-800/80 border border-slate-800 hover:border-purple-500/40 transition-all text-left group shadow-lg"
+          className="p-4 rounded-xl bg-slate-900/80 hover:bg-slate-800/80 border border-slate-800 hover:border-purple-500/50 shadow-lg shadow-purple-500/10 hover:shadow-xl hover:shadow-purple-500/25 transition-all duration-200 text-left group active:scale-95"
         >
           <div className="flex items-center justify-between text-purple-400 mb-2">
             <Clock className="w-5 h-5" />
@@ -204,7 +204,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         {/* Completed */}
         <button
           onClick={() => onNavigate('downloads', 'completed')}
-          className="p-4 rounded-xl bg-slate-900/80 hover:bg-slate-800/80 border border-slate-800 hover:border-emerald-500/40 transition-all text-left group shadow-lg"
+          className="p-4 rounded-xl bg-slate-900/80 hover:bg-slate-800/80 border border-slate-800 hover:border-emerald-500/50 shadow-lg shadow-emerald-500/10 hover:shadow-xl hover:shadow-emerald-500/25 transition-all duration-200 text-left group active:scale-95"
         >
           <div className="flex items-center justify-between text-emerald-400 mb-2">
             <CheckCircle2 className="w-5 h-5" />
@@ -217,7 +217,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         {/* Paused */}
         <button
           onClick={() => onNavigate('downloads', 'paused')}
-          className="p-4 rounded-xl bg-slate-900/80 hover:bg-slate-800/80 border border-slate-800 hover:border-amber-500/40 transition-all text-left group shadow-lg"
+          className="p-4 rounded-xl bg-slate-900/80 hover:bg-slate-800/80 border border-slate-800 hover:border-amber-500/50 shadow-lg shadow-amber-500/10 hover:shadow-xl hover:shadow-amber-500/25 transition-all duration-200 text-left group active:scale-95"
         >
           <div className="flex items-center justify-between text-amber-400 mb-2">
             <PauseCircle className="w-5 h-5" />
@@ -230,7 +230,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         {/* Failed */}
         <button
           onClick={() => onNavigate('downloads', 'failed')}
-          className="p-4 rounded-xl bg-slate-900/80 hover:bg-slate-800/80 border border-slate-800 hover:border-rose-500/40 transition-all text-left group shadow-lg col-span-2 sm:col-span-1"
+          className="p-4 rounded-xl bg-slate-900/80 hover:bg-slate-800/80 border border-slate-800 hover:border-rose-500/50 shadow-lg shadow-rose-500/10 hover:shadow-xl hover:shadow-rose-500/25 transition-all duration-200 text-left group col-span-2 sm:col-span-1 active:scale-95"
         >
           <div className="flex items-center justify-between text-rose-400 mb-2">
             <XCircle className="w-5 h-5" />
@@ -249,7 +249,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <button
             onClick={onOpenNewDownload}
-            className="flex items-start gap-3.5 p-4 rounded-xl bg-slate-900/80 hover:bg-slate-800/90 border border-slate-800 hover:border-blue-500/40 transition-all text-left group"
+            className="flex items-start gap-3.5 p-4 rounded-xl bg-slate-900/80 hover:bg-slate-800/90 border border-slate-800 hover:border-blue-500/50 shadow-md shadow-blue-500/10 hover:shadow-lg hover:shadow-blue-500/25 transition-all duration-200 text-left group active:scale-95"
           >
             <div className="w-10 h-10 rounded-lg bg-blue-500/10 text-blue-400 flex items-center justify-center shrink-0 border border-blue-500/20 group-hover:scale-105 transition-transform">
               <Plus className="w-5 h-5" />
@@ -266,7 +266,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
           <button
             onClick={() => onNavigate('batchLinks')}
-            className="flex items-start gap-3.5 p-4 rounded-xl bg-slate-900/80 hover:bg-slate-800/90 border border-slate-800 hover:border-cyan-500/40 transition-all text-left group"
+            className="flex items-start gap-3.5 p-4 rounded-xl bg-slate-900/80 hover:bg-slate-800/90 border border-slate-800 hover:border-cyan-500/50 shadow-md shadow-cyan-500/10 hover:shadow-lg hover:shadow-cyan-500/25 transition-all duration-200 text-left group active:scale-95"
           >
             <div className="w-10 h-10 rounded-lg bg-cyan-500/10 text-cyan-400 flex items-center justify-center shrink-0 border border-cyan-500/20 group-hover:scale-105 transition-transform">
               <Layers className="w-5 h-5" />
@@ -283,7 +283,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
           <button
             onClick={() => onNavigate('mediaDetector')}
-            className="flex items-start gap-3.5 p-4 rounded-xl bg-slate-900/80 hover:bg-slate-800/90 border border-slate-800 hover:border-amber-500/40 transition-all text-left group"
+            className="flex items-start gap-3.5 p-4 rounded-xl bg-slate-900/80 hover:bg-slate-800/90 border border-slate-800 hover:border-amber-500/50 shadow-md shadow-amber-500/10 hover:shadow-lg hover:shadow-amber-500/25 transition-all duration-200 text-left group active:scale-95"
           >
             <div className="w-10 h-10 rounded-lg bg-amber-500/10 text-amber-400 flex items-center justify-center shrink-0 border border-amber-500/20 group-hover:scale-105 transition-transform">
               <Flame className="w-5 h-5" />
@@ -300,7 +300,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
           <button
             onClick={() => onNavigate('siteGrabber')}
-            className="flex items-start gap-3.5 p-4 rounded-xl bg-slate-900/80 hover:bg-slate-800/90 border border-slate-800 hover:border-emerald-500/40 transition-all text-left group"
+            className="flex items-start gap-3.5 p-4 rounded-xl bg-slate-900/80 hover:bg-slate-800/90 border border-slate-800 hover:border-emerald-500/50 shadow-md shadow-emerald-500/10 hover:shadow-lg hover:shadow-emerald-500/25 transition-all duration-200 text-left group active:scale-95"
           >
             <div className="w-10 h-10 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center shrink-0 border border-emerald-500/20 group-hover:scale-105 transition-transform">
               <Globe className="w-5 h-5" />
@@ -326,7 +326,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
           <button
             onClick={() => onNavigate('downloads')}
-            className="text-xs text-blue-400 hover:text-blue-300 font-semibold flex items-center gap-1"
+            className="text-xs text-blue-400 hover:text-blue-300 font-semibold flex items-center gap-1 transition-colors duration-150"
           >
             <span>View All ({downloads.length})</span>
             <ArrowUpRight className="w-3.5 h-3.5" />
@@ -412,7 +412,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                           e.stopPropagation();
                           api.pauseDownload(item.id);
                         }}
-                        className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-400"
+                        className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-400 shadow-sm shadow-amber-500/15 hover:shadow-md hover:shadow-amber-500/30 transition-all duration-200 active:scale-95"
                         title="Pause"
                       >
                         <Pause className="w-3.5 h-3.5 fill-amber-400" />
@@ -423,7 +423,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                           e.stopPropagation();
                           api.resumeDownload(item.id);
                         }}
-                        className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-emerald-400"
+                        className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-emerald-400 shadow-sm shadow-emerald-500/15 hover:shadow-md hover:shadow-emerald-500/30 transition-all duration-200 active:scale-95"
                         title="Resume"
                       >
                         <Play className="w-3.5 h-3.5 fill-emerald-400" />

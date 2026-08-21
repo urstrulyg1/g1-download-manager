@@ -281,6 +281,7 @@ export default function Home() {
             <QueuesView
               queues={queues}
               downloads={downloads}
+              settings={settings}
               lang={lang}
               onRefresh={refreshAll}
             />

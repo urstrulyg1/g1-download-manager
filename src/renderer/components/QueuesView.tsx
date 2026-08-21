@@ -7,37 +7,39 @@ import {
   Trash2,
   Clock,
   Settings,
-  Calendar,
-  Zap,
-  CheckCircle2,
-  AlertCircle,
+  FolderOpen,
+  Gauge,
+  Network,
+  ArrowUpDown,
 } from 'lucide-react';
-import { DownloadQueue, DownloadItem } from '../../shared/types';
-import { Language, translations } from '../lib/i18n';
+import { DownloadQueue, DownloadItem, AppSettings } from '../../shared/types';
+import { Language } from '../lib/i18n';
 import { api } from '../lib/api';
 
 interface QueuesViewProps {
   queues: DownloadQueue[];
   downloads: DownloadItem[];
+  settings: AppSettings | null;
   lang: Language;
   onRefresh: () => void;
 }
 
-export const QueuesView: React.FC<QueuesViewProps> = ({ queues, downloads, lang, onRefresh }) => {
-  const t = translations[lang] || translations.en;
+export const QueuesView: React.FC<QueuesViewProps> = ({ queues, downloads, settings, onRefresh }) => {
   const [editingQueue, setEditingQueue] = useState<Partial<DownloadQueue> | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+
+  const defaultDir = settings?.general.defaultDownloadDir ?? '';
 
   const handleOpenAdd = () => {
     setEditingQueue({
       id: `q_${Date.now()}`,
-      name: 'New Custom Queue',
+      name: '',
       priority: 3,
       mode: 'parallel',
-      maxConcurrentDownloads: 2,
-      maxConnectionsPerDownload: 8,
+      maxConcurrentDownloads: settings?.downloads.maxConcurrentDownloads ?? 4,
+      maxConnectionsPerDownload: settings?.downloads.defaultConnectionsPerDownload ?? 8,
       speedLimitBytesPerSec: 0,
-      destinationDir: '/home/user/Downloads',
+      destinationDir: defaultDir,
       status: 'active',
       schedule: {
         enabled: false,
@@ -91,7 +93,7 @@ export const QueuesView: React.FC<QueuesViewProps> = ({ queues, downloads, lang,
 
         <button
           onClick={handleOpenAdd}
-          className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold flex items-center gap-1.5 shadow-lg shadow-blue-600/30"
+          className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold flex items-center gap-1.5 shadow-lg shadow-blue-500/30 hover:shadow-xl hover:shadow-blue-500/50 transition-all duration-200 active:scale-95"
         >
           <Plus className="w-4 h-4" />
           <span>Create New Queue</span>
@@ -109,7 +111,7 @@ export const QueuesView: React.FC<QueuesViewProps> = ({ queues, downloads, lang,
           return (
             <div
               key={queue.id}
-              className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 shadow-xl space-y-4 relative overflow-hidden"
+              className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 shadow-lg shadow-indigo-500/10 space-y-4 relative overflow-hidden transition-all duration-200 hover:border-indigo-500/40 hover:shadow-xl hover:shadow-indigo-500/20 hover:-translate-y-0.5"
             >
               <div className="flex items-start justify-between">
                 <div>
@@ -137,10 +139,10 @@ export const QueuesView: React.FC<QueuesViewProps> = ({ queues, downloads, lang,
                 <div className="flex items-center gap-1">
                   <button
                     onClick={() => toggleQueueStatus(queue)}
-                    className={`p-2 rounded-xl text-xs font-semibold ${
+                    className={`p-2 rounded-xl text-xs font-semibold transition-all duration-200 active:scale-95 ${
                       queue.status === 'active'
-                        ? 'bg-amber-500/20 text-amber-300 hover:bg-amber-500/30'
-                        : 'bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30'
+                        ? 'bg-amber-500/20 text-amber-300 shadow-sm shadow-amber-500/20 hover:bg-amber-500/30 hover:shadow-md hover:shadow-amber-500/35'
+                        : 'bg-emerald-500/20 text-emerald-300 shadow-sm shadow-emerald-500/20 hover:bg-emerald-500/30 hover:shadow-md hover:shadow-emerald-500/35'
                     }`}
                     title={queue.status === 'active' ? 'Pause Queue' : 'Start Queue'}
                   >
@@ -152,7 +154,7 @@ export const QueuesView: React.FC<QueuesViewProps> = ({ queues, downloads, lang,
                       setEditingQueue(queue);
                       setIsModalOpen(true);
                     }}
-                    className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300"
+                    className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white shadow-sm shadow-slate-900/20 hover:shadow-md hover:shadow-blue-500/20 transition-all duration-200 active:scale-95"
                     title="Queue Settings"
                   >
                     <Settings className="w-4 h-4" />
@@ -161,7 +163,7 @@ export const QueuesView: React.FC<QueuesViewProps> = ({ queues, downloads, lang,
                   {queue.id !== 'default' && (
                     <button
                       onClick={() => handleDelete(queue.id)}
-                      className="p-2 rounded-xl bg-slate-800 hover:bg-rose-950 text-slate-400 hover:text-rose-400"
+                      className="p-2 rounded-xl bg-slate-800 hover:bg-rose-950 text-slate-400 hover:text-rose-400 shadow-sm shadow-slate-900/20 hover:shadow-md hover:shadow-rose-500/30 transition-all duration-200 active:scale-95"
                       title="Delete Queue"
                     >
                       <Trash2 className="w-4 h-4" />
@@ -222,37 +224,58 @@ export const QueuesView: React.FC<QueuesViewProps> = ({ queues, downloads, lang,
         <div className="theme-overlay fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
           <form
             onSubmit={handleSave}
-            className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg shadow-2xl p-5 space-y-4 text-xs"
+            className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg shadow-2xl p-5 space-y-4 text-xs overflow-y-auto max-h-[90vh]"
           >
             <div className="flex justify-between items-center pb-2 border-b border-slate-800">
-              <h2 className="text-sm font-bold text-white">Queue Configuration</h2>
+              <h2 className="text-sm font-bold text-white">
+                {editingQueue.createdAt ? 'Edit Queue' : 'Create New Queue'}
+              </h2>
               <button
                 type="button"
                 onClick={() => setIsModalOpen(false)}
-                className="p-1 text-slate-400 hover:text-white"
+                className="p-1 text-slate-400 hover:text-white transition-colors duration-150"
               >
                 ✕
               </button>
             </div>
 
+            {/* Queue Name */}
             <div className="space-y-1">
               <label className="text-slate-300 font-semibold">Queue Name</label>
               <input
                 type="text"
                 value={editingQueue.name || ''}
                 onChange={(e) => setEditingQueue({ ...editingQueue, name: e.target.value })}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2 text-slate-200"
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2 text-slate-200 focus:border-blue-500/50 focus:outline-none transition-colors"
+                placeholder="e.g. Large Files, Night Downloads…"
                 required
               />
             </div>
 
+            {/* Destination Directory */}
+            <div className="space-y-1">
+              <label className="text-slate-300 font-semibold flex items-center gap-1.5">
+                <FolderOpen className="w-3.5 h-3.5 text-amber-400" />
+                Destination Folder
+              </label>
+              <input
+                type="text"
+                value={editingQueue.destinationDir || ''}
+                onChange={(e) => setEditingQueue({ ...editingQueue, destinationDir: e.target.value })}
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2 text-slate-200 font-mono text-[11px] focus:border-blue-500/50 focus:outline-none transition-colors"
+                placeholder={defaultDir || '/path/to/downloads'}
+                required
+              />
+            </div>
+
+            {/* Mode + Concurrency */}
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
                 <label className="text-slate-300 font-semibold">Execution Mode</label>
                 <select
                   value={editingQueue.mode || 'parallel'}
                   onChange={(e) => setEditingQueue({ ...editingQueue, mode: e.target.value as any })}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2 text-slate-200"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2 text-slate-200 focus:border-blue-500/50 focus:outline-none transition-colors"
                 >
                   <option value="parallel">Parallel (Simultaneous)</option>
                   <option value="sequential">Sequential (One at a time)</option>
@@ -265,13 +288,67 @@ export const QueuesView: React.FC<QueuesViewProps> = ({ queues, downloads, lang,
                   type="number"
                   min={1}
                   max={16}
-                  value={editingQueue.maxConcurrentDownloads || 2}
+                  value={editingQueue.maxConcurrentDownloads ?? 4}
                   onChange={(e) =>
                     setEditingQueue({ ...editingQueue, maxConcurrentDownloads: parseInt(e.target.value, 10) })
                   }
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2 text-slate-200"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2 text-slate-200 focus:border-blue-500/50 focus:outline-none transition-colors"
                 />
               </div>
+            </div>
+
+            {/* Connections per download + Priority */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="text-slate-300 font-semibold flex items-center gap-1.5">
+                  <Network className="w-3.5 h-3.5 text-cyan-400" />
+                  Connections / File
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  max={32}
+                  value={editingQueue.maxConnectionsPerDownload ?? 8}
+                  onChange={(e) =>
+                    setEditingQueue({ ...editingQueue, maxConnectionsPerDownload: parseInt(e.target.value, 10) })
+                  }
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2 text-slate-200 focus:border-blue-500/50 focus:outline-none transition-colors"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-slate-300 font-semibold flex items-center gap-1.5">
+                  <ArrowUpDown className="w-3.5 h-3.5 text-indigo-400" />
+                  Priority
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  max={10}
+                  value={editingQueue.priority ?? 3}
+                  onChange={(e) =>
+                    setEditingQueue({ ...editingQueue, priority: parseInt(e.target.value, 10) })
+                  }
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2 text-slate-200 focus:border-blue-500/50 focus:outline-none transition-colors"
+                />
+              </div>
+            </div>
+
+            {/* Speed Limit */}
+            <div className="space-y-1">
+              <label className="text-slate-300 font-semibold flex items-center gap-1.5">
+                <Gauge className="w-3.5 h-3.5 text-rose-400" />
+                Speed Limit (KB/s) — <span className="text-slate-400 font-normal">0 = unlimited</span>
+              </label>
+              <input
+                type="number"
+                min={0}
+                value={Math.round((editingQueue.speedLimitBytesPerSec ?? 0) / 1024)}
+                onChange={(e) =>
+                  setEditingQueue({ ...editingQueue, speedLimitBytesPerSec: parseInt(e.target.value, 10) * 1024 })
+                }
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2 text-slate-200 focus:border-blue-500/50 focus:outline-none transition-colors"
+              />
             </div>
 
             {/* Schedule section */}
@@ -295,34 +372,55 @@ export const QueuesView: React.FC<QueuesViewProps> = ({ queues, downloads, lang,
               </div>
 
               {editingQueue.schedule?.enabled && (
-                <div className="grid grid-cols-2 gap-3 pt-2">
-                  <div>
-                    <label className="text-slate-400 mb-1 block">Start Time (HH:MM)</label>
-                    <input
-                      type="time"
-                      value={editingQueue.schedule?.startTime || '00:00'}
-                      onChange={(e) =>
-                        setEditingQueue({
-                          ...editingQueue,
-                          schedule: { ...editingQueue.schedule!, startTime: e.target.value },
-                        })
-                      }
-                      className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-slate-200"
-                    />
+                <div className="space-y-3 pt-1">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-slate-400 mb-1 block">Start Time</label>
+                      <input
+                        type="time"
+                        value={editingQueue.schedule?.startTime || '00:00'}
+                        onChange={(e) =>
+                          setEditingQueue({
+                            ...editingQueue,
+                            schedule: { ...editingQueue.schedule!, startTime: e.target.value },
+                          })
+                        }
+                        className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-slate-200 focus:border-blue-500/50 focus:outline-none transition-colors"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-slate-400 mb-1 block">Stop Time</label>
+                      <input
+                        type="time"
+                        value={editingQueue.schedule?.stopTime || '06:00'}
+                        onChange={(e) =>
+                          setEditingQueue({
+                            ...editingQueue,
+                            schedule: { ...editingQueue.schedule!, stopTime: e.target.value },
+                          })
+                        }
+                        className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-slate-200 focus:border-blue-500/50 focus:outline-none transition-colors"
+                      />
+                    </div>
                   </div>
-                  <div>
-                    <label className="text-slate-400 mb-1 block">Stop Time (HH:MM)</label>
-                    <input
-                      type="time"
-                      value={editingQueue.schedule?.stopTime || '06:00'}
+
+                  <div className="space-y-1">
+                    <label className="text-slate-400 block">On Complete Action</label>
+                    <select
+                      value={editingQueue.schedule?.onCompleteAction || 'nothing'}
                       onChange={(e) =>
                         setEditingQueue({
                           ...editingQueue,
-                          schedule: { ...editingQueue.schedule!, stopTime: e.target.value },
+                          schedule: { ...editingQueue.schedule!, onCompleteAction: e.target.value as any },
                         })
                       }
-                      className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-slate-200"
-                    />
+                      className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-slate-200 focus:border-blue-500/50 focus:outline-none transition-colors"
+                    >
+                      <option value="nothing">Do nothing</option>
+                      <option value="notification">Send notification</option>
+                      <option value="sleep">Sleep system</option>
+                      <option value="shutdown">Shutdown system</option>
+                    </select>
                   </div>
                 </div>
               )}
@@ -332,13 +430,13 @@ export const QueuesView: React.FC<QueuesViewProps> = ({ queues, downloads, lang,
               <button
                 type="button"
                 onClick={() => setIsModalOpen(false)}
-                className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 font-semibold"
+                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-semibold shadow-sm shadow-slate-900/20 hover:shadow-md hover:shadow-slate-500/20 transition-all duration-200 active:scale-95"
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold"
+                className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold shadow-md shadow-blue-500/30 hover:shadow-lg hover:shadow-blue-500/50 transition-all duration-200 active:scale-95"
               >
                 Save Queue
               </button>
