@@ -178,9 +178,46 @@
     return window.location.href;
   }
 
+  function formatBytes(bytes) {
+    if (!bytes || bytes <= 0) return 'Variable Size';
+    if (bytes >= 1073741824) return (bytes / 1073741824).toFixed(2) + ' GB';
+    if (bytes >= 1048576) return (bytes / 1048576).toFixed(1) + ' MB';
+    if (bytes >= 1024) return (bytes / 1024).toFixed(0) + ' KB';
+    return bytes + ' B';
+  }
+
+  function estimateFileSize(durationSec, height, codec, isAudio) {
+    const isDefault = !durationSec || durationSec <= 0 || !isFinite(durationSec);
+    const dur = isDefault ? 600 : durationSec; // 10m default reference
+
+    let bps = 4000000;
+    if (isAudio) {
+      if (codec === 'FLAC') bps = 950000;
+      else if (codec === 'PCM') bps = 1411200;
+      else if (codec === 'AAC' || codec === 'MP3') bps = 320000;
+      else if (codec === 'OPUS') bps = 160000;
+      else bps = 256000;
+    } else {
+      const isEfficient = codec === 'HEVC' || codec === 'AV1' || codec === 'VP9';
+      if (height >= 4320) bps = isEfficient ? 48000000 : 85000000;
+      else if (height >= 2160) bps = isEfficient ? 18000000 : 32000000;
+      else if (height >= 1440) bps = isEfficient ? 10000000 : 16000000;
+      else if (height >= 1080) bps = isEfficient ? 4500000 : 8000000;
+      else if (height >= 720) bps = isEfficient ? 2200000 : 4000000;
+      else if (height >= 480) bps = isEfficient ? 1200000 : 2000000;
+      else if (height >= 360) bps = isEfficient ? 600000 : 1000000;
+      else bps = 400000;
+    }
+
+    const totalBytes = Math.round((bps / 8) * dur);
+    const formatted = formatBytes(totalBytes);
+    return isDefault ? `~${formatted} (10m)` : `~${formatted}`;
+  }
+
   function buildAllCombinations(video, filter) {
     const vWidth = video.videoWidth || 1920;
     const vHeight = video.videoHeight || 1080;
+    const durationSec = video.duration;
     const bestSrc = getBestMediaSource(video);
     const results = [];
 
@@ -194,6 +231,7 @@
         const isHls = sUrl.includes('.m3u8');
         const isDash = sUrl.includes('.mpd');
         const badge = isHls ? 'HLS M3U8' : isDash ? 'DASH MPD' : 'DIRECT';
+        const estSize = estimateFileSize(durationSec, vHeight, 'H264', false);
         results.push({
           label: isHls ? 'Master HLS Stream (.m3u8)' : isDash ? 'DASH Manifest (.mpd)' : 'Direct Video Stream',
           formatLabel: isHls ? 'Adaptive Bitrate • M3U8 Playlist' : isDash ? 'Multi-Track • MPD Manifest' : 'Direct Stream',
@@ -203,6 +241,7 @@
           resolution: `${vWidth}×${vHeight}`,
           container: isHls ? 'mkv' : isDash ? 'mkv' : 'mp4',
           codec: 'ORIGINAL',
+          estimatedSize: estSize,
           isStream: true
         });
       }
@@ -219,6 +258,8 @@
           if (!matchTab) continue;
         }
 
+        const estSize = estimateFileSize(durationSec, res.height, cfg.codec, false);
+
         results.push({
           label: `${res.label}${isCurrentPlayback ? ' (Current Stream)' : ''}`,
           formatLabel: cfg.description,
@@ -229,6 +270,7 @@
           container: cfg.container,
           codec: cfg.codec,
           height: res.height,
+          estimatedSize: estSize,
           isCurrent: isCurrentPlayback
         });
       }
@@ -237,6 +279,7 @@
     // 3. Audio Extraction Formats
     if (filter === 'ALL' || filter === 'AUDIO') {
       for (const aud of AUDIO_FORMATS) {
+        const estSize = estimateFileSize(durationSec, 0, aud.codec, true);
         results.push({
           label: aud.label,
           formatLabel: aud.sublabel,
@@ -245,6 +288,7 @@
           url: bestSrc,
           container: aud.container,
           codec: aud.codec,
+          estimatedSize: estSize,
           isAudio: true
         });
       }
@@ -387,7 +431,10 @@
               text-align: center;
             ">${item.badge}</span>
             <div style="display: flex; flex-direction: column; overflow: hidden;">
-              <span style="font-size: 11px; font-weight: 700; color: #f8fafc; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${item.label}</span>
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <span style="font-size: 11px; font-weight: 700; color: #f8fafc; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${item.label}</span>
+                <span style="background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.35); color: #34d399; padding: 1px 5px; border-radius: 4px; font-family: monospace; font-size: 9px; font-weight: 700; white-space: nowrap;">${item.estimatedSize}</span>
+              </div>
               <span style="font-size: 10px; color: #94a3b8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${item.formatLabel} ${item.resolution ? '• ' + item.resolution : ''}</span>
             </div>
           </div>
