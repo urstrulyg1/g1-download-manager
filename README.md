@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="resources/brand/logo-full.png" alt="G1DM — Next-Generation Internet Download Manager" width="440" />
+</p>
+
 # ⚡ G1DM — Next-Generation Internet Download Manager
 ### Commercial-Grade, Autonomous, Multi-Threaded Download Platform & Media Intelligence Engine
 

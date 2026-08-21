@@ -50,8 +50,11 @@ export default function App({ Component, pageProps }: AppProps) {
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="apple-mobile-web-app-title" content="G1DM" />
         <link rel="manifest" href="/manifest.json" />
-        <link rel="apple-touch-icon" href="/icons/icon-192.svg" />
-        <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%233b82f6'><path d='M12 2v14m0 0l-5-5m5 5l5-5M4 18h16v2H4z'/></svg>" />
+        <link rel="icon" href="/favicon.ico" sizes="any" />
+        <link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-32.png" />
+        <link rel="icon" type="image/png" sizes="16x16" href="/icons/icon-16.png" />
+        <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+        <meta property="og:image" content="/logo-full.png" />
       </Head>
       <Component {...pageProps} />
     </>

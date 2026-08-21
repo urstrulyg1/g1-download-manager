@@ -126,8 +126,12 @@ export const Navbar: React.FC<NavbarProps> = ({
             onOpenNewDownload();
           }}
         >
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-cyan-400 flex items-center justify-center shadow-lg shadow-blue-500/25">
-            <Download className="w-5 h-5 text-white" />
+          <div className="w-10 h-10 flex items-center justify-center relative shrink-0">
+            <img
+              src="/logo-mark.png"
+              alt="G1DM Logo"
+              className="w-10 h-10 object-contain drop-shadow-[0_2px_10px_rgba(52,211,153,0.35)] transition-transform hover:scale-105"
+            />
           </div>
           <div>
             <div className="flex items-center gap-2">
