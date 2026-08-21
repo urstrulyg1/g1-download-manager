@@ -291,6 +291,18 @@ export default function Home() {
         </main>
       </div>
 
+      {/* Bottom Center Credits Footer */}
+      <footer className="w-full py-3.5 border-t border-slate-800/80 bg-slate-950/80 backdrop-blur-md flex items-center justify-center text-xs text-slate-400 select-none">
+        <div className="flex items-center gap-1.5 font-medium tracking-wide">
+          <span>Made with</span>
+          <span className="text-rose-500 animate-pulse inline-block text-sm">❤️</span>
+          <span>by</span>
+          <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-cyan-400 to-indigo-400 font-bold hover:brightness-125 transition-all">
+            Jeevan
+          </span>
+        </div>
+      </footer>
+
       {/* Modals & Drawers */}
       <AddDownloadModal
         isOpen={isAddModalOpen}
