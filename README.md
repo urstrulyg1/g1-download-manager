@@ -39,21 +39,22 @@
 
 ## 🏆 Feature Matrix & Competitor Comparison
 
-| Capability / Feature | G1DM (Free & Open) | IDM ($24.95/yr) | Folx PRO ($19.95) | Downie ($19.99) | JDownloader 2 |
-| :--- | :---: | :---: | :---: | :---: | :---: |
-| **Parallel Dynamic Segmentation** | ✅ **Yes (Work-Stealing 2.0)** | ✅ Yes (Basic) | ✅ Yes | ❌ No | ✅ Yes |
-| **8K (4320p) & 4K Floating Video Pill** | ✅ **Yes (Full Codec Matrix)** | ⚠️ Basic 1080p | ❌ No | ⚠️ App Only | ❌ No |
-| **Play/Preview Media While Downloading** | ✅ **Yes (HTTP 206 Partial)** | ❌ No | ❌ No | ❌ No | ❌ No |
-| **Pre-Download Zero-Day Threat Scanner** | ✅ **Yes (Heuristics & MIME)**| ❌ No | ❌ No | ❌ No | ❌ No |
-| **Multi-Source Mirror Swarming** | ✅ **Yes (RTT Latency Balanced)**| ❌ No (Single Host)| ❌ No | ❌ No | ⚠️ Basic |
-| **Multi-Interface Channel Bonding** | ✅ **Yes (Ethernet+Wi-Fi+5G)** | ❌ No | ❌ No | ❌ No | ❌ No |
-| **Live Stream Sliding-Window DVR** | ✅ **Yes (HLS/DASH Rewind)**| ❌ Fails on rollover| ❌ No | ⚠️ Basic | ❌ No |
-| **BitTorrent & WebTorrent Swarm** | ✅ **Yes (PEX/DHT/WebSeed)** | ❌ No | ✅ Yes | ❌ No | ❌ No |
-| **Direct Cloud & Debrid Resolvers** | ✅ **Yes (GDrive/Mega/Debrid)**| ❌ Needs 3rd party | ❌ No | ⚠️ Basic | ✅ Yes |
-| **Auto-Archive Extraction & Passwords** | ✅ **Yes (Auto-Dictionary)** | ❌ No | ❌ No | ❌ No | ✅ Yes |
-| **Hardware-Encrypted AES-256 Vault** | ✅ **Yes (PIN/Key Rooted)** | ❌ Plaintext only | ❌ Plaintext | ❌ Plaintext | ❌ Plaintext |
-| **Remote Telegram / Discord Bot** | ✅ **Yes (Direct Commands)** | ❌ No | ❌ No | ❌ No | ⚠️ MyJDownloader |
-| **Automated Verification Test Suite** | ✅ **281 Tests / 93 Suites** | ❌ Closed Source | ❌ Closed | ❌ Closed | ❌ Untracked |
+| Capability / Feature | G1DM (Free & Open) | IDM ($24.95/yr) | NeatDM (Free) | FDM (Free) | JDownloader 2 | Folx PRO ($19.95) | Downie ($19.99) | Aria2 / Motrix |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| **Dynamic Segmentation** | ✅ **Yes (Work-Stealing 2.0)** | ✅ Yes (Basic) | ✅ Yes (Static) | ✅ Yes (Basic) | ✅ Yes (Basic) | ✅ Yes | ❌ No | ✅ Yes |
+| **8K (4320p) & 4K Floating Video Pill** | ✅ **Yes (Full Codec Matrix)** | ⚠️ Basic 1080p | ⚠️ 1080p Only | ❌ No | ❌ No | ❌ No | ⚠️ App Only | ❌ No |
+| **Play/Preview While Downloading** | ✅ **Yes (HTTP 206 Partial)** | ❌ No | ❌ No | ⚠️ Torrent only | ❌ No | ❌ No | ❌ No | ❌ No |
+| **Pre-Download Threat Scanner** | ✅ **Yes (Heuristics & MIME)**| ❌ No | ❌ No | ⚠️ Post-scan only| ❌ No | ❌ No | ❌ No | ❌ No |
+| **Multi-Source Mirror Swarming** | ✅ **Yes (RTT-Balanced)** | ❌ No (Single Host)| ❌ No | ❌ No | ⚠️ Basic | ❌ No | ❌ No | ⚠️ Manual CLI |
+| **Multi-Interface Channel Bonding** | ✅ **Yes (Ethernet+Wi-Fi+5G)** | ❌ No | ❌ No | ❌ No | ❌ No | ❌ No | ❌ No | ❌ No |
+| **Live Stream Sliding-Window DVR** | ✅ **Yes (HLS/DASH Rewind)**| ❌ Fails on rollover| ❌ No | ❌ No | ❌ No | ❌ No | ⚠️ Basic | ❌ No |
+| **BitTorrent & WebTorrent Swarm** | ✅ **Yes (PEX/DHT/WebSeed)** | ❌ No | ❌ No | ✅ Yes | ❌ No | ✅ Yes | ❌ No | ✅ Yes |
+| **Direct Cloud & Debrid Resolvers** | ✅ **Yes (GDrive/Mega/Debrid)**| ❌ Needs 3rd party | ❌ No | ❌ No | ✅ Yes | ❌ No | ⚠️ Basic | ❌ No |
+| **Auto-Archive Extraction & Passwords** | ✅ **Yes (Auto-Dictionary)** | ❌ No | ❌ No | ⚠️ ZIP only | ✅ Yes | ❌ No | ❌ No | ❌ No |
+| **Hardware-Encrypted AES-256 Vault** | ✅ **Yes (PIN/Key Rooted)** | ❌ Plaintext only | ❌ Plaintext | ❌ Plaintext | ❌ Plaintext | ❌ Plaintext | ❌ Plaintext | ❌ Plaintext |
+| **Remote Telegram / Discord Bot** | ✅ **Yes (Direct Commands)** | ❌ No | ❌ No | ❌ No | ⚠️ MyJDownloader | ❌ No | ❌ No | ⚠️ WebUI only |
+| **Cross-Platform (macOS/Win/Linux)** | ✅ **macOS, Win, Linux** | ❌ Windows only | ⚠️ macOS/Win | ✅ macOS, Win, Linux | ✅ Java | ❌ macOS only | ❌ macOS only | ✅ macOS, Win, Linux |
+| **Automated Verification Test Suite** | ✅ **281 Tests / 93 Suites** | ❌ Closed Source | ❌ Closed | ❌ Untracked | ❌ Untracked | ❌ Closed | ❌ Closed | ⚠️ Untracked |
 
 ---
 
