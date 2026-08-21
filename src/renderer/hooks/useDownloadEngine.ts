@@ -78,13 +78,14 @@ export function useDownloadEngine() {
         api.getGrabberProjects().catch(() => []),
       ]);
 
-      setDownloads(dls);
-      setQueues(qs);
-      setCategories(cats);
+      setDownloads(dls || []);
+      setQueues(qs || []);
+      setCategories(cats || []);
       if (sets) setSettings(sets);
       if (mets) setMetrics(mets);
-      setHistory(hists);
-      setGrabberProjects(grabs);
+      setHistory(hists || []);
+      setGrabberProjects(grabs || []);
+      setIsConnected(true);
     } catch (err) {
       console.error('Failed to load initial engine data:', err);
     }
