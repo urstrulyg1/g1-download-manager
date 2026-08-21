@@ -40,7 +40,7 @@ echo [OK] Node.js detected: %NODE_VER%
 echo.
 
 REM 2. Install dependencies if node_modules is missing
-echo [2/4] Verifying and installing dependencies...
+echo [2/5] Verifying dependencies...
 if not exist "node_modules\" (
     echo node_modules missing. Running npm install...
     call npm install
@@ -54,8 +54,23 @@ if not exist "node_modules\" (
 )
 echo.
 
-REM 3. Build backend & frontend
-echo [3/4] Building G1DM backend & frontend...
+REM 3. Generate & Validate Browser Extensions
+echo [3/5] Verifying and validating browser companion extensions...
+call node scripts\build\generate-extension-icons.js
+if %errorlevel% neq 0 (
+    echo Error: Failed to generate companion extension icons.
+    pause
+    exit /b %errorlevel%
+)
+call node scripts\build\validate-extensions.js
+if %errorlevel% neq 0 (
+    echo Error: Browser extension validation failed! Check manifest and assets.
+    pause
+    exit /b %errorlevel%
+)
+
+REM 4. Build backend & frontend
+echo [4/5] Building G1DM backend & frontend...
 if not exist "dist\main\" (
     call npm run build
     if %errorlevel% neq 0 (
@@ -70,12 +85,13 @@ echo [OK] Build verified.
 echo.
 
 if exist "resources\native-host\install-host.bat" (
-    call resources\native-host\install-host.bat >nul
+    call resources\native-host\install-host.bat >nul 2>nul
     echo [OK] Configured native-host integration for available browsers.
 )
 
 if "%PORT%"=="" set PORT=8055
 set URL=http://127.0.0.1:%PORT%
+set CHROME_EXT_DIR=%~dp0resources\extensions\chrome
 set /a BROWSER_COUNT=0
 
 set /a BROWSER_COUNT+=1
@@ -85,14 +101,20 @@ set "BROWSER_CMD_!BROWSER_COUNT!=start """
 where chrome >nul 2>nul
 if %errorlevel% equ 0 (
     set /a BROWSER_COUNT+=1
-    set "BROWSER_NAME_!BROWSER_COUNT!=Google Chrome"
-    set "BROWSER_CMD_!BROWSER_COUNT!=start "" chrome"
+    set "BROWSER_NAME_!BROWSER_COUNT!=Google Chrome (with G1DM Extension)"
+    set "BROWSER_CMD_!BROWSER_COUNT!=start "" chrome --load-extension="%CHROME_EXT_DIR%""
 )
 where msedge >nul 2>nul
 if %errorlevel% equ 0 (
     set /a BROWSER_COUNT+=1
-    set "BROWSER_NAME_!BROWSER_COUNT!=Microsoft Edge"
-    set "BROWSER_CMD_!BROWSER_COUNT!=start "" msedge"
+    set "BROWSER_NAME_!BROWSER_COUNT!=Microsoft Edge (with G1DM Extension)"
+    set "BROWSER_CMD_!BROWSER_COUNT!=start "" msedge --load-extension="%CHROME_EXT_DIR%""
+)
+where brave >nul 2>nul
+if %errorlevel% equ 0 (
+    set /a BROWSER_COUNT+=1
+    set "BROWSER_NAME_!BROWSER_COUNT!=Brave Browser (with G1DM Extension)"
+    set "BROWSER_CMD_!BROWSER_COUNT!=start "" brave --load-extension="%CHROME_EXT_DIR%""
 )
 where firefox >nul 2>nul
 if %errorlevel% equ 0 (
@@ -107,8 +129,8 @@ set /a SKIP_OPTION=%BROWSER_COUNT%+1
 echo   !SKIP_OPTION!^) Do not open a browser
 set /p BROWSER_CHOICE=Choose a browser to open G1DM [!SKIP_OPTION!]:
 
-REM 4. Start G1DM Unified Server
-echo [4/4] Starting G1DM Core Service on port %PORT%...
+REM 5. Start G1DM Unified Server
+echo [5/5] Starting G1DM Core Service on port %PORT%...
 echo The service binds to 127.0.0.1 for local-only access.
 echo.
 echo   ===============================================================

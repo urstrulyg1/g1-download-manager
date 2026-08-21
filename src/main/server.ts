@@ -776,6 +776,53 @@ export async function createUnifiedServer(port: number = 8055) {
     }
   });
 
+  // Live Stream Preview & HTTP 206 Partial Content
+  app.get('/api/downloads/:id/stream', async (req, res) => {
+    try {
+      const { StreamPreviewService } = await import('./engine/StreamPreviewService');
+      await StreamPreviewService.handleStreamRequest(req, res, req.params.id);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.get('/api/downloads/:id/preview-status', async (req, res) => {
+    try {
+      const { StreamPreviewService } = await import('./engine/StreamPreviewService');
+      const status = StreamPreviewService.getPreviewStatus(req.params.id);
+      res.json(status);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Cloud Host Direct Link Resolver
+  app.post('/api/cloud/resolve', async (req, res) => {
+    try {
+      const { url } = req.body;
+      if (!url) return res.status(400).json({ error: 'URL required' });
+      const { CloudLinkResolver } = await import('./media/CloudLinkResolver');
+      const resolved = CloudLinkResolver.resolve(url);
+      res.json(resolved);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Multi-Mirror Swarm Prober
+  app.post('/api/mirrors/swarm/probe', async (req, res) => {
+    try {
+      const { primaryUrl, mirrors } = req.body;
+      if (!primaryUrl) return res.status(400).json({ error: 'primaryUrl required' });
+      const { MultiMirrorSwarmEngine } = await import('./engine/MultiMirrorSwarmEngine');
+      const swarm = new MultiMirrorSwarmEngine(primaryUrl, mirrors || []);
+      const probed = await swarm.probeAllMirrors();
+      res.json({ mirrors: probed });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // Batch Links Extractor
   app.post('/api/batch/extract', async (req, res) => {
     try {

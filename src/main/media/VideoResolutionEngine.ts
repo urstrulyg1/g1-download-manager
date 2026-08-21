@@ -34,6 +34,7 @@ export interface AnalyzedAudioTrack {
 
 export class VideoResolutionEngine {
   public static computeResolutionLabel(width: number, height: number): string {
+    if (height >= 4320 || width >= 7680) return '4320p';
     if (height >= 2160 || width >= 3840) return '2160p';
     if (height >= 1440 || width >= 2560) return '1440p';
     if (height >= 1080 || width >= 1920) return '1080p';
