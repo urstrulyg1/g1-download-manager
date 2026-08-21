@@ -11,19 +11,15 @@ const themeBootstrapScript = `
 (function () {
   try {
     var stored = window.localStorage.getItem('g1dm-theme');
-    var mode = ['dark', 'light', 'oled', 'system'].indexOf(stored) !== -1 ? stored : 'dark';
-    var resolved = mode === 'system'
-      ? (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark')
-      : mode;
+    var mode = stored === 'light' ? 'light' : 'dark';
     var root = document.documentElement;
     root.classList.remove('light', 'dark', 'oled');
-    root.classList.add(resolved === 'light' ? 'light' : 'dark');
-    if (resolved === 'oled') root.classList.add('oled');
+    root.classList.add(mode);
     root.dataset.themeMode = mode;
-    root.dataset.theme = resolved;
-    root.style.colorScheme = resolved === 'light' ? 'light' : 'dark';
+    root.dataset.theme = mode;
+    root.style.colorScheme = mode;
     var themeMeta = document.querySelector('meta[name="theme-color"]');
-    if (themeMeta) themeMeta.setAttribute('content', resolved === 'light' ? '#f8fafc' : resolved === 'oled' ? '#000000' : '#090d16');
+    if (themeMeta) themeMeta.setAttribute('content', mode === 'light' ? '#f8fafc' : '#090d16');
   } catch (_) {
     document.documentElement.dataset.theme = 'dark';
     document.documentElement.classList.add('dark');

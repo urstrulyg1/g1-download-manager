@@ -75,37 +75,6 @@ html[data-theme='light'] {
   --scrollbar-thumb: #cbd5e1;
 }
 
-html[data-theme='oled'] {
-  color-scheme: dark;
-  --background: #000000;
-  --foreground: #ffffff;
-  --panel-bg: rgba(0, 0, 0, 0.96);
-  --card-bg: rgba(10, 10, 10, 0.92);
-  --border-color: rgba(255, 255, 255, 0.14);
-
-  --surface-page: #000000;
-  --surface-panel: #000000;
-  --surface-elevated: #0a0a0a;
-  --surface-inset: #000000;
-  --surface-hover: #1e1e1e;
-  --input-bg: #080808;
-
-  --text-primary: #ffffff;
-  --text-secondary: #d4d4d8;
-  --text-muted: #a1a1aa;
-  --text-subtle: #71717a;
-
-  --theme-slate-50-rgb: 18 18 18;
-  --theme-slate-700-rgb: 30 30 30;
-  --theme-slate-800-rgb: 18 18 18;
-  --theme-slate-900-rgb: 8 8 8;
-  --theme-slate-950-rgb: 0 0 0;
-  --theme-border-rgb: 34 34 34;
-  --theme-border-strong-rgb: 55 55 55;
-  --theme-overlay: rgb(0 0 0 / 0.82);
-  --scrollbar-thumb: #27272a;
-}
-
 html,
 body,
 #__next {
@@ -252,10 +221,8 @@ html[data-theme] [class~='bg-slate-900/60'] { background-color: rgb(var(--theme-
 html[data-theme] [class~='bg-slate-900/80'] { background-color: rgb(var(--theme-slate-900-rgb) / 0.8) !important; }
 html[data-theme] [class~='bg-slate-900/90'] { background-color: rgb(var(--theme-slate-900-rgb) / 0.9) !important; }
 html[data-theme] [class~='bg-slate-900/95'] { background-color: rgb(var(--theme-slate-900-rgb) / 0.95) !important; }
-html[data-theme='dark'] [class~='dark:bg-slate-950/90'],
-html[data-theme='oled'] [class~='dark:bg-slate-950/90'] { background-color: rgb(var(--theme-slate-950-rgb) / 0.9) !important; }
-html[data-theme='dark'] [class~='dark:bg-slate-950/95'],
-html[data-theme='oled'] [class~='dark:bg-slate-950/95'] { background-color: rgb(var(--theme-slate-950-rgb) / 0.95) !important; }
+html[data-theme='dark'] [class~='dark:bg-slate-950/90'] { background-color: rgb(var(--theme-slate-950-rgb) / 0.9) !important; }
+html[data-theme='dark'] [class~='dark:bg-slate-950/95'] { background-color: rgb(var(--theme-slate-950-rgb) / 0.95) !important; }
 html[data-theme] [class~='bg-slate-950/40'] { background-color: rgb(var(--theme-slate-950-rgb) / 0.4) !important; }
 html[data-theme] [class~='bg-slate-950/50'] { background-color: rgb(var(--theme-slate-950-rgb) / 0.5) !important; }
 html[data-theme] [class~='bg-slate-950/60'] { background-color: rgb(var(--theme-slate-950-rgb) / 0.6) !important; }

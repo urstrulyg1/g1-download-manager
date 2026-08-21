@@ -160,9 +160,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, lang, onSa
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-200"
                   >
                     <option value="dark">Dark Theme</option>
-                    <option value="oled">OLED Black</option>
                     <option value="light">Light Theme</option>
-                    <option value="system">System Default</option>
                   </select>
                 </div>
 

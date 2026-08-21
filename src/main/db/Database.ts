@@ -816,7 +816,12 @@ export class AppDatabase {
       return {
         ...this.defaultSettings,
         ...parsed,
-        general: { ...this.defaultSettings.general, ...(parsed.general || {}) },
+        general: {
+          ...this.defaultSettings.general,
+          ...(parsed.general || {}),
+          // Older profiles may contain the removed OLED/System values.
+          theme: parsed.general?.theme === 'light' ? 'light' : 'dark',
+        },
         downloads: { ...this.defaultSettings.downloads, ...(parsed.downloads || {}) },
         network: { ...this.defaultSettings.network, ...(parsed.network || {}) },
         browser: { ...this.defaultSettings.browser, ...(parsed.browser || {}) },

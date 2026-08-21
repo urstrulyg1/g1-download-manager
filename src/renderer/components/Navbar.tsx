@@ -9,7 +9,6 @@ import {
   Globe,
   Sun,
   Moon,
-  Monitor,
   Plus,
   Radio,
   Rocket,
@@ -323,8 +322,6 @@ export const Navbar: React.FC<NavbarProps> = ({
         >
           {theme === 'light' ? (
             <Moon className="w-4 h-4 text-blue-400" />
-          ) : theme === 'system' ? (
-            <Monitor className="w-4 h-4 text-cyan-400" />
           ) : (
             <Sun className="w-4 h-4 text-amber-400" />
           )}

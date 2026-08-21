@@ -31,9 +31,7 @@ import {
   applyTheme,
   getStoredTheme,
   isThemeMode,
-  resolveTheme,
   storeTheme,
-  subscribeToSystemTheme,
 } from '../design-system/theme';
 import { Language } from '../lib/i18n';
 import { DownloadItem } from '../../shared/types';
@@ -58,7 +56,7 @@ export default function Home() {
   const [queueFilter, setQueueFilter] = useState('all');
 
   const [theme, setTheme] = useState<ThemeMode>(() => getStoredTheme() || 'dark');
-  const [resolvedTheme, setResolvedTheme] = useState(() => resolveTheme(theme));
+  const [resolvedTheme, setResolvedTheme] = useState<ThemeMode>(() => theme);
   const [lang, setLang] = useState<Language>('en');
   const [currentProfile, setCurrentProfile] = useState<ProfileType>('TURBO');
   const [viewMode, setViewMode] = useState<ViewMode>('advanced');
@@ -88,25 +86,14 @@ export default function Home() {
     }
   }, [settings]);
 
-  // Keep the document root and the app state in lockstep. System mode follows
-  // OS changes without requiring a reload.
+  // Keep the document root and the app state in lockstep.
   useEffect(() => {
     const nextResolvedTheme = applyTheme(theme);
     setResolvedTheme(nextResolvedTheme);
-
-    const themeColor = nextResolvedTheme === 'light' ? '#f8fafc' : nextResolvedTheme === 'oled' ? '#000000' : '#090d16';
-    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', themeColor);
-
-    if (theme !== 'system') return undefined;
-
-    return subscribeToSystemTheme((systemTheme) => {
-      setResolvedTheme(systemTheme);
-      applyTheme('system');
-      document.querySelector('meta[name="theme-color"]')?.setAttribute(
-        'content',
-        systemTheme === 'light' ? '#f8fafc' : '#090d16',
-      );
-    });
+    document.querySelector('meta[name="theme-color"]')?.setAttribute(
+      'content',
+      nextResolvedTheme === 'light' ? '#f8fafc' : '#090d16',
+    );
   }, [theme]);
 
   const handleThemeChange = (nextTheme: ThemeMode) => {
@@ -129,9 +116,7 @@ export default function Home() {
   };
 
   const cycleTheme = () => {
-    const cycle: ThemeMode[] = ['dark', 'oled', 'light'];
-    const currentIndex = cycle.indexOf(theme);
-    handleThemeChange(cycle[(currentIndex + 1) % cycle.length] || 'dark');
+    handleThemeChange(theme === 'dark' ? 'light' : 'dark');
   };
 
   // Global Keyboard Shortcuts (Ctrl+K, Ctrl+N, etc.)
@@ -185,7 +170,7 @@ export default function Home() {
 
   return (
     <div
-      className={`theme-app min-h-screen ${resolvedTheme === 'oled' ? 'theme-oled' : ''}`}
+      className="theme-app min-h-screen"
       data-active-theme={resolvedTheme}
       suppressHydrationWarning
     >

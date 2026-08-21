@@ -164,7 +164,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
     },
     {
       id: 'cmd-toggle-theme',
-      title: 'Cycle Dark, OLED, and Light Themes',
+      title: 'Toggle Dark / Light Theme',
       category: 'Preferences',
       icon: Sun,
       action: () => {

@@ -1,4 +1,4 @@
-export type ThemeMode = 'dark' | 'oled' | 'light' | 'system';
+export type ThemeMode = 'dark' | 'light';
 export type DensityMode = 'compact' | 'comfortable' | 'spacious';
 export type ViewMode = 'simple' | 'advanced' | 'developer';
 
@@ -13,16 +13,6 @@ export const designTokens = {
       textPrimary: '#f8fafc',
       textSecondary: '#94a3b8',
       textMuted: '#64748b',
-    },
-    oled: {
-      background: '#000000',
-      surface: '#080808',
-      surfaceElevated: '#121212',
-      border: '#222222',
-      borderSubtle: '#141414',
-      textPrimary: '#ffffff',
-      textSecondary: '#a1a1aa',
-      textMuted: '#71717a',
     },
     light: {
       background: '#f8fafc',
