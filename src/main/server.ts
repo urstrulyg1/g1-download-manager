@@ -1215,5 +1215,35 @@ function collectSystemMetrics(db: AppDatabase, engine: DownloadEngine, networkQu
 }
 
 if (require.main === module) {
-  createUnifiedServer(parseInt(process.env.PORT || '8055', 10));
+  createUnifiedServer(parseInt(process.env.PORT || '8055', 10))
+    .then(({ server, db }) => {
+      let _exiting = false;
+
+      const shutdown = (signal: string) => {
+        if (_exiting) return;
+        _exiting = true;
+        console.log(`\n[G1DM] Received ${signal} — shutting down gracefully...`);
+
+        // Stop accepting new HTTP/WS connections.
+        server.close(() => {
+          // Flush the SQLite database before the process exits.
+          try { db.flush(); } catch { /* best-effort */ }
+          console.log('[G1DM] Clean shutdown complete.');
+          process.exit(0);
+        });
+
+        // Force-exit after 6 s if the server hangs (active connections, etc.).
+        setTimeout(() => {
+          console.error('[G1DM] Forced exit after timeout.');
+          process.exit(1);
+        }, 6000).unref();
+      };
+
+      process.on('SIGINT',  () => shutdown('SIGINT'));
+      process.on('SIGTERM', () => shutdown('SIGTERM'));
+    })
+    .catch((err) => {
+      console.error('[G1DM] Failed to start:', err);
+      process.exit(1);
+    });
 }

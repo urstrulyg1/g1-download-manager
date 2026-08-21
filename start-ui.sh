@@ -200,18 +200,42 @@ PORT=${PORT:-8055}
 echo -e "\n${BRIGHT_BLUE}${BOLD}┌── [5/5] Starting G1DM Core Service${RESET}"
 echo -e "${CYAN}│  • Binding listener to ${BRIGHT_WHITE}127.0.0.1:${PORT}${CYAN} (Local Loopback)...${RESET}"
 
-# Start G1DM server in background
+# Start G1DM server in background, in its own process group so kill -PGID works
 PORT="${PORT}" NODE_ENV=production node dist/main/server.js &
 SERVER_PID=$!
 
-cleanup() {
+# Track whether we have already run the shutdown sequence so the EXIT trap
+# (which fires after INT/TERM handlers return) doesn't double-print.
+_SHUTDOWN_DONE=0
+
+_do_shutdown() {
+    # Guard against re-entry (EXIT fires after INT/TERM handlers return).
+    [ "$_SHUTDOWN_DONE" -eq 1 ] && return
+    _SHUTDOWN_DONE=1
+
+    echo -e "\n${BRIGHT_YELLOW}🛑 Stopping G1DM Core Server (PID: ${SERVER_PID})...${RESET}"
+
+    # Send SIGTERM first — lets the Node process flush the DB.
+    kill -TERM "$SERVER_PID" 2>/dev/null || true
+
+    # Give it up to 5 seconds to exit gracefully.
+    local waited=0
+    while kill -0 "$SERVER_PID" 2>/dev/null && [ $waited -lt 50 ]; do
+        sleep 0.1
+        waited=$((waited + 1))
+    done
+
+    # Force-kill if it's still alive after the grace period.
     if kill -0 "$SERVER_PID" 2>/dev/null; then
-        echo -e "\n${BRIGHT_YELLOW}🛑 Stopping G1DM Core Server (PID: ${SERVER_PID})...${RESET}"
-        kill "$SERVER_PID" 2>/dev/null || true
-        echo -e "${GREEN}✔ Server stopped cleanly. Goodbye!${RESET}"
+        echo -e "${YELLOW}⚠  Force-killing unresponsive server...${RESET}"
+        kill -KILL "$SERVER_PID" 2>/dev/null || true
     fi
+
+    echo -e "${GREEN}✔ G1DM stopped. Goodbye!${RESET}"
 }
-trap cleanup INT TERM EXIT
+
+trap '_do_shutdown; exit 0' INT TERM
+trap '_do_shutdown'         EXIT
 
 # Readiness Probe: wait until server is actively responding
 echo -en "${CYAN}│  • Awaiting server readiness probe... ${RESET}"
@@ -255,4 +279,7 @@ fi
 
 echo -e "\n${BRIGHT_YELLOW}${BOLD}💡 Tip:${RESET} ${GRAY}Press ${BRIGHT_WHITE}Ctrl + C${GRAY} at any time to gracefully terminate the server.${RESET}\n"
 
-wait "$SERVER_PID"
+# Wait for the server. When Ctrl+C (SIGINT) is pressed the shell delivers
+# SIGINT to this script; the trap calls _do_shutdown which sends SIGTERM to
+# the node child. wait then returns once the child exits.
+wait "$SERVER_PID" 2>/dev/null || true
