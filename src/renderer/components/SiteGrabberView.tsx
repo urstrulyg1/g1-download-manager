@@ -264,7 +264,7 @@ export const SiteGrabberView: React.FC<SiteGrabberViewProps> = ({ projects, lang
 
       {/* Create Project Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
+        <div className="theme-overlay fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
           <form
             onSubmit={handleCreateProject}
             className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg shadow-2xl p-5 space-y-4 text-xs"

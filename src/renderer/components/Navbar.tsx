@@ -23,7 +23,7 @@ import {
 } from 'lucide-react';
 import { Language, translations } from '../lib/i18n';
 import { ProfileType, DownloadProfilesManager } from '../../main/engine/DownloadProfiles';
-import { ViewMode } from '../design-system/tokens';
+import type { ThemeMode, ViewMode } from '../design-system/tokens';
 import { Button } from './ui/Button';
 import { Badge } from './ui/Badge';
 import { api } from '../lib/api';
@@ -31,7 +31,7 @@ import { api } from '../lib/api';
 interface NavbarProps {
   lang: Language;
   onLanguageChange: (lang: Language) => void;
-  theme: 'dark' | 'light' | 'oled';
+  theme: ThemeMode;
   onThemeToggle: () => void;
   onOpenNewDownload: () => void;
   onOpenCommandPalette: () => void;
@@ -316,10 +316,15 @@ export const Navbar: React.FC<NavbarProps> = ({
             closeAllDropdowns();
             onThemeToggle();
           }}
-          title={`Toggle Theme (Current: ${theme.toUpperCase()})`}
+          title={`Switch theme (Current: ${theme.toUpperCase()})`}
+          aria-label={`Switch theme. Current theme: ${theme}`}
           className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 transition-colors"
         >
-          {theme === 'dark' || theme === 'oled' ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-blue-400" />}
+          {theme === 'light' ? (
+            <Moon className="w-4 h-4 text-blue-400" />
+          ) : (
+            <Sun className="w-4 h-4 text-amber-400" />
+          )}
         </button>
       </div>
     </header>

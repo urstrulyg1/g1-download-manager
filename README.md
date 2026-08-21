@@ -218,7 +218,7 @@
 
 ### 8. Modern Glassmorphic UI & Developer Tools
 * **Rich Glassmorphic Design System**:
-  - Designed with Tailwind-free custom CSS, glassmorphic blur filters, micro-animations, and 3 tailored themes (**Dark**, **OLED Pure Black**, and **Light**).
+  - Designed with Tailwind-free custom CSS, glassmorphic blur filters, micro-animations, and 2 tailored themes (**Dark** and **Light**).
 * **Power Features Dashboard (`PowerFeaturesView.tsx`)**:
   - Dedicated interactive control hub for the Encrypted Vault, Live Stream DVR, Playlist Grabber, Telegram Bot, Debrid Accounts, and Channel Bonding.
 * **Command Palette (`CommandPalette.tsx`)**:

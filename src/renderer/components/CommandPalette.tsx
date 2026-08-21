@@ -232,7 +232,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-start justify-center pt-24 p-4">
+    <div className="theme-overlay fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-start justify-center pt-24 p-4">
       <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-xl shadow-2xl overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-100">
         {/* Search input */}
         <div className="p-3.5 border-b border-slate-800 flex items-center gap-3 bg-slate-950/60">
