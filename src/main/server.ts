@@ -115,17 +115,9 @@ export async function createUnifiedServer(port: number = 8055) {
   );
   app.use(express.json({ limit: '10mb' }));
 
-  // Authentication for the control plane (remote clients require an API key
-  // when one is configured).
+  // Authentication for the control plane (optional user-defined token)
   RequestAuth.setApiKeyProvider(() => db.getSettings().security?.apiKey || undefined);
   app.use(RequestAuth.middleware());
-  if (!RequestAuth.isRemoteAuthEnabled()) {
-    console.warn(
-      '[G1DM] ⚠️  No API key configured — remote (non-loopback) access to the ' +
-        'dashboard and API is currently unauthenticated. Set the G1DM_API_KEY ' +
-        'environment variable (or Security → API Key in Settings) to require authentication.'
-    );
-  }
 
   const server = createServer(app);
   const wss = new WebSocketServer({ server, path: '/ws' });
