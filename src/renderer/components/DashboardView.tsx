@@ -138,31 +138,37 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
 
         {/* Real-time SVG Bandwidth Graph */}
-        <div className="w-full h-32 relative bg-slate-950/80 rounded-xl p-2 border border-slate-800/60 overflow-hidden">
-          <svg
-            viewBox={`0 0 ${chartWidth} ${chartHeight}`}
-            className="w-full h-full preserve-3d"
-            preserveAspectRatio="none"
-          >
-            <defs>
-              <linearGradient id="speedGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-                <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.4" />
-                <stop offset="100%" stopColor="#3b82f6" stopOpacity="0.0" />
-              </linearGradient>
-            </defs>
-            {/* Grid lines */}
-            <line x1="0" y1="30" x2={chartWidth} y2="30" stroke="#334155" strokeDasharray="4 4" strokeWidth="0.5" />
-            <line x1="0" y1="60" x2={chartWidth} y2="60" stroke="#334155" strokeDasharray="4 4" strokeWidth="0.5" />
-            <line x1="0" y1="90" x2={chartWidth} y2="90" stroke="#334155" strokeDasharray="4 4" strokeWidth="0.5" />
+        <div className="w-full relative bg-slate-950/80 rounded-xl p-4 border border-slate-800/60 shadow-inner flex flex-col gap-2">
+          <div className="w-full h-32 relative">
+            <svg
+              viewBox={`0 0 ${chartWidth} ${chartHeight}`}
+              className="w-full h-full"
+              preserveAspectRatio="none"
+            >
+              <defs>
+                <linearGradient id="speedGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                  <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.45" />
+                  <stop offset="100%" stopColor="#3b82f6" stopOpacity="0.0" />
+                </linearGradient>
+              </defs>
+              {/* Grid lines */}
+              <line x1="0" y1="25" x2={chartWidth} y2="25" stroke="#334155" strokeDasharray="4 4" strokeWidth="0.5" opacity="0.6" />
+              <line x1="0" y1="55" x2={chartWidth} y2="55" stroke="#334155" strokeDasharray="4 4" strokeWidth="0.5" opacity="0.6" />
+              <line x1="0" y1="85" x2={chartWidth} y2="85" stroke="#334155" strokeDasharray="4 4" strokeWidth="0.5" opacity="0.6" />
 
-            {/* Filled area */}
-            <path d={areaPath} fill="url(#speedGrad)" />
-            {/* Line */}
-            <path d={svgPath} fill="none" stroke="#38bdf8" strokeWidth="2.5" strokeLinecap="round" />
-          </svg>
+              {/* Filled area */}
+              <path d={areaPath} fill="url(#speedGrad)" />
+              {/* Line */}
+              <path d={svgPath} fill="none" stroke="#38bdf8" strokeWidth="2.5" strokeLinecap="round" />
+            </svg>
+          </div>
 
-          <div className="absolute bottom-2 right-3 text-[10px] text-slate-500 font-mono">
-            Last 60 seconds • Dynamic Splitting Active
+          <div className="flex items-center justify-between pt-2 px-1 text-[11px] text-slate-400 font-mono border-t border-slate-800/50">
+            <span className="flex items-center gap-1.5 text-cyan-400 font-semibold">
+              <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
+              Dynamic Work-Stealing 2.0
+            </span>
+            <span>Last 60 Seconds Throughput</span>
           </div>
         </div>
       </div>
