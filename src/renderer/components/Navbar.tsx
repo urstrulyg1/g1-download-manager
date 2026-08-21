@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Download,
   Pause,
@@ -69,6 +69,41 @@ export const Navbar: React.FC<NavbarProps> = ({
   const [showViewModeMenu, setShowViewModeMenu] = useState(false);
   const [customSpeedInput, setCustomSpeedInput] = useState('');
 
+  const viewModeRef = useRef<HTMLDivElement>(null);
+  const profileRef = useRef<HTMLDivElement>(null);
+
+  const closeAllDropdowns = () => {
+    setShowSpeedMenu(false);
+    setShowProfileMenu(false);
+    setShowViewModeMenu(false);
+  };
+
+  // Close dropdowns on outside click or Escape key
+  useEffect(() => {
+    const handleGlobalClick = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (
+        viewModeRef.current && !viewModeRef.current.contains(target) &&
+        profileRef.current && !profileRef.current.contains(target)
+      ) {
+        closeAllDropdowns();
+      }
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        closeAllDropdowns();
+      }
+    };
+
+    document.addEventListener('mousedown', handleGlobalClick);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handleGlobalClick);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
+
   const profiles = DownloadProfilesManager.getProfiles();
 
   const handleApplyCustomSpeed = (e: React.FormEvent) => {
@@ -84,7 +119,13 @@ export const Navbar: React.FC<NavbarProps> = ({
     <header className="h-16 bg-slate-900/90 dark:bg-slate-950/90 backdrop-blur-md border-b border-slate-800 px-4 flex items-center justify-between sticky top-0 z-30 select-none">
       {/* Left: Brand, Core Status & Mode */}
       <div className="flex items-center gap-3">
-        <div className="flex items-center gap-2.5 cursor-pointer" onClick={onOpenNewDownload}>
+        <div
+          className="flex items-center gap-2.5 cursor-pointer"
+          onClick={() => {
+            closeAllDropdowns();
+            onOpenNewDownload();
+          }}
+        >
           <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-cyan-400 flex items-center justify-center shadow-lg shadow-blue-500/25">
             <Download className="w-5 h-5 text-white" />
           </div>
@@ -114,9 +155,13 @@ export const Navbar: React.FC<NavbarProps> = ({
         </div>
 
         {/* View Mode Dropdown */}
-        <div className="relative">
+        <div className="relative" ref={viewModeRef}>
           <button
-            onClick={() => setShowViewModeMenu(!showViewModeMenu)}
+            onClick={() => {
+              setShowProfileMenu(false);
+              setShowSpeedMenu(false);
+              setShowViewModeMenu((prev) => !prev);
+            }}
             className="flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-slate-300 text-[11px] font-semibold"
           >
             <span className="capitalize">{viewMode} Mode</span>
@@ -151,16 +196,23 @@ export const Navbar: React.FC<NavbarProps> = ({
           size="sm"
           variant="primary"
           leftIcon={<Plus className="w-4 h-4" />}
-          onClick={onOpenNewDownload}
+          onClick={() => {
+            closeAllDropdowns();
+            onOpenNewDownload();
+          }}
           title="Start a new download (Ctrl+N / ⌘N)"
         >
           {t.newDownload}
         </Button>
 
         {/* Profile Selector */}
-        <div className="relative">
+        <div className="relative" ref={profileRef}>
           <button
-            onClick={() => setShowProfileMenu(!showProfileMenu)}
+            onClick={() => {
+              setShowViewModeMenu(false);
+              setShowSpeedMenu(false);
+              setShowProfileMenu((prev) => !prev);
+            }}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-semibold transition-colors"
             title={`Current Profile: ${currentProfile}. Click to switch performance profiles.`}
           >
@@ -198,7 +250,10 @@ export const Navbar: React.FC<NavbarProps> = ({
         </div>
 
         <button
-          onClick={() => api.resumeAll()}
+          onClick={() => {
+            closeAllDropdowns();
+            api.resumeAll();
+          }}
           title="Resume all queued and paused downloads immediately"
           className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 active:scale-95 transition-all"
         >
@@ -207,7 +262,10 @@ export const Navbar: React.FC<NavbarProps> = ({
         </button>
 
         <button
-          onClick={() => api.pauseAll()}
+          onClick={() => {
+            closeAllDropdowns();
+            api.pauseAll();
+          }}
           title="Pause all currently active downloads"
           className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 active:scale-95 transition-all"
         >
@@ -219,7 +277,10 @@ export const Navbar: React.FC<NavbarProps> = ({
       {/* Right: Search, Action Center & Settings */}
       <div className="flex items-center gap-2">
         <button
-          onClick={onOpenCommandPalette}
+          onClick={() => {
+            closeAllDropdowns();
+            onOpenCommandPalette();
+          }}
           title="Open Command Palette & Global Search (Ctrl+K / ⌘K)"
           className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-slate-400 hover:text-slate-200 text-xs transition-all"
         >
@@ -230,7 +291,10 @@ export const Navbar: React.FC<NavbarProps> = ({
 
         {/* Needs Attention Action Center Button */}
         <button
-          onClick={onToggleActionCenter}
+          onClick={() => {
+            closeAllDropdowns();
+            onToggleActionCenter();
+          }}
           className={`relative p-2 rounded-xl border transition-colors ${
             alertCount > 0
               ? 'bg-amber-500/20 border-amber-500/40 text-amber-300'
@@ -248,7 +312,10 @@ export const Navbar: React.FC<NavbarProps> = ({
 
         {/* Theme Switcher */}
         <button
-          onClick={onThemeToggle}
+          onClick={() => {
+            closeAllDropdowns();
+            onThemeToggle();
+          }}
           title={`Toggle Theme (Current: ${theme.toUpperCase()})`}
           className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 transition-colors"
         >
