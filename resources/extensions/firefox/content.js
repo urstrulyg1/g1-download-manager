@@ -208,13 +208,10 @@
       }
     }
 
-    // 2. Video Resolution & Container & Codec Combinations
-    const maxRes = vHeight >= 3600 ? 4320 : vHeight >= 1800 ? 2160 : vHeight >= 1200 ? 1440 : vHeight >= 900 ? 1080 : vHeight >= 600 ? 720 : 480;
-
+    // 2. Video Resolution & Container & Codec Combinations (Show all tiers up to 8K / 4K / HD)
     for (const res of RESOLUTION_TIERS) {
-      if (res.height > Math.max(maxRes, 1080)) continue;
-
       const calcWidth = Math.round(res.height * (16 / 9));
+      const isCurrentPlayback = (vHeight >= res.height * 0.9 && vHeight <= res.height * 1.1) || (res.height === 1080 && vHeight <= 1080 && vHeight > 720);
 
       for (const cfg of CONTAINER_CODEC_CONFIGS) {
         if (filter !== 'ALL') {
@@ -223,7 +220,7 @@
         }
 
         results.push({
-          label: `${res.label}`,
+          label: `${res.label}${isCurrentPlayback ? ' (Current Stream)' : ''}`,
           formatLabel: cfg.description,
           badge: `${res.badge} ${cfg.codec}`,
           color: cfg.badgeColor,
@@ -231,7 +228,8 @@
           resolution: `${calcWidth}×${res.height} • ${res.bitrate}`,
           container: cfg.container,
           codec: cfg.codec,
-          height: res.height
+          height: res.height,
+          isCurrent: isCurrentPlayback
         });
       }
     }
