@@ -26,16 +26,16 @@ set "WHITE=%ESC%[97m"
 set "GRAY=%ESC%[90m"
 
 echo.
-echo %CYAN%%BOLD%  ╔═══════════════════════════════════════════════════════════════════════╗%RESET%
-echo %CYAN%%BOLD%  ║                                                                       ║%RESET%
-echo   %CYAN%%BOLD%║   %MAGENTA%██████╗  ██╗██████╗ ███╗   ███╗%CYAN%                                     ║%RESET%
-echo   %CYAN%%BOLD%║  %MAGENTA%██╔════╝ ███║██╔══██╗████╗ ████║%CYAN%   %WHITE%%BOLD%Next-Gen Internet Download Manager%CYAN%  ║%RESET%
-echo   %CYAN%%BOLD%║  %MAGENTA%██║  ███╗╚██║██║  ██║██╔████╔██║%CYAN%   %DIM%Universal Core Engine & Web UI%RESET%%CYAN%%BOLD%      ║%RESET%
-echo   %CYAN%%BOLD%║  %MAGENTA%██║   ██║ ██║██║  ██║██║╚██╔╝██║%CYAN%   %YELLOW%v2.0-PRO%CYAN% • %GREEN%Production Ready%CYAN%         ║%RESET%
-echo   %CYAN%%BOLD%║  %MAGENTA%╚██████╔╝ ██║██████╔╝██║ ╚═╝ ██║%CYAN%                                     ║%RESET%
-echo   %CYAN%%BOLD%║   %MAGENTA%╚═════╝  ╚═╝╚═════╝ ╚═╝     ╚═╝%CYAN%                                     ║%RESET%
-echo %CYAN%%BOLD%  ║                                                                       ║%RESET%
-echo %CYAN%%BOLD%  ╚═══════════════════════════════════════════════════════════════════════╝%RESET%
+echo %CYAN%%BOLD%  ╔═════════════════════════════════════════════════════════════════════════╗%RESET%
+echo %CYAN%%BOLD%  ║                                                                         ║%RESET%
+echo   %CYAN%%BOLD%║   %MAGENTA%██████╗   ██╗ ██████╗  ███╗   ███╗                                    %CYAN%║%RESET%
+echo   %CYAN%%BOLD%║  %MAGENTA%██╔════╝  ███║ ██╔══██╗ ████╗ ████║   %WHITE%%BOLD%Next-Gen Internet Download Mgr   %CYAN%║%RESET%
+echo   %CYAN%%BOLD%║  %MAGENTA%██║  ███╗  ██║ ██║  ██║ ██╔████╔██║   %DIM%Universal Core Engine & Web UI   %RESET%%CYAN%%BOLD%║%RESET%
+echo   %CYAN%%BOLD%║  %MAGENTA%██║   ██║  ██║ ██║  ██║ ██║╚██╔╝██║   %YELLOW%v2.0-PRO%CYAN% • %GREEN%Production Ready      %CYAN%║%RESET%
+echo   %CYAN%%BOLD%║  %MAGENTA%╚██████╔╝  ██║ ██████╔╝ ██║ ╚═╝ ██║   %GRAY%High-Performance Core Engine     %CYAN%║%RESET%
+echo   %CYAN%%BOLD%║   %MAGENTA%╚═════╝   ╚═╝ ╚═════╝  ╚═╝     ╚═╝                                    %CYAN%║%RESET%
+echo %CYAN%%BOLD%  ║                                                                         ║%RESET%
+echo %CYAN%%BOLD%  ╚═════════════════════════════════════════════════════════════════════════╝%RESET%
 echo.
 
 cd /d "%~dp0"
