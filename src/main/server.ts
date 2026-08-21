@@ -47,8 +47,9 @@ import { PathGuard } from './security/PathGuard';
 import { redactSettings } from './security/Redact';
 
 export async function createUnifiedServer(port: number = 8055) {
-  const isDev = process.env.NODE_ENV !== 'production';
   const rendererDir = path.join(process.cwd(), 'src', 'renderer');
+  const hasProductionBuild = fs.existsSync(path.join(rendererDir, '.next', 'BUILD_ID'));
+  const isDev = process.env.NODE_ENV === 'development' || (!hasProductionBuild && process.env.NODE_ENV !== 'production');
 
   const nextApp = next({ dev: isDev, dir: rendererDir });
   const nextHandler = nextApp.getRequestHandler();

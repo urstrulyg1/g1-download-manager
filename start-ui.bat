@@ -148,6 +148,7 @@ echo Press Ctrl+C to stop the G1DM server.
 echo.
 
 set PORT=%PORT%
+set NODE_ENV=production
 node dist\main\server.js
 if %errorlevel% neq 0 (
     pause

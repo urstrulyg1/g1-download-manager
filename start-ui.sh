@@ -67,12 +67,7 @@ fi
 
 # 4. Build backend & frontend
 echo -e "${BLUE}[4/5] Building G1DM backend & Next.js frontend...${RESET}"
-if [ ! -d "dist/main" ] || [ ! -d "src/renderer/.next" ]; then
-    npm run build
-else
-    # Build to ensure latest updates are compiled
-    npm run build:backend
-fi
+npm run build
 echo -e "${GREEN}✓ Build verified.${RESET}"
 
 URL="http://127.0.0.1:${PORT:-8055}"
@@ -108,34 +103,51 @@ if [ -x "resources/native-host/install-host.sh" ]; then
     fi
 fi
 
-if command -v open >/dev/null 2>&1; then
-    add_browser_option "Default browser" "open"
-    [ -d "/Applications/Google Chrome.app" ] && add_browser_option "Google Chrome (with G1DM Extension)" "open -na 'Google Chrome' --args --load-extension='$CHROME_EXT_DIR'"
-    [ -d "/Applications/Brave Browser.app" ] && add_browser_option "Brave Browser (with G1DM Extension)" "open -na 'Brave Browser' --args --load-extension='$CHROME_EXT_DIR'"
-    [ -d "/Applications/Microsoft Edge.app" ] && add_browser_option "Microsoft Edge (with G1DM Extension)" "open -na 'Microsoft Edge' --args --load-extension='$CHROME_EXT_DIR'"
-    [ -d "/Applications/Firefox.app" ] && add_browser_option "Firefox" "open -a 'Firefox'"
-    [ -d "/Applications/Safari.app" ] && add_browser_option "Safari" "open -a 'Safari'"
-    [ -d "/Applications/Safari.app" ] && add_manual_browser "Safari"
+# Determine browser options
+if [ -d "/Applications/Google Chrome.app" ]; then
+    add_browser_option "Google Chrome (with G1DM Extension)" "open -a '/Applications/Google Chrome.app' --args --load-extension='$CHROME_EXT_DIR'"
+elif [ -d "/Applications/Brave Browser.app" ]; then
+    add_browser_option "Brave Browser (with G1DM Extension)" "open -a '/Applications/Brave Browser.app' --args --load-extension='$CHROME_EXT_DIR'"
+elif [ -d "/Applications/Microsoft Edge.app" ]; then
+    add_browser_option "Microsoft Edge (with G1DM Extension)" "open -a '/Applications/Microsoft Edge.app' --args --load-extension='$CHROME_EXT_DIR'"
 fi
+
+if [ -d "/Applications/Firefox.app" ]; then
+    add_browser_option "Firefox" "open -a '/Applications/Firefox.app'"
+fi
+
+if [ -d "/Applications/Safari.app" ]; then
+    add_browser_option "Safari" "open -a '/Applications/Safari.app'"
+fi
+
+add_browser_option "Default browser" "open"
+add_browser_option "Do not open a browser" ""
 
 if [ ${#AUTO_CONFIGURED_BROWSERS[@]} -gt 0 ]; then
-    echo -e "${GREEN}Configured native-host integration for: ${AUTO_CONFIGURED_BROWSERS[*]}${RESET}"
+    echo -e "${GREEN}Configured native-host integration for:${RESET} ${AUTO_CONFIGURED_BROWSERS[*]}"
 fi
 if [ ${#MANUAL_BROWSERS[@]} -gt 0 ]; then
-    echo -e "${YELLOW}Manual extension enablement still required for: ${MANUAL_BROWSERS[*]}${RESET}"
+    echo -e "${YELLOW}Manual extension enablement still required for:${RESET} ${MANUAL_BROWSERS[*]}"
 fi
 
-if [ ${#BROWSER_NAMES[@]} -gt 0 ]; then
-    echo -e "\n${BLUE}Detected browsers:${RESET}"
-    for i in "${!BROWSER_NAMES[@]}"; do
-        printf "  %d) %s\n" "$((i + 1))" "${BROWSER_NAMES[$i]}"
-    done
-    printf "  %d) Do not open a browser\n" "$(( ${#BROWSER_NAMES[@]} + 1 ))"
-    printf "Choose a browser to open G1DM [%d]: " "$(( ${#BROWSER_NAMES[@]} + 1 ))"
-    read -r BROWSER_CHOICE
-    if [[ "$BROWSER_CHOICE" =~ ^[0-9]+$ ]] && [ "$BROWSER_CHOICE" -ge 1 ] && [ "$BROWSER_CHOICE" -le ${#BROWSER_NAMES[@]} ]; then
-        OPEN_BROWSER_CMD="${BROWSER_CMDS[$((BROWSER_CHOICE - 1))]}"
+echo -e "\n${BOLD}Detected browsers:${RESET}"
+for i in "${!BROWSER_NAMES[@]}"; do
+    echo "  $((i + 1))) ${BROWSER_NAMES[$i]}"
+done
+
+DEFAULT_OPTION=1
+for i in "${!BROWSER_NAMES[@]}"; do
+    if [ "${BROWSER_NAMES[$i]}" = "Google Chrome (with G1DM Extension)" ] || [ "${BROWSER_NAMES[$i]}" = "Default browser" ]; then
+        DEFAULT_OPTION=$((i + 1))
+        break
     fi
+done
+
+echo -n "Choose a browser to open G1DM [$DEFAULT_OPTION]: "
+read -r BROWSER_CHOICE
+BROWSER_CHOICE="${BROWSER_CHOICE:-$DEFAULT_OPTION}"
+if [[ "$BROWSER_CHOICE" =~ ^[0-9]+$ ]] && [ "$BROWSER_CHOICE" -ge 1 ] && [ "$BROWSER_CHOICE" -le ${#BROWSER_NAMES[@]} ]; then
+    OPEN_BROWSER_CMD="${BROWSER_CMDS[$((BROWSER_CHOICE - 1))]}"
 fi
 
 # 5. Start G1DM Unified Server
@@ -154,4 +166,4 @@ if [ -n "$OPEN_BROWSER_CMD" ]; then
 fi
 echo -e "${YELLOW}Press Ctrl+C to stop the G1DM server.${RESET}\n"
 
-exec env PORT="${PORT}" node dist/main/server.js
+exec env PORT="${PORT}" NODE_ENV=production node dist/main/server.js
