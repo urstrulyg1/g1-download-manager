@@ -22,6 +22,7 @@ import { AutomationView } from '../components/AutomationView';
 import { MediaLibraryView } from '../components/MediaLibraryView';
 import { IncidentsView } from '../components/IncidentsView';
 import { SnapshotsView } from '../components/SnapshotsView';
+import { PowerFeaturesView } from '../components/PowerFeaturesView';
 import { ActionCenterDrawer } from '../components/ui/ActionCenterDrawer';
 import { InboxItem } from '../../main/engine/DownloadInbox';
 import { ProfileType } from '../../main/engine/DownloadProfiles';
@@ -217,6 +218,10 @@ export default function Home() {
 
           {activeView === 'automation' && (
             <AutomationView downloads={downloads} lang={lang} />
+          )}
+
+          {activeView === 'powerFeatures' && (
+            <PowerFeaturesView lang={lang} />
           )}
 
           {activeView === 'analytics' && (

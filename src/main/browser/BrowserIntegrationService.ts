@@ -1,17 +1,105 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as zlib from 'zlib';
-import { AppDatabase } from '../db/Database';
-import { DownloadEngine } from '../engine/DownloadEngine';
 
 export class BrowserIntegrationService {
+  public static generatePngBuffer(width: number, height: number): Buffer {
+    const rawData: number[] = [];
+    for (let y = 0; y < height; y++) {
+      rawData.push(0); // filter 0
+      for (let x = 0; x < width; x++) {
+        const nx = x / width;
+        const ny = y / height;
+        let isArrow = false;
+        if (nx >= 0.42 && nx <= 0.58 && ny >= 0.22 && ny <= 0.52) isArrow = true;
+        else if (ny >= 0.52 && ny <= 0.72) {
+          const progress = (ny - 0.52) / 0.20;
+          const halfW = 0.28 * (1 - progress);
+          if (nx >= 0.5 - halfW && nx <= 0.5 + halfW) isArrow = true;
+        } else if (ny >= 0.75 && ny <= 0.82 && nx >= 0.25 && nx <= 0.75) isArrow = true;
+
+        if (isArrow) {
+          rawData.push(255, 255, 255, 255);
+        } else {
+          rawData.push(30, 80, 200, 255);
+        }
+      }
+    }
+
+    const compressed = zlib.deflateSync(Buffer.from(rawData));
+    const crcTable: number[] = [];
+    for (let n = 0; n < 256; n++) {
+      let c = n;
+      for (let k = 0; k < 8; k++) {
+        c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+      }
+      crcTable[n] = c;
+    }
+    function crc32(buf: Buffer): number {
+      let c = 0xffffffff;
+      for (let i = 0; i < buf.length; i++) {
+        c = crcTable[(c ^ buf[i]) & 0xff] ^ (c >>> 8);
+      }
+      return (c ^ 0xffffffff) >>> 0;
+    }
+
+    function makeChunk(type: string, data: Buffer): Buffer {
+      const lenBuf = Buffer.alloc(4);
+      lenBuf.writeUInt32BE(data.length, 0);
+      const typeBuf = Buffer.from(type, 'ascii');
+      const crcVal = crc32(Buffer.concat([typeBuf, data]));
+      const crcBuf = Buffer.alloc(4);
+      crcBuf.writeUInt32BE(crcVal, 0);
+      return Buffer.concat([lenBuf, typeBuf, data, crcBuf]);
+    }
+
+    const header = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+    const ihdr = Buffer.alloc(13);
+    ihdr.writeUInt32BE(width, 0);
+    ihdr.writeUInt32BE(height, 4);
+    ihdr[8] = 8;
+    ihdr[9] = 6;
+    ihdr[10] = 0;
+    ihdr[11] = 0;
+    ihdr[12] = 0;
+
+    return Buffer.concat([
+      header,
+      makeChunk('IHDR', ihdr),
+      makeChunk('IDAT', compressed),
+      makeChunk('IEND', Buffer.alloc(0)),
+    ]);
+  }
+
   public static ensureExtensionFiles(): void {
     const extensionDir = path.join(process.cwd(), 'resources', 'browser-extension');
     if (!fs.existsSync(extensionDir)) {
       fs.mkdirSync(extensionDir, { recursive: true });
     }
 
-    // Write manifest.json
+    // Ensure icons in resources/browser-extension and resources/extensions/chrome
+    const targetIconDirs = [
+      path.join(extensionDir, 'icons'),
+      extensionDir,
+      path.join(process.cwd(), 'resources', 'extensions', 'chrome', 'icons'),
+      path.join(process.cwd(), 'resources', 'extensions', 'firefox', 'icons'),
+      path.join(process.cwd(), 'resources', 'extensions', 'safari', 'icons'),
+    ];
+
+    for (const dir of targetIconDirs) {
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+      for (const size of [16, 32, 48, 128]) {
+        const iconPath = path.join(dir, `icon${size}.png`);
+        if (!fs.existsSync(iconPath)) {
+          const pngBuf = this.generatePngBuffer(size, size);
+          fs.writeFileSync(iconPath, pngBuf);
+        }
+      }
+    }
+
+    // Write manifest.json for resources/browser-extension
     const manifest = {
       manifest_version: 3,
       name: 'G1DM — Internet Download Manager Integration',

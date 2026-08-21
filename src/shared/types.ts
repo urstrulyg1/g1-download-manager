@@ -88,6 +88,27 @@ export interface SecurityScanInfo {
   timestamp?: number;
 }
 
+export interface UrlSafetyScanResult {
+  url: string;
+  isSafe: boolean;
+  riskScore: number;
+  riskLevel: 'SAFE' | 'SUSPICIOUS' | 'HIGH_RISK' | 'CRITICAL_MALICIOUS';
+  threatType:
+    | 'SAFE'
+    | 'PHISHING_URL'
+    | 'DRIVE_BY_MALWARE'
+    | 'SUSPICIOUS_IP_DOWNLOAD'
+    | 'DISGUISED_EXECUTABLE'
+    | 'MIME_SPOOFING'
+    | 'HIGH_REDIRECT_CHAIN';
+  warningTitle: string;
+  warningDetails: string;
+  reasons: string[];
+  recommendation: string;
+  requireUserOverride: boolean;
+  scannedAt: number;
+}
+
 export interface ArchiveEntry {
   name: string;
   size: number;
@@ -142,6 +163,7 @@ export interface DownloadItem {
   completedAt?: number;
   durationMs: number;
   securityScan: SecurityScanInfo;
+  safetyWarning?: UrlSafetyScanResult;
   archiveInfo?: ArchiveInfo;
   logs: { timestamp: number; level: 'info' | 'warn' | 'error'; message: string }[];
 }

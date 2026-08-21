@@ -21,6 +21,24 @@ import { BrowserIntegrationService } from './browser/BrowserIntegrationService';
 import { ClipboardMonitor } from './clipboard/ClipboardMonitor';
 import { SystemMetrics } from '../shared/types';
 
+// Supercharged Modules
+import { PlaylistBatchGrabber } from './media/PlaylistBatchGrabber';
+import { LiveStreamDVR } from './media/LiveStreamDVR';
+import { MultiTrackExtractor } from './media/MultiTrackExtractor';
+import { MediaTranscoder } from './media/MediaTranscoder';
+import { MetadataInjector } from './media/MetadataInjector';
+import { ChannelBonding } from './network/ChannelBonding';
+import { TorrentEngine } from './engine/TorrentEngine';
+import { DualStackSelector } from './network/DualStackSelector';
+import { LatencySense } from './network/LatencySense';
+import { WebhookTrigger } from './automation/WebhookTrigger';
+import { AutoExtractor } from './archive/AutoExtractor';
+import { DebridManager } from './debrid/DebridManager';
+import { CloudSyncManager } from './storage/CloudSyncManager';
+import { DropBoxWatcher } from './storage/DropBoxWatcher';
+import { EncryptedVault } from './security/EncryptedVault';
+import { ControlBot } from './remote/ControlBot';
+
 export async function createUnifiedServer(port: number = 8055) {
   const isDev = process.env.NODE_ENV !== 'production';
   const rendererDir = path.join(process.cwd(), 'src', 'renderer');
@@ -70,7 +88,19 @@ export async function createUnifiedServer(port: number = 8055) {
   engine.on('item_progress', (item) => broadcast('item_progress', item));
   engine.on('item_added', (item) => broadcast('item_added', item));
   engine.on('item_updated', (item) => broadcast('item_updated', item));
-  engine.on('item_completed', (item) => broadcast('item_completed', item));
+  engine.on('item_completed', (item) => {
+    broadcast('item_completed', item);
+    // Trigger webhooks and cloud sync on completion
+    const settings = db.getSettings();
+    if (settings.security.runAntivirusScan) {
+      SecurityScanner.scanFile(item.finalPath, settings.security.antivirusCommand);
+    }
+    WebhookTrigger.executeTriggers(item, {
+      enabled: true,
+      triggerOnComplete: true,
+      triggerOnError: false,
+    });
+  });
   engine.on('item_error', (err, item) => broadcast('item_error', { error: err.message, item }));
   engine.on('item_deleted', (id) => broadcast('item_deleted', { id }));
   engine.on('log', (log) => broadcast('log', log));
@@ -302,6 +332,198 @@ export async function createUnifiedServer(port: number = 8055) {
       res.setHeader('Content-Type', 'application/json');
       res.setHeader('Content-Disposition', `attachment; filename="g1dm_diag_${Date.now()}.json"`);
       res.send(report);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Supercharged Features REST Routes
+  app.post('/api/media/playlist/parse', async (req, res) => {
+    try {
+      const { url } = req.body;
+      const parsed = await PlaylistBatchGrabber.parsePlaylist(url);
+      res.json(parsed);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/media/playlist/enqueue', async (req, res) => {
+    try {
+      const { playlist, destinationDir } = req.body;
+      const ids = await PlaylistBatchGrabber.enqueuePlaylist(playlist, engine, destinationDir);
+      res.json({ success: true, enqueuedIds: ids });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/media/dvr/schedule', (req, res) => {
+    const rec = LiveStreamDVR.scheduleRecording(req.body);
+    res.json(rec);
+  });
+
+  app.get('/api/media/dvr/recordings', (req, res) => {
+    res.json(LiveStreamDVR.getAllRecordings());
+  });
+
+  app.post('/api/media/dvr/:id/cancel', async (req, res) => {
+    const success = await LiveStreamDVR.cancelRecording(req.params.id);
+    res.json({ success });
+  });
+
+  app.post('/api/media/tracks/extract', async (req, res) => {
+    try {
+      const { url } = req.body;
+      const tracks = await MultiTrackExtractor.extractTracks(url);
+      res.json(tracks);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/media/transcode', async (req, res) => {
+    try {
+      const result = await MediaTranscoder.transcode(req.body);
+      res.json(result);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/media/metadata/inject', async (req, res) => {
+    try {
+      const { filePath, metadata } = req.body;
+      const ok = await MetadataInjector.injectMetadata(filePath, metadata);
+      res.json({ success: ok });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.get('/api/network/adapters', (req, res) => {
+    res.json(ChannelBonding.detectAdapters());
+  });
+
+  app.post('/api/network/dual-stack/select', async (req, res) => {
+    try {
+      const { hostname } = req.body;
+      const result = await DualStackSelector.selectOptimalFamily(hostname);
+      res.json(result);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/network/latency-sense/update', (req, res) => {
+    const { pingMs } = req.body;
+    const throttled = LatencySense.updatePing(pingMs, engine);
+    res.json({ ...LatencySense.getStatus(), throttled });
+  });
+
+  app.get('/api/network/latency-sense/status', (req, res) => {
+    res.json(LatencySense.getStatus());
+  });
+
+  app.post('/api/torrent/add', (req, res) => {
+    try {
+      const { magnetOrFilePath } = req.body;
+      const status = TorrentEngine.addTorrent(magnetOrFilePath);
+      res.json(status);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.get('/api/torrent/list', (req, res) => {
+    res.json(TorrentEngine.getAllTorrents());
+  });
+
+  app.post('/api/archive/auto-extract', async (req, res) => {
+    try {
+      const { filePath, passwords, deleteOriginalArchive } = req.body;
+      const result = await AutoExtractor.extractArchive(filePath, passwords, deleteOriginalArchive);
+      res.json(result);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/debrid/account', (req, res) => {
+    DebridManager.addAccount(req.body);
+    res.json({ success: true });
+  });
+
+  app.post('/api/debrid/unrestrict', async (req, res) => {
+    try {
+      const { url, provider } = req.body;
+      const unrestrict = await DebridManager.unrestrictLink(url, provider);
+      res.json(unrestrict);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/storage/cloud/upload', async (req, res) => {
+    try {
+      const { filePath, target } = req.body;
+      const result = await CloudSyncManager.uploadToCloud(filePath, target);
+      res.json(result);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/storage/dropbox/process', async (req, res) => {
+    try {
+      const { filePath } = req.body;
+      const count = await DropBoxWatcher.processDropFile(filePath, engine);
+      res.json({ count });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/security/vault/unlock', (req, res) => {
+    const { password } = req.body;
+    const ok = EncryptedVault.unlockVault(password);
+    res.json({ unlocked: ok });
+  });
+
+  app.post('/api/security/vault/lock', (req, res) => {
+    EncryptedVault.lockVault();
+    res.json({ locked: true });
+  });
+
+  app.post('/api/security/vault/store', async (req, res) => {
+    try {
+      const { filePath } = req.body;
+      const item = await EncryptedVault.encryptAndStoreFile(filePath);
+      res.json(item);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/security/vault/export', async (req, res) => {
+    try {
+      const { vaultItemId, outputDir } = req.body;
+      const exportedPath = await EncryptedVault.decryptAndExportFile(vaultItemId, outputDir);
+      res.json({ exportedPath });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.get('/api/security/vault/items', (req, res) => {
+    res.json(EncryptedVault.getVaultItems());
+  });
+
+  app.post('/api/remote/bot/command', async (req, res) => {
+    try {
+      const { commandText } = req.body;
+      const result = await ControlBot.processCommand(commandText, engine);
+      res.json(result);
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
