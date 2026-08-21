@@ -141,8 +141,8 @@ echo   OpenAPI Docs:    %URL%/api/v1/openapi.json
 echo   ===============================================================
 echo.
 if defined BROWSER_CHOICE if %BROWSER_CHOICE% geq 1 if %BROWSER_CHOICE% leq %BROWSER_COUNT% (
-    call echo Opening %URL% in %%BROWSER_NAME_%BROWSER_CHOICE%%%...
-    call %%BROWSER_CMD_%BROWSER_CHOICE%%% %URL%
+    call echo Opening %URL% in %%BROWSER_NAME_%BROWSER_CHOICE%%% once ready...
+    start /b cmd /c "timeout /t 1 /nobreak >nul & call %%BROWSER_CMD_%BROWSER_CHOICE%%% %URL%"
 )
 echo Press Ctrl+C to stop the G1DM server.
 echo.

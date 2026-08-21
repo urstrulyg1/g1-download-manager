@@ -154,16 +154,42 @@ fi
 PORT=${PORT:-8055}
 echo -e "\n${BLUE}[5/5] Starting G1DM Core Service on port ${PORT}...${RESET}"
 echo -e "${YELLOW}The service binds to 127.0.0.1 for local-only access.${RESET}"
+
+# Start G1DM server in background
+PORT="${PORT}" NODE_ENV=production node dist/main/server.js &
+SERVER_PID=$!
+
+cleanup() {
+    if kill -0 "$SERVER_PID" 2>/dev/null; then
+        kill "$SERVER_PID" 2>/dev/null
+    fi
+}
+trap cleanup INT TERM EXIT
+
+# Readiness Probe: wait until server is actively responding
+MAX_RETRIES=40
+RETRY_COUNT=0
+while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+    HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "http://127.0.0.1:${PORT}/api/browser/health" 2>/dev/null || echo "")
+    if [ "$HTTP_STATUS" = "200" ]; then
+        break
+    fi
+    sleep 0.1
+    RETRY_COUNT=$((RETRY_COUNT + 1))
+done
+
 echo -e "${GREEN}${BOLD}"
 echo "  🚀 G1DM is ready."
 echo "  🌐 Local Access:    ${URL}"
 echo "  ⚡ API Endpoint:    ${URL}/api/v1"
 echo "  📋 OpenAPI Docs:    ${URL}/api/v1/openapi.json"
 echo -e "${RESET}"
+
 if [ -n "$OPEN_BROWSER_CMD" ]; then
     echo -e "${GREEN}Launching ${BROWSER_NAMES[$((BROWSER_CHOICE - 1))]} with G1DM...${RESET}"
     eval "$OPEN_BROWSER_CMD '$URL'" >/dev/null 2>&1 &
 fi
+
 echo -e "${YELLOW}Press Ctrl+C to stop the G1DM server.${RESET}\n"
 
-exec env PORT="${PORT}" NODE_ENV=production node dist/main/server.js
+wait "$SERVER_PID"
