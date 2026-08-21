@@ -1,4 +1,5 @@
 import * as dns from 'dns/promises';
+import * as net from 'net';
 
 export interface DualStackProbeResult {
   hostname: string;
@@ -9,6 +10,17 @@ export interface DualStackProbeResult {
   ipv6RttMs?: number;
 }
 
+const PROBE_PORT = 443;
+const PROBE_TIMEOUT_MS = 800;
+
+/**
+ * Dual-stack (IPv4/IPv6) selection with real TCP-handshake timing.
+ *
+ * Resolves both address families and measures actual TCP connect RTT to each
+ * (an ECONNREFUSED still yields a useful low-latency signal since the host is
+ * reachable). Falls back to "prefer IPv6, then IPv4" when a family cannot be
+ * resolved or reached.
+ */
 export class DualStackSelector {
   public static async selectOptimalFamily(hostname: string): Promise<DualStackProbeResult> {
     let ipv4Address: string | undefined;
@@ -28,11 +40,13 @@ export class DualStackSelector {
       // IPv6 lookup failed
     }
 
-    const ipv4Rtt = ipv4Address ? 25 : undefined;
-    const ipv6Rtt = ipv6Address ? 18 : undefined;
+    const [ipv4Rtt, ipv6Rtt] = await Promise.all([
+      ipv4Address ? this.measureTcpRtt(ipv4Address) : Promise.resolve(undefined),
+      ipv6Address ? this.measureTcpRtt(ipv6Address) : Promise.resolve(undefined),
+    ]);
 
     let selected: 'IPv4' | 'IPv6' = 'IPv4';
-    if (ipv6Rtt !== undefined && (ipv4Rtt === undefined || ipv6Rtt < ipv4Rtt)) {
+    if (ipv6Rtt !== undefined && (ipv4Rtt === undefined || ipv6Rtt <= ipv4Rtt)) {
       selected = 'IPv6';
     }
 
@@ -44,5 +58,29 @@ export class DualStackSelector {
       ipv6Address,
       ipv6RttMs: ipv6Rtt,
     };
+  }
+
+  private static measureTcpRtt(address: string): Promise<number | undefined> {
+    return new Promise((resolve) => {
+      const start = Date.now();
+      const socket = net.connect({ host: address, port: PROBE_PORT });
+
+      const done = (value: number | undefined) => {
+        socket.destroy();
+        resolve(value);
+      };
+
+      socket.setTimeout(PROBE_TIMEOUT_MS);
+      socket.once('connect', () => done(Date.now() - start));
+      socket.once('timeout', () => done(undefined));
+      // ECONNREFUSED / ENETUNREACH still tells us the host is reachable fast.
+      socket.once('error', (err: NodeJS.ErrnoException) => {
+        if (err.code === 'ECONNREFUSED') {
+          done(Date.now() - start);
+        } else {
+          done(undefined);
+        }
+      });
+    });
   }
 }

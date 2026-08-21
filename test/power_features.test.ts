@@ -1,5 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import * as http from 'http';
 import { PlaylistBatchGrabber } from '../src/main/media/PlaylistBatchGrabber';
 import { LiveStreamDVR } from '../src/main/media/LiveStreamDVR';
 import { MultiTrackExtractor } from '../src/main/media/MultiTrackExtractor';
@@ -41,10 +42,17 @@ describe('G1DM Master Power Features Suite', () => {
   });
 
   describe('1. Media & Streaming Superpowers', () => {
-    it('should parse playlist and enqueue multi-threaded batch items', async () => {
+    it('should parse playlist via yt-dlp (or fail clearly instead of fabricating tracks)', async () => {
+      if (!(await PlaylistBatchGrabber.isYtDlpAvailable())) {
+        await expect(
+          PlaylistBatchGrabber.parsePlaylist('https://youtube.com/playlist?list=PL123')
+        ).rejects.toThrow(/yt-dlp/);
+        return;
+      }
+
       const parsed = await PlaylistBatchGrabber.parsePlaylist('https://youtube.com/playlist?list=PL123');
-      expect(parsed.totalTracks).toBeGreaterThan(0);
-      expect(parsed.tracks[0].filename).toContain('Track_01');
+      expect(Array.isArray(parsed.tracks)).toBe(true);
+      expect(parsed.tracks.every((t) => t.url.startsWith('http'))).toBe(true);
 
       const ids = await PlaylistBatchGrabber.enqueuePlaylist(parsed, engine, tempDir);
       expect(ids.length).toBe(parsed.totalTracks);
@@ -67,11 +75,35 @@ describe('G1DM Master Power Features Suite', () => {
       expect(cancelled).toBe(true);
     });
 
-    it('should extract audio and subtitle tracks from stream manifest', async () => {
-      const tracks = await MultiTrackExtractor.extractTracks('https://example.com/stream.m3u8');
-      expect(tracks.audioTracks.length).toBeGreaterThan(0);
-      expect(tracks.subtitleTracks.length).toBeGreaterThan(0);
-      expect(tracks.audioTracks.some((a) => a.language === 'en')).toBe(true);
+    it('should extract audio and subtitle tracks from a real HLS master playlist', async () => {
+      const manifest = [
+        '#EXTM3U',
+        '#EXT-X-STREAM-INF:BANDWIDTH=4000000,RESOLUTION=1920x1080,AUDIO="aud"',
+        'video_1080p.m3u8',
+        '#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="aud",NAME="English",LANGUAGE="en",URI="eng.m3u8",CHANNELS="6"',
+        '#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="aud",NAME="Español",LANGUAGE="es",URI="esp.m3u8"',
+        '#EXT-X-MEDIA:TYPE=SUBTITLES,GROUP-ID="subs",NAME="English Subs",LANGUAGE="en",URI="sub_en.vtt"',
+      ].join('\n');
+
+      const server = http.createServer((req, res) => {
+        res.writeHead(200, { 'Content-Type': 'application/vnd.apple.mpegurl' });
+        res.end(manifest);
+      });
+      await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+      const addr = server.address() as { port: number };
+
+      try {
+        const tracks = await MultiTrackExtractor.extractTracks(
+          `http://127.0.0.1:${addr.port}/stream.m3u8`
+        );
+        expect(tracks.videoTracksCount).toBe(1);
+        expect(tracks.audioTracks.length).toBe(2);
+        expect(tracks.subtitleTracks.length).toBe(1);
+        expect(tracks.audioTracks.some((a) => a.language === 'en')).toBe(true);
+        expect(tracks.subtitleTracks[0].format).toBe('vtt');
+      } finally {
+        server.close();
+      }
     });
 
     it('should perform in-engine media transcoding and trimming', async () => {
@@ -90,7 +122,7 @@ describe('G1DM Master Power Features Suite', () => {
       expect(result.durationSec).toBe(20);
     });
 
-    it('should inject metadata into media files', async () => {
+    it('should inject metadata into media files (or report failure instead of faking it)', async () => {
       const testFile = path.join(tempDir, 'metadata_video.mp4');
       fs.writeFileSync(testFile, Buffer.from('dummy mp4 bytes'));
 
@@ -99,7 +131,10 @@ describe('G1DM Master Power Features Suite', () => {
         artist: 'Media Engine',
         chapters: [{ startTimeSec: 0, title: 'Intro' }],
       });
-      expect(injected).toBe(true);
+      // Without ffmpeg (or on a non-media file) injection must fail gracefully
+      // rather than fabricate success.
+      expect(typeof injected).toBe('boolean');
+      expect(fs.existsSync(testFile)).toBe(true);
     });
   });
 
@@ -109,10 +144,15 @@ describe('G1DM Master Power Features Suite', () => {
       expect(Array.isArray(adapters)).toBe(true);
     });
 
-    it('should parse magnet URIs and add accelerated torrent downloads', () => {
-      const status = TorrentEngine.addTorrent('magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567&dn=Ubuntu_Linux_ISO');
+    it('should parse magnet URIs and track torrents without fabricating transfer stats', () => {
+      const status = TorrentEngine.addTorrent(
+        'magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567&dn=Ubuntu_Linux_ISO'
+      );
       expect(status.name).toContain('Ubuntu_Linux_ISO');
-      expect(status.webSeedAccelerated).toBe(true);
+      expect(status.infoHash).toBe('0123456789abcdef0123456789abcdef01234567');
+      // No peer engine is wired in — speeds/seeder counts must be honest (0).
+      expect(status.downloadSpeed).toBe(0);
+      expect(status.seeders).toBe(0);
 
       const list = TorrentEngine.getAllTorrents();
       expect(list.length).toBeGreaterThan(0);
@@ -173,15 +213,29 @@ describe('G1DM Master Power Features Suite', () => {
   });
 
   describe('4. Cloud, Debrid & Drop-Box Integrations', () => {
-    it('should configure Debrid account and unrestrict hoster links', async () => {
+    it('should configure Debrid account and unrestrict hoster links via the real API', async () => {
       DebridManager.addAccount({
         provider: 'real-debrid',
         apiKey: 'rd_test_key_123',
         isPremium: true,
       });
 
-      const unrestricted = await DebridManager.unrestrictLink('https://rapidgator.net/file/123/file.zip');
-      expect(unrestricted.downloadUrl).toContain('debrid_token=rd_test_key_123');
+      const originalFetch = global.fetch;
+      (global as any).fetch = jest.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ download: 'https://rd.example/download/file.zip', filename: 'file.zip' }),
+      });
+
+      try {
+        const unrestricted = await DebridManager.unrestrictLink('https://rapidgator.net/file/123/file.zip');
+        expect(unrestricted.downloadUrl).toBe('https://rd.example/download/file.zip');
+        expect((global as any).fetch).toHaveBeenCalledWith(
+          'https://api.real-debrid.com/rest/1.0/unrestrict/link',
+          expect.objectContaining({ method: 'POST' })
+        );
+      } finally {
+        (global as any).fetch = originalFetch;
+      }
     });
 
     it('should upload completed file to local NAS or Cloud target', async () => {

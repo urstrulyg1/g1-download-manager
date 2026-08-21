@@ -1,5 +1,6 @@
 import * as http from 'http';
 import * as https from 'https';
+import { TlsPolicy } from '../security/TlsPolicy';
 
 export interface BenchmarkTierResult {
   workersCount: number;
@@ -90,7 +91,7 @@ export class DownloadBenchmark {
                 'User-Agent': 'G1DM-Benchmark/1.0',
               },
               timeout: durationMs,
-              rejectUnauthorized: false,
+              rejectUnauthorized: TlsPolicy.rejectUnauthorized(),
             },
             (res) => {
               res.on('data', (c) => {

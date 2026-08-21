@@ -7,6 +7,7 @@ import { HttpsProxyAgent } from 'https-proxy-agent';
 import { SocksProxyAgent } from 'socks-proxy-agent';
 import { DownloadItem, SegmentInfo, DownloadAuth, ProxyConfig } from '../../shared/types';
 import { TokenBucketRateLimiter } from './RateLimiter';
+import { TlsPolicy } from '../security/TlsPolicy';
 
 export interface HttpDownloaderEvents {
   progress: (item: DownloadItem) => void;
@@ -234,7 +235,7 @@ export class HttpDownloader extends EventEmitter {
         headers,
         timeout: (this.item.maxRetries || 5) * 5000,
         agent,
-        rejectUnauthorized: false,
+        rejectUnauthorized: TlsPolicy.rejectUnauthorized(),
       };
 
       const req = reqModule.request(targetUrl, reqOptions, (res) => {
@@ -401,7 +402,7 @@ export class HttpDownloader extends EventEmitter {
         headers,
         timeout: 30000,
         agent,
-        rejectUnauthorized: false,
+        rejectUnauthorized: TlsPolicy.rejectUnauthorized(),
       };
 
       const req = reqModule.request(targetUrl, reqOptions, (res) => {

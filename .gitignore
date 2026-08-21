@@ -19,3 +19,5 @@ coverage/
 test_manual_db.db
 resources/vault/
 :memory:
+
+*.tsbuildinfo

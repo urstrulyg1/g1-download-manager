@@ -8,6 +8,7 @@ import { TransferCoordinator } from './TransferCoordinator';
 import { ParallelFileWriter } from '../storage/ParallelFileWriter';
 import { WorkScheduler } from './WorkScheduler';
 import { TokenBucketRateLimiter } from './RateLimiter';
+import { TlsPolicy } from '../security/TlsPolicy';
 
 export class ParallelTransferEngine extends EventEmitter {
   private item: DownloadItem;
@@ -90,7 +91,7 @@ export class ParallelTransferEngine extends EventEmitter {
         ...(segment.endOffset !== -1 ? { Range: `bytes=${segment.startOffset}-${segment.endOffset}` } : {}),
       };
 
-      const req = reqMod.get(targetUrl, { headers, timeout: 20000, rejectUnauthorized: false }, (res) => {
+      const req = reqMod.get(targetUrl, { headers, timeout: 20000, rejectUnauthorized: TlsPolicy.rejectUnauthorized() }, (res) => {
         let bytesThisSec = 0;
         let lastSec = Date.now();
 

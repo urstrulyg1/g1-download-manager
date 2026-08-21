@@ -2,6 +2,7 @@ import * as dns from 'dns';
 import * as net from 'net';
 import * as tls from 'tls';
 import * as https from 'https';
+import { TlsPolicy } from '../security/TlsPolicy';
 
 export interface PathLatencyBreakdown {
   targetUrl: string;
@@ -53,7 +54,7 @@ export class NetworkPathDiagnostics {
       const tlsStart = Date.now();
       try {
         await new Promise<void>((resolve) => {
-          const tlsSocket = tls.connect({ host: dnsAddress, port, servername: host, timeout: 3000, rejectUnauthorized: false }, () => {
+          const tlsSocket = tls.connect({ host: dnsAddress, port, servername: host, timeout: 3000, rejectUnauthorized: TlsPolicy.rejectUnauthorized() }, () => {
             tlsHandshakeMs = Math.max(1, Date.now() - tlsStart);
             tlsSocket.destroy();
             resolve();
@@ -69,7 +70,7 @@ export class NetworkPathDiagnostics {
     let timeToFirstByteMs = 40;
     try {
       await new Promise<void>((resolve) => {
-        const req = (isHttps ? https : require('http')).request(targetUrl, { method: 'HEAD', timeout: 4000, rejectUnauthorized: false }, (res: any) => {
+        const req = (isHttps ? https : require('http')).request(targetUrl, { method: 'HEAD', timeout: 4000, rejectUnauthorized: TlsPolicy.rejectUnauthorized() }, (res: any) => {
           timeToFirstByteMs = Math.max(1, Date.now() - ttfbStart);
           res.destroy();
           resolve();
