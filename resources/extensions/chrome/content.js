@@ -565,16 +565,16 @@
     }
 
     function triggerDownload(item, title) {
-      const ext = item.container || (item.isAudio ? 'mp3' : 'mkv');
-      const codecTag = item.codec ? `_${item.codec.replace(/[^a-zA-Z0-9]/g, '')}` : '';
-      const filename = `${title}_${item.badge || 'video'}${codecTag}.${ext}`.replace(/\s+/g, '_');
+      const ext = item.container || (item.isAudio ? 'mp3' : 'mp4');
+      const filename = `${title}.${ext}`;
 
       chrome.runtime.sendMessage({
         type: 'DOWNLOAD_URL',
-        url: item.url,
+        url: item.url || window.location.href,
         filename,
         category: item.isAudio ? 'audio' : 'video',
         format: ext,
+        formatSpec: item.formatSpec,
         codec: item.codec
       });
 

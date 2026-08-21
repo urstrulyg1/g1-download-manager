@@ -94,7 +94,7 @@ chrome.downloads.onCreated.addListener(async (downloadItem) => {
 // Messages from content scripts / popup
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'DOWNLOAD_URL') {
-    sendToG1DM(message.url, message.filename, message.category);
+    sendToG1DM(message.url, message.filename, message.category, message.formatSpec, message.container);
     sendResponse({ success: true });
   } else if (message.type === 'OPEN_G1DM_STUDIO') {
     const target = message.url ? `http://127.0.0.1:${G1DM_PORT}/#media?url=${encodeURIComponent(message.url)}` : `http://127.0.0.1:${G1DM_PORT}/#media`;
@@ -106,13 +106,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 });
 
-async function sendToG1DM(url, filename, category) {
+async function sendToG1DM(url, filename, category, formatSpec, container) {
   // First attempt: Native Messaging Host if configured
   try {
     const nativeRes = await new Promise((resolve, reject) => {
       chrome.runtime.sendNativeMessage(
         'com.g1dm.native_host',
-        { command: 'add', url, filename, category },
+        { command: 'add', url, filename, category, formatSpec, container },
         (res) => {
           if (chrome.runtime.lastError) reject(chrome.runtime.lastError);
           else resolve(res);
@@ -132,6 +132,8 @@ async function sendToG1DM(url, filename, category) {
         url,
         filename,
         category,
+        formatSpec,
+        container,
         startImmediately: true,
       }),
     });

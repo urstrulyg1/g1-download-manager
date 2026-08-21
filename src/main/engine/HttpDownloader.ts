@@ -672,25 +672,56 @@ export class HttpDownloader extends EventEmitter {
 
   private finalizeCompletion(): void {
     if (this.isCompleted) return;
-    this.isCompleted = true;
     this.cleanupFd();
     this.stopStateFlushTimer();
 
+    const targetTemp = this.item.tempPath;
+    if (!fs.existsSync(targetTemp)) {
+      this.handleDownloadError(new Error(`Download file was not found at ${targetTemp}`));
+      return;
+    }
+
+    const stat = fs.statSync(targetTemp);
+    const ext = path.extname(this.item.filename).toLowerCase();
+    const isMedia = ['.mp4', '.mkv', '.webm', '.mov', '.ts', '.mp3', '.flac', '.wav', '.aac', '.m4a'].includes(ext);
+
+    // Reject 31-byte or invalid small media files
+    if (isMedia && stat.size <= 100) {
+      try { fs.unlinkSync(targetTemp); } catch {}
+      if (fs.existsSync(this.item.stateFilePath)) {
+        try { fs.unlinkSync(this.item.stateFilePath); } catch {}
+      }
+      this.handleDownloadError(
+        new Error(`Download failed: Stream returned an invalid response (${stat.size} bytes). Never saving error responses as media.`)
+      );
+      return;
+    }
+
     // Rename tempPath to finalPath
     try {
-      if (fs.existsSync(this.item.tempPath)) {
-        // If final file already exists, handle collision if needed
-        fs.renameSync(this.item.tempPath, this.item.finalPath);
+      if (fs.existsSync(this.item.finalPath)) {
+        // Handle collision if needed
       }
+      fs.renameSync(targetTemp, this.item.finalPath);
+
       // Remove sidecar state file
       if (fs.existsSync(this.item.stateFilePath)) {
         fs.unlinkSync(this.item.stateFilePath);
       }
     } catch (err: any) {
       this.log('error', `Failed to finalize file: ${err.message}`);
+      this.handleDownloadError(err);
+      return;
     }
 
+    this.isCompleted = true;
     this.item.status = 'completed';
+    (this.item as any).phase = 'completed';
+    (this.item as any).statusMessage = 'Download verified and complete.';
+    this.item.downloadedBytes = stat.size;
+    if (this.item.totalBytes <= 0) {
+      this.item.totalBytes = stat.size;
+    }
     this.item.progress = 100;
     this.item.speed = 0;
     this.item.eta = 0;
@@ -698,7 +729,7 @@ export class HttpDownloader extends EventEmitter {
     this.item.completedAt = Date.now();
     this.item.durationMs = this.item.startedAt ? this.item.completedAt - this.item.startedAt : 0;
 
-    this.log('info', `Download completed successfully in ${Math.round(this.item.durationMs / 1000)}s!`);
+    this.log('info', `Download completed successfully in ${Math.round(this.item.durationMs / 1000)}s! (${stat.size} bytes)`);
     this.emit('completed', this.item);
   }
 

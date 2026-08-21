@@ -3,9 +3,60 @@ import * as https from 'https';
 import * as path from 'path';
 import { MediaDetectionResult, MediaFormatOption } from '../../shared/types';
 import { ProbeService } from '../engine/ProbeService';
+import { SecureMediaDetector } from './SecureMediaDetector';
 
 export class MediaDetector {
   public static async detectMedia(pageUrl: string): Promise<MediaDetectionResult> {
+    // 1. Try SecureMediaDetector first (covers yt-dlp, HLS, DASH, direct streams)
+    try {
+      const secureAnalysis = await SecureMediaDetector.analyze(pageUrl, 20000);
+      if (secureAnalysis && secureAnalysis.availableVideoQualities.length > 0) {
+        const formats: MediaFormatOption[] = secureAnalysis.availableVideoQualities.map((q) => ({
+          formatId: q.id,
+          ext: q.container.toLowerCase().includes('webm') ? 'webm' : (q.container.toLowerCase().includes('mkv') ? 'mkv' : 'mp4'),
+          resolution: q.resolutionLabel,
+          codec: q.videoCodec,
+          fps: q.frameRate,
+          bitrate: q.bitrateBps,
+          filesize: q.exactSizeBytes || q.estimatedSizeBytes,
+          isAudioOnly: false,
+          isVideoOnly: false,
+          url: q.downloadUrl,
+          protocol: q.protocol === 'hls' ? 'hls' : q.protocol === 'dash' ? 'dash' : 'http',
+          qualityLabel: `${q.resolutionLabel} (${q.videoCodec}, ${q.formattedSize})`,
+        }));
+
+        // Append audio-only options
+        for (const a of secureAnalysis.availableAudioTracks) {
+          formats.push({
+            formatId: a.id,
+            ext: a.audioCodec.toLowerCase().includes('opus') ? 'opus' : (a.audioCodec.toLowerCase().includes('mp3') ? 'mp3' : 'm4a'),
+            resolution: undefined,
+            codec: a.audioCodec,
+            bitrate: a.bitrateBps,
+            isAudioOnly: true,
+            isVideoOnly: false,
+            url: a.downloadUrl,
+            protocol: 'http',
+            qualityLabel: `${a.languageLabel} Audio (${a.audioCodec}, ${a.bitrateFormatted})`,
+          });
+        }
+
+        return {
+          url: pageUrl,
+          title: secureAnalysis.title,
+          pageUrl,
+          thumbnailUrl: secureAnalysis.thumbnailUrl,
+          duration: secureAnalysis.durationSec,
+          formats,
+          isProtected: secureAnalysis.isProtected,
+          protectionReason: secureAnalysis.protectionReason,
+        };
+      }
+    } catch {
+      // Fall through to direct / html detection
+    }
+
     const parsed = new URL(pageUrl);
     const directExt = path.extname(parsed.pathname).toLowerCase();
 
@@ -86,7 +137,6 @@ export class MediaDetector {
           res.setEncoding('utf8');
           res.on('data', (chunk) => {
             data += chunk;
-            // Limit page read to 2MB
             if (data.length > 2 * 1024 * 1024) res.destroy();
           });
           res.on('end', () => resolve(data));
@@ -100,14 +150,12 @@ export class MediaDetector {
   }
 
   private static parseHtmlMedia(html: string, pageUrl: string): MediaDetectionResult {
-    // Extract title
     let title = 'Detected Web Media';
     const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
     if (titleMatch && titleMatch[1]) {
       title = titleMatch[1].trim();
     }
 
-    // Extract OpenGraph / Twitter video
     const ogVideoMatch = html.match(/<meta[^>]+property=["']og:video(?::secure_url)?["'][^>]+content=["']([^"']+)["']/i);
     const ogImageMatch = html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i);
 
@@ -120,7 +168,6 @@ export class MediaDetector {
       } catch {}
     }
 
-    // Find <video src="...">, <source src="...">, <audio src="...">
     const mediaTagRegex = /<(?:video|audio|source)[^>]+src=["']([^"']+)["'][^>]*>/gi;
     let match: RegExpExecArray | null;
     while ((match = mediaTagRegex.exec(html)) !== null) {
@@ -135,13 +182,11 @@ export class MediaDetector {
       } catch {}
     }
 
-    // Check for DRM / Protected markers (Widevine, EME, EncryptedMedia)
     const isProtected =
       html.includes('com.widevine.alpha') ||
       html.includes('com.microsoft.playready') ||
       html.includes('encrypted-media');
 
-    // Deduplicate discovered formats
     const uniqueFormats: MediaFormatOption[] = [];
     const seenUrls = new Set<string>();
 

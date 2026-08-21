@@ -16,12 +16,19 @@ import { ComprehensiveMediaAnalysis, SecureMediaDetector } from '../../main/medi
 import { VideoQualitySelectorModal } from './VideoQualitySelectorModal';
 import { Language, translations } from '../lib/i18n';
 
+import { DownloadItem } from '../../shared/types';
+
 interface MediaDetectorViewProps {
   lang: Language;
   onDownloadAdded: () => void;
+  onDownloadStarted?: (item: DownloadItem) => void;
 }
 
-export const MediaDetectorView: React.FC<MediaDetectorViewProps> = ({ lang, onDownloadAdded }) => {
+export const MediaDetectorView: React.FC<MediaDetectorViewProps> = ({
+  lang,
+  onDownloadAdded,
+  onDownloadStarted,
+}) => {
   const t = translations[lang] || translations.en;
   const [url, setUrl] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -128,6 +135,7 @@ export const MediaDetectorView: React.FC<MediaDetectorViewProps> = ({ lang, onDo
           analysis={analysis}
           onClose={() => setIsQualityModalOpen(false)}
           onDownloadEnqueued={onDownloadAdded}
+          onDownloadStarted={onDownloadStarted}
         />
       )}
     </div>

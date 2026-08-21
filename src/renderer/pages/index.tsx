@@ -23,6 +23,7 @@ import { MediaLibraryView } from '../components/MediaLibraryView';
 import { IncidentsView } from '../components/IncidentsView';
 import { SnapshotsView } from '../components/SnapshotsView';
 import { PowerFeaturesView } from '../components/PowerFeaturesView';
+import { IdmProgressModal } from '../components/IdmProgressModal';
 import { ActionCenterDrawer } from '../components/ui/ActionCenterDrawer';
 import { InboxItem } from '../../main/engine/DownloadInbox';
 import { ProfileType } from '../../main/engine/DownloadProfiles';
@@ -65,6 +66,7 @@ export default function Home() {
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isActionCenterOpen, setIsActionCenterOpen] = useState(false);
   const [selectedDownload, setSelectedDownload] = useState<DownloadItem | null>(null);
+  const [activeIdmDownloadId, setActiveIdmDownloadId] = useState<string | null>(null);
 
   const [clipboardUrl, setClipboardUrl] = useState<string | null>(null);
   const [inboxItems, setInboxItems] = useState<InboxItem[]>([]);
@@ -308,6 +310,7 @@ export default function Home() {
             <MediaDetectorView
               lang={lang}
               onDownloadAdded={refreshAll}
+              onDownloadStarted={(item) => setActiveIdmDownloadId(item.id)}
             />
           )}
 
@@ -357,6 +360,12 @@ export default function Home() {
       <DownloadDetailModal
         item={selectedDownload}
         onClose={() => setSelectedDownload(null)}
+      />
+
+      <IdmProgressModal
+        item={downloads.find((d) => d.id === activeIdmDownloadId) || null}
+        onClose={() => setActiveIdmDownloadId(null)}
+        onMinimize={() => setActiveIdmDownloadId(null)}
       />
 
       <CommandPalette

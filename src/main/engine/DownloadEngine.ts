@@ -18,6 +18,8 @@ import { HttpDownloader } from './HttpDownloader';
 import { Http2Downloader } from './Http2Downloader';
 import { FtpDownloader } from './FtpDownloader';
 import { HlsDownloader } from './HlsDownloader';
+import { MediaStreamDownloader } from '../media/MediaStreamDownloader';
+import { SecureMediaDetector } from '../media/SecureMediaDetector';
 import { ProbeService } from './ProbeService';
 import { TokenBucketRateLimiter } from './RateLimiter';
 import { ChecksumVerifier } from './ChecksumVerifier';
@@ -31,7 +33,10 @@ export class DownloadEngine extends EventEmitter {
   private db: AppDatabase;
   private downloads: Map<string, DownloadItem> = new Map();
   private stateMachines: Map<string, DownloadStateMachine> = new Map();
-  private activeWorkers: Map<string, HttpDownloader | Http2Downloader | FtpDownloader | HlsDownloader> = new Map();
+  private activeWorkers: Map<
+    string,
+    HttpDownloader | Http2Downloader | FtpDownloader | HlsDownloader | MediaStreamDownloader
+  > = new Map();
   private policyEngine: ServerPolicyEngine = new ServerPolicyEngine();
   private globalRateLimiter: TokenBucketRateLimiter;
   private isShuttingDown = false;
@@ -210,7 +215,31 @@ export class DownloadEngine extends EventEmitter {
 
     PathSanitizer.ensureDirectory(destDir);
 
-    let filename = params.filename || probe.filename;
+    const isStreamPlatform =
+      /youtube\.com|youtu\.be|vimeo\.com|soundcloud\.com|twitch\.tv|twitter\.com|x\.com|tiktok\.com|instagram\.com/i.test(
+        params.url
+      ) ||
+      Boolean((params as any).mediaFormatSpec) ||
+      Boolean((params as any).formatSpec);
+
+    let mediaAnalysis: any = null;
+    if (isStreamPlatform) {
+      try {
+        mediaAnalysis = await SecureMediaDetector.analyze(params.url, 15000);
+      } catch {}
+    }
+
+    let initialFilename = params.filename;
+    const isGenericFilename =
+      !initialFilename ||
+      /^YouTube_|^video(\.mp4)?$|^watch(\.mp4)?$|^stream(\.mp4)?$/i.test(initialFilename);
+
+    if (mediaAnalysis && mediaAnalysis.title && isGenericFilename) {
+      const ext = (params as any).container || (params as any).format || 'mp4';
+      initialFilename = `${mediaAnalysis.title}.${ext}`;
+    }
+
+    let filename = initialFilename || probe.filename;
     filename = PathSanitizer.sanitizeFilename(filename);
 
     const finalPath = this.resolveFileCollision(destDir, filename, settings.downloads.fileCollisionAction);
@@ -224,6 +253,13 @@ export class DownloadEngine extends EventEmitter {
     const stateFilePath = `${finalPath}.g1dm`;
 
     const id = `dl_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+
+    const effectiveTotalBytes =
+      probe.size > 0
+        ? probe.size
+        : mediaAnalysis?.recommendedQuality?.exactSizeBytes ||
+          mediaAnalysis?.recommendedQuality?.estimatedSizeBytes ||
+          -1;
 
     // Adaptive connection suggestion from ServerPolicyEngine
     const recommendedConns = this.policyEngine.getRecommendedConnections(
@@ -252,7 +288,7 @@ export class DownloadEngine extends EventEmitter {
       tempPath,
       stateFilePath,
       status: 'queued',
-      totalBytes: probe.size,
+      totalBytes: effectiveTotalBytes,
       downloadedBytes: 0,
       progress: 0,
       speed: 0,
@@ -284,9 +320,22 @@ export class DownloadEngine extends EventEmitter {
         {
           timestamp: Date.now(),
           level: 'info',
-          message: `Download created. Size: ${probe.size > 0 ? `${(probe.size / 1024 / 1024).toFixed(2)} MB` : 'Stream'}, Resumable: ${probe.capabilities.supportsRange ? 'Yes' : 'No'}. Duplicate analysis: ${dupCheck.classification}`,
+          message: `Download created. Size: ${effectiveTotalBytes > 0 ? `${(effectiveTotalBytes / 1024 / 1024).toFixed(2)} MB` : 'Stream'}, Resumable: ${probe.capabilities.supportsRange ? 'Yes' : 'No'}. Duplicate analysis: ${dupCheck.classification}`,
         },
       ],
+    };
+
+    (item as any).thumbnailUrl = mediaAnalysis?.thumbnailUrl || (params as any).thumbnailUrl;
+    (item as any).mediaFormatSpec =
+      (params as any).formatSpec ||
+      (params as any).mediaFormatSpec ||
+      (mediaAnalysis?.recommendedQuality as any)?.formatSpec ||
+      (isStreamPlatform ? 'bestvideo+bestaudio/best' : undefined);
+    (item as any).mediaMetadata = {
+      title: mediaAnalysis?.title || filename,
+      resolution: mediaAnalysis?.recommendedQuality?.resolutionLabel,
+      codec: mediaAnalysis?.recommendedQuality?.videoCodec,
+      container: (params as any).container || mediaAnalysis?.recommendedQuality?.container || path.extname(filename).replace('.', ''),
     };
 
     let startOk = params.startImmediately !== false;
@@ -388,10 +437,18 @@ export class DownloadEngine extends EventEmitter {
 
     const workerItem = { ...item, auth: workerAuth };
 
-    let worker: HttpDownloader | Http2Downloader | FtpDownloader | HlsDownloader;
+    let worker: HttpDownloader | Http2Downloader | FtpDownloader | HlsDownloader | MediaStreamDownloader;
     const protocol = item.serverCapabilities.protocol;
+    const isStreamPlatform =
+      /youtube\.com|youtu\.be|vimeo\.com|soundcloud\.com|twitch\.tv|twitter\.com|x\.com|tiktok\.com|instagram\.com/i.test(
+        item.url
+      ) ||
+      Boolean((item as any).mediaFormatSpec) ||
+      (protocol as string) === 'media_stream';
 
-    if (protocol === 'ftp' || protocol === 'ftps') {
+    if (isStreamPlatform) {
+      worker = new MediaStreamDownloader(workerItem);
+    } else if (protocol === 'ftp' || protocol === 'ftps') {
       worker = new FtpDownloader(workerItem, this.globalRateLimiter);
     } else if (protocol === 'hls') {
       worker = new HlsDownloader(workerItem, this.globalRateLimiter);

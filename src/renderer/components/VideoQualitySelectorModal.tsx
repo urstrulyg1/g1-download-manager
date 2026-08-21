@@ -24,18 +24,21 @@ import {
   AnalyzedAudioTrack,
   VideoResolutionEngine,
 } from '../../main/media/VideoResolutionEngine';
+import { DownloadItem } from '../../shared/types';
 import { api } from '../lib/api';
 
 interface VideoQualitySelectorModalProps {
   analysis: ComprehensiveMediaAnalysis | null;
   onClose: () => void;
-  onDownloadEnqueued: () => void;
+  onDownloadEnqueued?: () => void;
+  onDownloadStarted?: (item: DownloadItem) => void;
 }
 
 export const VideoQualitySelectorModal: React.FC<VideoQualitySelectorModalProps> = ({
   analysis,
   onClose,
   onDownloadEnqueued,
+  onDownloadStarted,
 }) => {
   if (!analysis) return null;
 
@@ -65,18 +68,32 @@ export const VideoQualitySelectorModal: React.FC<VideoQualitySelectorModalProps>
     try {
       const sanitizedTitle = (analysis.title || 'video')
         .replace(/[/\\?%*:|"<>]/g, '_')
-        .slice(0, 100);
-      const ext = selectedQuality.container.toLowerCase().includes('webm') ? 'webm' : 'mp4';
-      const filename = `${sanitizedTitle}_${selectedQuality.resolutionLabel}.${ext}`;
+        .trim();
+      const ext = selectedQuality.container.toLowerCase().includes('webm')
+        ? 'webm'
+        : selectedQuality.container.toLowerCase().includes('mkv')
+        ? 'mkv'
+        : 'mp4';
+      const filename = `${sanitizedTitle}.${ext}`;
 
-      await api.addDownload({
+      const formatSpec = (selectedQuality as any).formatSpec || selectedQuality.id;
+
+      const item = await api.addDownload({
         url: selectedQuality.downloadUrl,
         filename,
         category: 'video',
+        formatSpec,
+        container: ext,
+        thumbnailUrl: analysis.thumbnailUrl,
         startImmediately: action === 'now',
       });
 
-      onDownloadEnqueued();
+      if (onDownloadStarted && item) {
+        onDownloadStarted(item);
+      }
+      if (onDownloadEnqueued) {
+        onDownloadEnqueued();
+      }
       onClose();
     } catch (err: any) {
       alert(`Download error: ${err.message}`);
@@ -91,9 +108,15 @@ export const VideoQualitySelectorModal: React.FC<VideoQualitySelectorModalProps>
         {/* Header */}
         <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-950/70">
           <div className="flex items-center gap-3 min-w-0 pr-4">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-500/20 to-orange-500/20 border border-amber-500/30 text-amber-400 flex items-center justify-center shrink-0">
-              <Video className="w-5 h-5" />
-            </div>
+            {analysis.thumbnailUrl ? (
+              <div className="w-16 h-11 rounded-lg overflow-hidden bg-slate-950 border border-slate-800 shrink-0 shadow-md">
+                <img src={analysis.thumbnailUrl} alt={analysis.title} className="w-full h-full object-cover" />
+              </div>
+            ) : (
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-500/20 to-orange-500/20 border border-amber-500/30 text-amber-400 flex items-center justify-center shrink-0">
+                <Video className="w-5 h-5" />
+              </div>
+            )}
             <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <h2 className="text-sm font-bold text-white truncate" title={analysis.title}>
