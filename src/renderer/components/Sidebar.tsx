@@ -26,6 +26,7 @@ import {
   Camera,
   AlertOctagon,
   Sparkles,
+  Zap,
 } from 'lucide-react';
 import { DownloadItem, DownloadQueue, CategoryRule, SystemMetrics } from '../../shared/types';
 import { Language, translations } from '../lib/i18n';
@@ -40,6 +41,7 @@ export type ActiveView =
   | 'batchLinks'
   | 'mediaDetector'
   | 'automation'
+  | 'powerFeatures'
   | 'analytics'
   | 'incidents'
   | 'snapshots'
@@ -315,6 +317,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
             Power Tools
           </div>
           <div className="space-y-0.5">
+            <button
+              onClick={() => onViewChange('powerFeatures')}
+              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-all ${
+                activeView === 'powerFeatures'
+                  ? 'bg-gradient-to-r from-amber-500 to-orange-600 text-white shadow-md shadow-orange-600/30'
+                  : 'text-amber-400 hover:bg-slate-800 hover:text-amber-300'
+              }`}
+            >
+              <Zap className="w-4 h-4 text-amber-400" />
+              <span>Superpowers Suite</span>
+            </button>
+
             <button
               onClick={() => onViewChange('queues')}
               className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all ${

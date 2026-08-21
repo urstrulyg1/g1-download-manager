@@ -17,3 +17,5 @@ coverage/
 *.g1dm
 *.bin
 test_manual_db.db
+resources/vault/
+:memory:
