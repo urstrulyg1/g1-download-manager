@@ -39,22 +39,45 @@
 
 ## 🏆 Feature Matrix & Competitor Comparison
 
-| Capability / Feature | G1DM (Free & Open) | IDM ($24.95/yr) | NeatDM (Free) | FDM (Free) | JDownloader 2 | Folx PRO ($19.95) | Downie ($19.99) | Aria2 / Motrix |
+### 📊 Master Comparison Scorecard (Zero-Scroll Responsive Matrix)
+
+| Feature | G1DM | IDM | NeatDM | FDM | JD2 | Folx | Downie | Motrix |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| **Dynamic Segmentation** | ✅ **Yes (Work-Stealing 2.0)** | ✅ Yes (Basic) | ✅ Yes (Static) | ✅ Yes (Basic) | ✅ Yes (Basic) | ✅ Yes | ❌ No | ✅ Yes |
-| **8K (4320p) & 4K Floating Video Pill** | ✅ **Yes (Full Codec Matrix)** | ⚠️ Basic 1080p | ⚠️ 1080p Only | ❌ No | ❌ No | ❌ No | ⚠️ App Only | ❌ No |
-| **Play/Preview While Downloading** | ✅ **Yes (HTTP 206 Partial)** | ❌ No | ❌ No | ⚠️ Torrent only | ❌ No | ❌ No | ❌ No | ❌ No |
-| **Pre-Download Threat Scanner** | ✅ **Yes (Heuristics & MIME)**| ❌ No | ❌ No | ⚠️ Post-scan only| ❌ No | ❌ No | ❌ No | ❌ No |
-| **Multi-Source Mirror Swarming** | ✅ **Yes (RTT-Balanced)** | ❌ No (Single Host)| ❌ No | ❌ No | ⚠️ Basic | ❌ No | ❌ No | ⚠️ Manual CLI |
-| **Multi-Interface Channel Bonding** | ✅ **Yes (Ethernet+Wi-Fi+5G)** | ❌ No | ❌ No | ❌ No | ❌ No | ❌ No | ❌ No | ❌ No |
-| **Live Stream Sliding-Window DVR** | ✅ **Yes (HLS/DASH Rewind)**| ❌ Fails on rollover| ❌ No | ❌ No | ❌ No | ❌ No | ⚠️ Basic | ❌ No |
-| **BitTorrent & WebTorrent Swarm** | ✅ **Yes (PEX/DHT/WebSeed)** | ❌ No | ❌ No | ✅ Yes | ❌ No | ✅ Yes | ❌ No | ✅ Yes |
-| **Direct Cloud & Debrid Resolvers** | ✅ **Yes (GDrive/Mega/Debrid)**| ❌ Needs 3rd party | ❌ No | ❌ No | ✅ Yes | ❌ No | ⚠️ Basic | ❌ No |
-| **Auto-Archive Extraction & Passwords** | ✅ **Yes (Auto-Dictionary)** | ❌ No | ❌ No | ⚠️ ZIP only | ✅ Yes | ❌ No | ❌ No | ❌ No |
-| **Hardware-Encrypted AES-256 Vault** | ✅ **Yes (PIN/Key Rooted)** | ❌ Plaintext only | ❌ Plaintext | ❌ Plaintext | ❌ Plaintext | ❌ Plaintext | ❌ Plaintext | ❌ Plaintext |
-| **Remote Telegram / Discord Bot** | ✅ **Yes (Direct Commands)** | ❌ No | ❌ No | ❌ No | ⚠️ MyJDownloader | ❌ No | ❌ No | ⚠️ WebUI only |
-| **Cross-Platform (macOS/Win/Linux)** | ✅ **macOS, Win, Linux** | ❌ Windows only | ⚠️ macOS/Win | ✅ macOS, Win, Linux | ✅ Java | ❌ macOS only | ❌ macOS only | ✅ macOS, Win, Linux |
-| **Automated Verification Test Suite** | ✅ **281 Tests / 93 Suites** | ❌ Closed Source | ❌ Closed | ❌ Untracked | ❌ Untracked | ❌ Closed | ❌ Closed | ⚠️ Untracked |
+| **Work-Stealing Dynamic Segmentation** | ✅ | ⚠️ Basic | ⚠️ Static | ⚠️ Basic | ⚠️ Basic | ✅ | ❌ | ✅ |
+| **8K / 4K In-Video Floating Pill** | ✅ | ⚠️ 1080p | ⚠️ 1080p | ❌ | ❌ | ❌ | ⚠️ App | ❌ |
+| **Stream / Preview While Downloading** | ✅ | ❌ | ❌ | ⚠️ Torrent | ❌ | ❌ | ❌ | ❌ |
+| **Pre-Download Zero-Day Threat Scanner**| ✅ | ❌ | ❌ | ⚠️ Post | ❌ | ❌ | ❌ | ❌ |
+| **Multi-Source Mirror Swarming** | ✅ | ❌ | ❌ | ❌ | ⚠️ Basic | ❌ | ❌ | ⚠️ CLI |
+| **Multi-Interface Channel Bonding** | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| **Live Stream Sliding-Window DVR** | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ⚠️ Basic | ❌ |
+| **BitTorrent & WebTorrent Engine** | ✅ | ❌ | ❌ | ✅ | ❌ | ✅ | ❌ | ✅ |
+| **Cloud (GDrive/Dropbox) Resolvers** | ✅ | ❌ | ❌ | ❌ | ✅ | ❌ | ⚠️ Basic | ❌ |
+| **Multi-Host Debrid Resolvers** | ✅ | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ | ❌ |
+| **Auto-Archive Extraction & Passwords** | ✅ | ❌ | ❌ | ⚠️ ZIP | ✅ | ❌ | ❌ | ❌ |
+| **Hardware AES-256 Encrypted Vault** | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| **Telegram / Discord Remote Bot** | ✅ | ❌ | ❌ | ❌ | ⚠️ Web | ❌ | ❌ | ⚠️ Web |
+| **Ping-Adaptive Zero-Lag Throttling** | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| **Playlist & Channel Batch Grabber** | ✅ | ⚠️ Basic | ❌ | ❌ | ✅ | ❌ | ✅ | ❌ |
+| **In-App Media Trimmer & Transcoder** | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| **Multi-Track Audio & Subtitle Muxing**| ✅ | ❌ | ❌ | ❌ | ⚠️ Plugins| ❌ | ⚠️ Basic | ❌ |
+| **Cross-Platform (macOS / Win / Linux)**| ✅ | ❌ Win only| ⚠️ Mac/Win| ✅ | ✅ Java | ❌ Mac only| ❌ Mac only| ✅ |
+| **REST API & OpenAPI 3.0 Specs** | ✅ | ❌ | ❌ | ❌ | ⚠️ RPC | ❌ | ❌ | ⚠️ RPC |
+| **Price / License** | **Free & MIT** | $24.95/yr | Free | Free | Free | $19.95 | $19.99 | Free |
+
+---
+
+### 🔍 Detailed Comparative Breakdown
+
+#### 1. G1DM vs Commercial Paid Managers (IDM, Folx PRO, Downie 4)
+* **Internet Download Manager (IDM - $24.95/yr)**: Limited to Windows only; lacks pre-download threat scanning, 8K floating sniffer with codec selection, video stream preview during download, mirror swarming, channel bonding, live stream DVR, and remote bot control.
+* **Folx PRO ($19.95)**: macOS only; lacks in-video pill sniffer, zero-day threat scanner, mirror swarming, cloud link bypass resolvers, and encrypted hardware vault.
+* **Downie 4 ($19.99)**: macOS only; focused purely on video grabbing without multi-threaded general file transfer acceleration, mirror swarming, channel bonding, or archive extraction.
+
+#### 2. G1DM vs Popular Free Tools (NeatDM, FDM, JDownloader 2, Motrix)
+* **Neat Download Manager (NeatDM)**: Lightweight but uses static segmentation without work-stealing, lacks video previewing while downloading, live stream DVR, cloud resolvers, and automated archive password unlocking.
+* **Free Download Manager (FDM)**: Good general tool, but lacks floating in-video pill with codec matrix, pre-download threat scanner, mirror swarming, and hardware-encrypted vaults.
+* **JDownloader 2**: Powerful link grabber but heavy Java runtime footprint; lacks in-video floating pill overlay, HTTP 206 live stream preview player, and multi-NIC network bonding.
+* **Aria2 / Motrix**: Fast multi-threaded CLI/Electron frontend, but lacks in-video sniffer, pre-download security scanner, live stream DVR, and cloud link resolvers.
 
 ---
 
