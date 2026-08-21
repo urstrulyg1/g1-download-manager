@@ -33,6 +33,7 @@
 
   // Standard resolutions
   const RESOLUTION_TIERS = [
+    { height: 4320, label: '8K • 4320p (FUHD)', badge: '8K', color: '#ec4899', width: 7680, bitrate: '60-120 Mbps' },
     { height: 2160, label: '4K • 2160p (UHD)', badge: '4K', color: '#c084fc', width: 3840, bitrate: '25-45 Mbps' },
     { height: 1440, label: '2K • 1440p (QHD)', badge: '2K', color: '#a855f7', width: 2560, bitrate: '16-24 Mbps' },
     { height: 1080, label: '1080p (Full HD)', badge: '1080p', color: '#38bdf8', width: 1920, bitrate: '8-12 Mbps' },
@@ -208,7 +209,7 @@
     }
 
     // 2. Video Resolution & Container & Codec Combinations
-    const maxRes = vHeight >= 1800 ? 2160 : vHeight >= 1200 ? 1440 : vHeight >= 900 ? 1080 : vHeight >= 600 ? 720 : 480;
+    const maxRes = vHeight >= 3600 ? 4320 : vHeight >= 1800 ? 2160 : vHeight >= 1200 ? 1440 : vHeight >= 900 ? 1080 : vHeight >= 600 ? 720 : 480;
 
     for (const res of RESOLUTION_TIERS) {
       if (res.height > Math.max(maxRes, 1080)) continue;
@@ -335,7 +336,7 @@
       const badgeEl = pill.querySelector('.g1dm-res-badge');
       if (!badgeEl) return;
       const h = video.videoHeight || 1080;
-      const resStr = h >= 2160 ? '4K' : h >= 1440 ? '2K' : h >= 1080 ? '1080p' : h >= 720 ? '720p' : `${h}p`;
+      const resStr = h >= 3600 ? '8K' : h >= 2160 ? '4K' : h >= 1440 ? '2K' : h >= 1080 ? '1080p' : h >= 720 ? '720p' : `${h}p`;
       badgeEl.innerText = `${resStr} • ${activeFilter}`;
     }
 
