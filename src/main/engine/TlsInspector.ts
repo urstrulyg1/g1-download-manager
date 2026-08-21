@@ -1,5 +1,6 @@
 import * as tls from 'tls';
 import * as https from 'https';
+import * as net from 'net';
 import { TLSSocket } from 'tls';
 
 export interface CertificateInfo {
@@ -46,18 +47,21 @@ export class TlsInspector {
 
     const host = parsed.hostname;
     const port = parsed.port ? parseInt(parsed.port, 10) : 443;
+    const isIp = net.isIP(host) !== 0;
 
-    return new Promise<TlsInspectionResult>((resolve, reject) => {
+    return new Promise<TlsInspectionResult>((resolve) => {
       const options: tls.ConnectionOptions = {
         host,
         port,
-        servername: host,
+        servername: isIp ? undefined : host,
         rejectUnauthorized,
         ALPNProtocols: ['h2', 'http/1.1'],
         timeout: timeoutMs,
       };
 
-      const socket: TLSSocket = tls.connect(options, () => {
+      let socket: TLSSocket;
+      try {
+        socket = tls.connect(options, () => {
         const cipher = socket.getCipher();
         const tlsVersion = socket.getProtocol() || undefined;
         const alpn = socket.alpnProtocol || undefined;
@@ -122,6 +126,15 @@ export class TlsInspector {
           negotiatedAt: Date.now(),
         });
       });
+      } catch (err: any) {
+        resolve({
+          isHttps: true,
+          authorized: false,
+          authorizationError: err?.message || 'TLS connection error',
+          serverName: host,
+          negotiatedAt: Date.now(),
+        });
+      }
     });
   }
 }

@@ -96,6 +96,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'DOWNLOAD_URL') {
     sendToG1DM(message.url, message.filename, message.category);
     sendResponse({ success: true });
+  } else if (message.type === 'OPEN_G1DM_STUDIO') {
+    const target = message.url ? `http://127.0.0.1:${G1DM_PORT}/#media?url=${encodeURIComponent(message.url)}` : `http://127.0.0.1:${G1DM_PORT}/#media`;
+    chrome.tabs.create({ url: target });
+    sendResponse({ success: true });
   } else if (message.type === 'TEST_CONNECTION') {
     testG1DMConnection().then(sendResponse);
     return true; // async

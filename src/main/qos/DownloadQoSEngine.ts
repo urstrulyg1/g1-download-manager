@@ -25,7 +25,8 @@ export class DownloadQoSEngine {
       name: 'Work / Document priority during business hours (9 AM - 6 PM)',
       condition: (item, now) => {
         const hour = now.getHours();
-        return hour >= 9 && hour <= 18 && (item.category === 'document' || item.category === 'archive');
+        const isDefaultPriority = !item.priority || item.priority === 'normal';
+        return isDefaultPriority && hour >= 9 && hour <= 18 && (item.category === 'document' || item.category === 'archive');
       },
       assignedTier: 'HIGH',
     },
