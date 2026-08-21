@@ -116,10 +116,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
               onStatusFilterChange('all');
               onCategoryFilterChange('all');
             }}
-            className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
+            className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all duration-200 ${
               activeView === 'dashboard'
-                ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30'
-                : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/40'
+                : 'text-slate-300 hover:bg-slate-800 hover:text-white hover:shadow-md hover:shadow-blue-500/20'
             }`}
           >
             <div className="flex items-center gap-2.5">
@@ -137,10 +137,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
             onClick={() => {
               onViewChange('inbox');
             }}
-            className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
+            className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all duration-200 ${
               activeView === 'inbox'
-                ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30'
-                : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/40'
+                : 'text-slate-300 hover:bg-slate-800 hover:text-white hover:shadow-md hover:shadow-indigo-500/20'
             }`}
           >
             <div className="flex items-center gap-2.5">
@@ -157,10 +157,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
               onStatusFilterChange('all');
               onCategoryFilterChange('all');
             }}
-            className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
+            className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all duration-200 ${
               activeView === 'downloads' && statusFilter === 'all' && categoryFilter === 'all' && queueFilter === 'all'
-                ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30'
-                : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/40'
+                : 'text-slate-300 hover:bg-slate-800 hover:text-white hover:shadow-md hover:shadow-blue-500/20'
             }`}
           >
             <div className="flex items-center gap-2.5">
@@ -184,10 +184,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 onViewChange('downloads');
                 onStatusFilterChange('downloading');
               }}
-              className={`w-full flex items-center justify-between px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+              className={`w-full flex items-center justify-between px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ${
                 activeView === 'downloads' && statusFilter === 'downloading'
-                  ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30'
-                  : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-200'
+                  ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 shadow-sm shadow-cyan-500/20'
+                  : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-200 hover:shadow-sm hover:shadow-cyan-500/15'
               }`}
             >
               <div className="flex items-center gap-2">
@@ -202,10 +202,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 onViewChange('downloads');
                 onStatusFilterChange('queued');
               }}
-              className={`w-full flex items-center justify-between px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+              className={`w-full flex items-center justify-between px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ${
                 activeView === 'downloads' && statusFilter === 'queued'
-                  ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30'
-                  : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-200'
+                  ? 'bg-purple-500/10 text-purple-400 border border-purple-500/30 shadow-sm shadow-purple-500/20'
+                  : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-200 hover:shadow-sm hover:shadow-purple-500/15'
               }`}
             >
               <div className="flex items-center gap-2">
@@ -220,10 +220,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 onViewChange('downloads');
                 onStatusFilterChange('completed');
               }}
-              className={`w-full flex items-center justify-between px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+              className={`w-full flex items-center justify-between px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ${
                 activeView === 'downloads' && statusFilter === 'completed'
-                  ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30'
-                  : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-200'
+                  ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 shadow-sm shadow-emerald-500/20'
+                  : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-200 hover:shadow-sm hover:shadow-emerald-500/15'
               }`}
             >
               <div className="flex items-center gap-2">
@@ -238,10 +238,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 onViewChange('downloads');
                 onStatusFilterChange('paused');
               }}
-              className={`w-full flex items-center justify-between px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+              className={`w-full flex items-center justify-between px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ${
                 activeView === 'downloads' && statusFilter === 'paused'
-                  ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30'
-                  : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-200'
+                  ? 'bg-amber-500/10 text-amber-400 border border-amber-500/30 shadow-sm shadow-amber-500/20'
+                  : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-200 hover:shadow-sm hover:shadow-amber-500/15'
               }`}
             >
               <div className="flex items-center gap-2">
@@ -256,10 +256,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 onViewChange('downloads');
                 onStatusFilterChange('failed');
               }}
-              className={`w-full flex items-center justify-between px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+              className={`w-full flex items-center justify-between px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ${
                 activeView === 'downloads' && statusFilter === 'failed'
-                  ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30'
-                  : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-200'
+                  ? 'bg-rose-500/10 text-rose-400 border border-rose-500/30 shadow-sm shadow-rose-500/20'
+                  : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-200 hover:shadow-sm hover:shadow-rose-500/15'
               }`}
             >
               <div className="flex items-center gap-2">
@@ -294,10 +294,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     onViewChange('downloads');
                     onCategoryFilterChange(cat.id);
                   }}
-                  className={`w-full flex items-center justify-between px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                  className={`w-full flex items-center justify-between px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ${
                     activeView === 'downloads' && categoryFilter === cat.id
-                      ? 'bg-slate-800 text-slate-100 font-bold'
-                      : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-200'
+                      ? 'bg-slate-800 text-slate-100 font-bold shadow-sm shadow-slate-500/20'
+                      : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-200 hover:shadow-sm hover:shadow-slate-500/15'
                   }`}
                 >
                   <div className="flex items-center gap-2">
@@ -319,10 +319,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <div className="space-y-0.5">
             <button
               onClick={() => onViewChange('powerFeatures')}
-              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-all ${
+              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-all duration-200 ${
                 activeView === 'powerFeatures'
-                  ? 'bg-gradient-to-r from-amber-500 to-orange-600 text-white shadow-md shadow-orange-600/30'
-                  : 'text-amber-400 hover:bg-slate-800 hover:text-amber-300'
+                  ? 'bg-gradient-to-r from-amber-500 to-orange-600 text-white shadow-md shadow-amber-500/40'
+                  : 'text-amber-400 hover:bg-slate-800 hover:text-amber-300 hover:shadow-md hover:shadow-amber-500/20'
               }`}
             >
               <Zap className="w-4 h-4 text-amber-400" />
@@ -331,10 +331,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
             <button
               onClick={() => onViewChange('queues')}
-              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
+              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all duration-200 ${
                 activeView === 'queues'
-                  ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
-                  : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                  ? 'bg-blue-600 text-white shadow-md shadow-indigo-500/40'
+                  : 'text-slate-300 hover:bg-slate-800 hover:text-white hover:shadow-sm hover:shadow-indigo-500/20'
               }`}
             >
               <ListOrdered className="w-4 h-4 text-indigo-400" />
@@ -343,10 +343,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
             <button
               onClick={() => onViewChange('siteGrabber')}
-              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
+              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all duration-200 ${
                 activeView === 'siteGrabber'
-                  ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
-                  : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                  ? 'bg-blue-600 text-white shadow-md shadow-emerald-500/40'
+                  : 'text-slate-300 hover:bg-slate-800 hover:text-white hover:shadow-sm hover:shadow-emerald-500/20'
               }`}
             >
               <Globe className="w-4 h-4 text-emerald-400" />
@@ -355,10 +355,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
             <button
               onClick={() => onViewChange('batchLinks')}
-              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
+              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all duration-200 ${
                 activeView === 'batchLinks'
-                  ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
-                  : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                  ? 'bg-blue-600 text-white shadow-md shadow-cyan-500/40'
+                  : 'text-slate-300 hover:bg-slate-800 hover:text-white hover:shadow-sm hover:shadow-cyan-500/20'
               }`}
             >
               <Layers className="w-4 h-4 text-cyan-400" />
@@ -367,10 +367,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
             <button
               onClick={() => onViewChange('mediaDetector')}
-              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
+              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all duration-200 ${
                 activeView === 'mediaDetector'
-                  ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
-                  : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                  ? 'bg-blue-600 text-white shadow-md shadow-amber-500/40'
+                  : 'text-slate-300 hover:bg-slate-800 hover:text-white hover:shadow-sm hover:shadow-amber-500/20'
               }`}
             >
               <Flame className="w-4 h-4 text-amber-400" />
@@ -379,10 +379,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
             <button
               onClick={() => onViewChange('mediaLibrary')}
-              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
+              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all duration-200 ${
                 activeView === 'mediaLibrary'
-                  ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
-                  : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                  ? 'bg-blue-600 text-white shadow-md shadow-amber-500/40'
+                  : 'text-slate-300 hover:bg-slate-800 hover:text-white hover:shadow-sm hover:shadow-amber-500/20'
               }`}
             >
               <Video className="w-4 h-4 text-amber-400" />
@@ -391,10 +391,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
             <button
               onClick={() => onViewChange('automation')}
-              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
+              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all duration-200 ${
                 activeView === 'automation'
-                  ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
-                  : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                  ? 'bg-blue-600 text-white shadow-md shadow-indigo-500/40'
+                  : 'text-slate-300 hover:bg-slate-800 hover:text-white hover:shadow-sm hover:shadow-indigo-500/20'
               }`}
             >
               <Sparkles className="w-4 h-4 text-indigo-400" />
@@ -403,10 +403,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
             <button
               onClick={() => onViewChange('analytics')}
-              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
+              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all duration-200 ${
                 activeView === 'analytics'
-                  ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
-                  : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                  ? 'bg-blue-600 text-white shadow-md shadow-blue-500/40'
+                  : 'text-slate-300 hover:bg-slate-800 hover:text-white hover:shadow-sm hover:shadow-blue-500/20'
               }`}
             >
               <BarChart3 className="w-4 h-4 text-blue-400" />
@@ -415,10 +415,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
             <button
               onClick={() => onViewChange('incidents')}
-              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
+              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all duration-200 ${
                 activeView === 'incidents'
-                  ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
-                  : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                  ? 'bg-blue-600 text-white shadow-md shadow-rose-500/40'
+                  : 'text-slate-300 hover:bg-slate-800 hover:text-white hover:shadow-sm hover:shadow-rose-500/20'
               }`}
             >
               <AlertOctagon className="w-4 h-4 text-rose-400" />
@@ -427,10 +427,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
             <button
               onClick={() => onViewChange('snapshots')}
-              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
+              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all duration-200 ${
                 activeView === 'snapshots'
-                  ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
-                  : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                  ? 'bg-blue-600 text-white shadow-md shadow-cyan-500/40'
+                  : 'text-slate-300 hover:bg-slate-800 hover:text-white hover:shadow-sm hover:shadow-cyan-500/20'
               }`}
             >
               <Camera className="w-4 h-4 text-cyan-400" />
@@ -439,10 +439,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
             <button
               onClick={() => onViewChange('diagnostics')}
-              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
+              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all duration-200 ${
                 activeView === 'diagnostics'
-                  ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
-                  : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                  ? 'bg-blue-600 text-white shadow-md shadow-rose-500/40'
+                  : 'text-slate-300 hover:bg-slate-800 hover:text-white hover:shadow-sm hover:shadow-rose-500/20'
               }`}
             >
               <Activity className="w-4 h-4 text-rose-400" />
@@ -451,10 +451,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
             <button
               onClick={() => onViewChange('compatibility')}
-              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
+              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all duration-200 ${
                 activeView === 'compatibility'
-                  ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
-                  : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                  ? 'bg-blue-600 text-white shadow-md shadow-cyan-500/40'
+                  : 'text-slate-300 hover:bg-slate-800 hover:text-white hover:shadow-sm hover:shadow-cyan-500/20'
               }`}
             >
               <ShieldCheck className="w-4 h-4 text-cyan-400" />
@@ -463,10 +463,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
             <button
               onClick={() => onViewChange('storageMaintenance')}
-              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
+              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all duration-200 ${
                 activeView === 'storageMaintenance'
-                  ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
-                  : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                  ? 'bg-blue-600 text-white shadow-md shadow-teal-500/40'
+                  : 'text-slate-300 hover:bg-slate-800 hover:text-white hover:shadow-sm hover:shadow-teal-500/20'
               }`}
             >
               <HardDrive className="w-4 h-4 text-teal-400" />
@@ -475,10 +475,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
             <button
               onClick={() => onViewChange('settings')}
-              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
+              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all duration-200 ${
                 activeView === 'settings'
-                  ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
-                  : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                  ? 'bg-blue-600 text-white shadow-md shadow-blue-500/40'
+                  : 'text-slate-300 hover:bg-slate-800 hover:text-white hover:shadow-sm hover:shadow-slate-500/20'
               }`}
             >
               <Settings className="w-4 h-4 text-slate-400" />
