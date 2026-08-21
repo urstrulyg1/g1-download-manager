@@ -19,10 +19,12 @@ import {
   Info,
   Layers,
   ArrowUpDown,
+  Film,
 } from 'lucide-react';
 import { DownloadItem, DownloadQueue, CategoryRule } from '../../shared/types';
 import { Language, translations } from '../lib/i18n';
 import { api } from '../lib/api';
+import { MediaPreviewModal } from './MediaPreviewModal';
 
 interface DownloadsViewProps {
   downloads: DownloadItem[];
@@ -54,6 +56,7 @@ export const DownloadsView: React.FC<DownloadsViewProps> = ({
   const t = translations[lang] || translations.en;
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [previewItem, setPreviewItem] = useState<DownloadItem | null>(null);
   const [sortBy, setSortBy] = useState<'createdAt' | 'filename' | 'size' | 'progress' | 'speed'>('createdAt');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
@@ -459,6 +462,17 @@ export const DownloadsView: React.FC<DownloadsViewProps> = ({
                             </button>
                           ) : null}
 
+                          {/* Media Live Preview Button */}
+                          {(item.category === 'video' || item.category === 'audio' || item.filename?.match(/\.(mp4|mkv|webm|mov|ts|mp3|flac|wav|m4a)$/i)) && (
+                            <button
+                              onClick={() => setPreviewItem(item)}
+                              className="p-1.5 rounded-lg bg-slate-800 hover:bg-cyan-950 text-cyan-400 hover:text-cyan-300 border border-cyan-500/20"
+                              title="Play / Preview Stream"
+                            >
+                              <Film className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+
                           <button
                             onClick={() => api.restartDownload(item.id)}
                             className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300"
@@ -492,6 +506,13 @@ export const DownloadsView: React.FC<DownloadsViewProps> = ({
           </table>
         </div>
       </div>
+
+      {/* In-App Live Media Preview Player Modal */}
+      <MediaPreviewModal
+        item={previewItem}
+        isOpen={!!previewItem}
+        onClose={() => setPreviewItem(null)}
+      />
     </div>
   );
 };
