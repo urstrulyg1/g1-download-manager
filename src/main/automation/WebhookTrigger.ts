@@ -1,4 +1,4 @@
-import { exec } from 'child_process';
+import { execFile } from 'child_process';
 import { DownloadItem } from '../../shared/types';
 
 export interface WebhookConfig {
@@ -44,7 +44,8 @@ export class WebhookTrigger {
       }
     }
 
-    // 2. Execute Custom Post-Download Script
+    // 2. Execute Custom Post-Download Script (execFile → no shell interpolation,
+    //    so malicious filenames cannot inject commands)
     if (config.customScriptPath) {
       try {
         const env = {
@@ -52,9 +53,11 @@ export class WebhookTrigger {
           G1DM_FILE_PATH: item.finalPath,
           G1DM_FILENAME: item.filename,
           G1DM_URL: item.url,
+          G1DM_STATUS: item.status,
+          G1DM_TOTAL_BYTES: String(item.totalBytes || 0),
         };
-        exec(`"${config.customScriptPath}" "${item.finalPath}"`, { env }, (err) => {
-          if (err) console.warn('Script execution failed:', err);
+        execFile(config.customScriptPath, [item.finalPath], { env, timeout: 120000 }, (err) => {
+          if (err) console.warn('Script execution failed:', err.message);
         });
         scriptExecuted = true;
       } catch {

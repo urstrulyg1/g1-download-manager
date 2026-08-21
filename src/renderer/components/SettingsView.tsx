@@ -13,6 +13,9 @@ import {
   CheckCircle2,
   FileJson,
   Upload,
+  Zap,
+  Power,
+  Bot,
 } from 'lucide-react';
 import { AppSettings } from '../../shared/types';
 import { Language, translations } from '../lib/i18n';
@@ -27,7 +30,9 @@ interface SettingsViewProps {
 export const SettingsView: React.FC<SettingsViewProps> = ({ settings, lang, onSave }) => {
   const t = translations[lang] || translations.en;
   const [formData, setFormData] = useState<AppSettings | null>(settings);
-  const [activeSection, setActiveSection] = useState<'general' | 'downloads' | 'network' | 'browser' | 'security' | 'scheduler' | 'backup'>('general');
+  const [activeSection, setActiveSection] = useState<
+    'general' | 'downloads' | 'network' | 'browser' | 'security' | 'scheduler' | 'automation' | 'power' | 'remote' | 'backup'
+  >('general');
   const [saved, setSaved] = useState(false);
 
   if (!formData) return null;
@@ -94,6 +99,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, lang, onSa
             { id: 'browser', label: 'Browser Integration', icon: Layers },
             { id: 'security', label: 'Security & Privacy', icon: Shield },
             { id: 'scheduler', label: 'Scheduler', icon: Clock },
+            { id: 'automation', label: 'Post-Download Automation', icon: Zap },
+            { id: 'power', label: 'Power Governor', icon: Power },
+            { id: 'remote', label: 'Remote Control Bot', icon: Bot },
             { id: 'backup', label: 'Backup & Restore', icon: Database },
           ].map((sec) => {
             const IconComp = sec.icon;
@@ -451,6 +459,59 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, lang, onSa
                   <span>Automatically redact tokens, passwords, and cookies from diagnostic reports</span>
                 </label>
               </div>
+
+              <h3 className="text-sm font-bold text-white border-b border-slate-800 pb-2 pt-2">Cloud Threat Intelligence</h3>
+              <div className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800 space-y-3">
+                <label className="flex items-center gap-2 text-slate-300 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData.security.threatIntelEnabled}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        security: { ...formData.security, threatIntelEnabled: e.target.checked },
+                      })
+                    }
+                    className="rounded text-blue-600"
+                  />
+                  <span>Check every URL against live threat-intelligence feeds before downloading</span>
+                </label>
+
+                {formData.security.threatIntelEnabled && (
+                  <>
+                    <label className="flex items-center gap-2 text-slate-300 cursor-pointer pl-6">
+                      <input
+                        type="checkbox"
+                        checked={formData.security.urlHausEnabled}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            security: { ...formData.security, urlHausEnabled: e.target.checked },
+                          })
+                        }
+                        className="rounded text-blue-600"
+                      />
+                      <span>URLhaus (abuse.ch) malware URL database — free, no API key needed</span>
+                    </label>
+
+                    <div className="pl-6 pt-1">
+                      <label className="text-slate-400 mb-1 block">VirusTotal API Key (optional — enables 70+ engine URL & hash lookups)</label>
+                      <input
+                        type="password"
+                        placeholder="Paste your VirusTotal v3 API key"
+                        value={formData.security.virusTotalApiKey}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            security: { ...formData.security, virusTotalApiKey: e.target.value },
+                          })
+                        }
+                        className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-slate-200 font-mono"
+                      />
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
           )}
 
@@ -527,7 +588,285 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, lang, onSa
             </div>
           )}
 
-          {/* 7. BACKUP & RESTORE */}
+          {/* 7. POST-DOWNLOAD AUTOMATION */}
+          {activeSection === 'automation' && (
+            <div className="space-y-4">
+              <h3 className="text-sm font-bold text-white border-b border-slate-800 pb-2">Webhooks & Custom Scripts</h3>
+              <div className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800 space-y-3">
+                <label className="flex items-center gap-2 text-slate-300 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData.automation.webhooksEnabled}
+                    onChange={(e) =>
+                      setFormData({ ...formData, automation: { ...formData.automation, webhooksEnabled: e.target.checked } })
+                    }
+                    className="rounded text-blue-600"
+                  />
+                  <span>Enable post-download triggers (webhooks + custom scripts)</span>
+                </label>
+
+                {formData.automation.webhooksEnabled && (
+                  <div className="space-y-3 pl-6">
+                    <div>
+                      <label className="text-slate-400 mb-1 block">Webhook URL (Discord / Slack / IFTTT / custom endpoint)</label>
+                      <input
+                        type="text"
+                        placeholder="https://discord.com/api/webhooks/…"
+                        value={formData.automation.webhookUrl}
+                        onChange={(e) =>
+                          setFormData({ ...formData, automation: { ...formData.automation, webhookUrl: e.target.value } })
+                        }
+                        className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-slate-200 font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-slate-400 mb-1 block">Custom Script Path (receives file path as $1 + G1DM_* env vars)</label>
+                      <input
+                        type="text"
+                        placeholder="/home/user/scripts/on-download-complete.sh"
+                        value={formData.automation.customScriptPath}
+                        onChange={(e) =>
+                          setFormData({ ...formData, automation: { ...formData.automation, customScriptPath: e.target.value } })
+                        }
+                        className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-slate-200 font-mono"
+                      />
+                    </div>
+                    <div className="flex gap-6">
+                      <label className="flex items-center gap-2 text-slate-300 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={formData.automation.triggerOnComplete}
+                          onChange={(e) =>
+                            setFormData({ ...formData, automation: { ...formData.automation, triggerOnComplete: e.target.checked } })
+                          }
+                          className="rounded text-blue-600"
+                        />
+                        <span>Fire on completion</span>
+                      </label>
+                      <label className="flex items-center gap-2 text-slate-300 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={formData.automation.triggerOnError}
+                          onChange={(e) =>
+                            setFormData({ ...formData, automation: { ...formData.automation, triggerOnError: e.target.checked } })
+                          }
+                          className="rounded text-blue-600"
+                        />
+                        <span>Fire on failure</span>
+                      </label>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <h3 className="text-sm font-bold text-white border-b border-slate-800 pb-2 pt-2">Automated Archive Extraction</h3>
+              <div className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800 space-y-3">
+                <label className="flex items-center gap-2 text-slate-300 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData.automation.autoExtractArchives}
+                    onChange={(e) =>
+                      setFormData({ ...formData, automation: { ...formData.automation, autoExtractArchives: e.target.checked } })
+                    }
+                    className="rounded text-blue-600"
+                  />
+                  <span>Auto-extract .zip / .tar / .gz / .rar / .7z archives when downloads complete</span>
+                </label>
+
+                {formData.automation.autoExtractArchives && (
+                  <div className="space-y-3 pl-6">
+                    <div>
+                      <label className="text-slate-400 mb-1 block">Password Dictionary (one per line — tried in order for encrypted archives)</label>
+                      <textarea
+                        rows={4}
+                        placeholder={'mypassword123\nbackup-archive-key'}
+                        value={formData.automation.archivePasswords.join('\n')}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            automation: {
+                              ...formData.automation,
+                              archivePasswords: e.target.value.split('\n').map((p) => p.trim()).filter(Boolean),
+                            },
+                          })
+                        }
+                        className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-slate-200 font-mono"
+                      />
+                    </div>
+                    <label className="flex items-center gap-2 text-slate-300 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={formData.automation.deleteArchiveAfterExtract}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            automation: { ...formData.automation, deleteArchiveAfterExtract: e.target.checked },
+                          })
+                        }
+                        className="rounded text-blue-600"
+                      />
+                      <span>Delete the original archive after successful extraction</span>
+                    </label>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* 8. POWER GOVERNOR */}
+          {activeSection === 'power' && (
+            <div className="space-y-4">
+              <h3 className="text-sm font-bold text-white border-b border-slate-800 pb-2">OS Power Governor</h3>
+              <p className="text-slate-400">
+                When the entire download queue drains (no active or queued items), G1DM can automatically put the machine to
+                sleep or shut it down after a grace period. The countdown cancels itself if new downloads start.
+              </p>
+              <div className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800 space-y-3">
+                <label className="flex items-center gap-2 text-slate-300 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData.power.governorEnabled}
+                    onChange={(e) =>
+                      setFormData({ ...formData, power: { ...formData.power, governorEnabled: e.target.checked } })
+                    }
+                    className="rounded text-blue-600"
+                  />
+                  <span>Enable power governor</span>
+                </label>
+
+                {formData.power.governorEnabled && (
+                  <div className="grid grid-cols-2 gap-4 pl-6">
+                    <div className="space-y-1">
+                      <label className="text-slate-400">Action when queue drains</label>
+                      <select
+                        value={formData.power.actionOnQueueDrained}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            power: { ...formData.power, actionOnQueueDrained: e.target.value as any },
+                          })
+                        }
+                        className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-slate-200"
+                      >
+                        <option value="none">Do nothing</option>
+                        <option value="notify">Notify only</option>
+                        <option value="sleep">Sleep / Suspend</option>
+                        <option value="hibernate">Hibernate</option>
+                        <option value="shutdown">Shut down</option>
+                      </select>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-slate-400">Grace period (seconds)</label>
+                      <input
+                        type="number"
+                        min={5}
+                        max={3600}
+                        value={formData.power.graceSeconds}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            power: { ...formData.power, graceSeconds: parseInt(e.target.value, 10) || 60 },
+                          })
+                        }
+                        className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-slate-200"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* 9. REMOTE CONTROL BOT */}
+          {activeSection === 'remote' && (
+            <div className="space-y-4">
+              <h3 className="text-sm font-bold text-white border-b border-slate-800 pb-2">Telegram Remote Control</h3>
+              <p className="text-slate-400">
+                Create a bot with <span className="font-mono text-slate-300">@BotFather</span> on Telegram, paste the token
+                below, and send links to your bot from your phone — G1DM downloads them on this machine and replies with
+                progress. Commands: /add, /status, /speed, /pause, /resume.
+              </p>
+              <div className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800 space-y-3">
+                <label className="flex items-center gap-2 text-slate-300 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData.remote.telegramBotEnabled}
+                    onChange={(e) =>
+                      setFormData({ ...formData, remote: { ...formData.remote, telegramBotEnabled: e.target.checked } })
+                    }
+                    className="rounded text-blue-600"
+                  />
+                  <span>Enable Telegram bot (long-polling starts automatically after saving)</span>
+                </label>
+
+                {formData.remote.telegramBotEnabled && (
+                  <div className="space-y-3 pl-6">
+                    <div>
+                      <label className="text-slate-400 mb-1 block">Bot Token</label>
+                      <input
+                        type="password"
+                        placeholder="123456789:AAF…"
+                        value={formData.remote.telegramBotToken}
+                        onChange={(e) =>
+                          setFormData({ ...formData, remote: { ...formData.remote, telegramBotToken: e.target.value } })
+                        }
+                        className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-slate-200 font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-slate-400 mb-1 block">
+                        Allowed Chat IDs (comma-separated — leave empty to accept all chats)
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="123456789, 987654321"
+                        value={formData.remote.telegramAllowedChatIds.join(', ')}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            remote: {
+                              ...formData.remote,
+                              telegramAllowedChatIds: e.target.value.split(',').map((c) => c.trim()).filter(Boolean),
+                            },
+                          })
+                        }
+                        className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-slate-200 font-mono"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <h3 className="text-sm font-bold text-white border-b border-slate-800 pb-2 pt-2">Discord Notifications</h3>
+              <div className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800 space-y-3">
+                <div>
+                  <label className="text-slate-400 mb-1 block">Discord Webhook URL</label>
+                  <input
+                    type="text"
+                    placeholder="https://discord.com/api/webhooks/…"
+                    value={formData.remote.discordWebhookUrl}
+                    onChange={(e) =>
+                      setFormData({ ...formData, remote: { ...formData.remote, discordWebhookUrl: e.target.value } })
+                    }
+                    className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-slate-200 font-mono"
+                  />
+                </div>
+                <label className="flex items-center gap-2 text-slate-300 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData.remote.notifyOnComplete}
+                    onChange={(e) =>
+                      setFormData({ ...formData, remote: { ...formData.remote, notifyOnComplete: e.target.checked } })
+                    }
+                    className="rounded text-blue-600"
+                  />
+                  <span>Send a notification (Telegram + Discord) whenever a download finishes</span>
+                </label>
+              </div>
+            </div>
+          )}
+
+          {/* 10. BACKUP & RESTORE */}
           {activeSection === 'backup' && (
             <div className="space-y-4">
               <h3 className="text-sm font-bold text-white border-b border-slate-800 pb-2">Backup & State Migration</h3>

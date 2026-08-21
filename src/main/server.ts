@@ -38,6 +38,8 @@ import { CloudSyncManager } from './storage/CloudSyncManager';
 import { DropBoxWatcher } from './storage/DropBoxWatcher';
 import { EncryptedVault } from './security/EncryptedVault';
 import { ControlBot } from './remote/ControlBot';
+import { ThreatIntelService } from './security/ThreatIntelService';
+import { PowerGovernor } from './platform/PowerGovernor';
 
 export async function createUnifiedServer(port: number = 8055) {
   const isDev = process.env.NODE_ENV !== 'production';
@@ -61,6 +63,28 @@ export async function createUnifiedServer(port: number = 8055) {
   const clipboardMonitor = new ClipboardMonitor();
   BrowserIntegrationService.ensureExtensionFiles();
 
+  // Configure remote-control bot and power governor from persisted settings
+  const applyRemoteAndPowerSettings = () => {
+    const s = db.getSettings();
+    ControlBot.configure(
+      {
+        enabled: s.remote?.telegramBotEnabled || !!s.remote?.discordWebhookUrl,
+        telegramBotToken: s.remote?.telegramBotEnabled ? s.remote.telegramBotToken : undefined,
+        telegramAllowedChatIds: s.remote?.telegramAllowedChatIds || [],
+        discordWebhookUrl: s.remote?.discordWebhookUrl || undefined,
+      },
+      engine
+    );
+  };
+  applyRemoteAndPowerSettings();
+  PowerGovernor.start(engine, db, (message) => broadcastLater('power_governor', { message }));
+
+  // broadcast() is defined below; buffer via indirection so PowerGovernor can be started here.
+  let broadcastRef: ((type: string, data: any) => void) | null = null;
+  function broadcastLater(type: string, data: any) {
+    if (broadcastRef) broadcastRef(type, data);
+  }
+
   const app = express();
   app.use(cors({ origin: '*' }));
   app.use(express.json({ limit: '10mb' }));
@@ -83,6 +107,7 @@ export async function createUnifiedServer(port: number = 8055) {
       }
     }
   };
+  broadcastRef = broadcast;
 
   // Attach engine events to WebSocket broadcast
   engine.on('item_progress', (item) => broadcast('item_progress', item));
@@ -90,16 +115,52 @@ export async function createUnifiedServer(port: number = 8055) {
   engine.on('item_updated', (item) => broadcast('item_updated', item));
   engine.on('item_completed', (item) => {
     broadcast('item_completed', item);
-    // Trigger webhooks and cloud sync on completion
     const settings = db.getSettings();
+
+    // Antivirus scan
     if (settings.security.runAntivirusScan) {
       SecurityScanner.scanFile(item.finalPath, settings.security.antivirusCommand);
     }
-    WebhookTrigger.executeTriggers(item, {
-      enabled: true,
-      triggerOnComplete: true,
-      triggerOnError: false,
-    });
+
+    // Post-download webhooks & custom scripts (now driven by user settings)
+    if (settings.automation?.webhooksEnabled) {
+      WebhookTrigger.executeTriggers(item, {
+        enabled: true,
+        webhookUrl: settings.automation.webhookUrl || undefined,
+        customScriptPath: settings.automation.customScriptPath || undefined,
+        triggerOnComplete: settings.automation.triggerOnComplete,
+        triggerOnError: settings.automation.triggerOnError,
+      });
+    }
+
+    // Automated archive extraction with password dictionary
+    if (settings.automation?.autoExtractArchives && /\.(zip|rar|7z|gz|tgz|tar)$/i.test(item.finalPath || '')) {
+      AutoExtractor.extractArchive(
+        item.finalPath,
+        settings.automation.archivePasswords || [],
+        settings.automation.deleteArchiveAfterExtract
+      )
+        .then((result) => broadcast('archive_extracted', { downloadId: item.id, ...result }))
+        .catch(() => {});
+    }
+
+    // Remote bot completion notification
+    if (settings.remote?.notifyOnComplete) {
+      void ControlBot.sendNotification(`Download complete: ${item.filename}`);
+    }
+  });
+
+  engine.on('item_error', (err: any, item: any) => {
+    const settings = db.getSettings();
+    if (settings.automation?.webhooksEnabled && settings.automation.triggerOnError && item) {
+      WebhookTrigger.executeTriggers(item, {
+        enabled: true,
+        webhookUrl: settings.automation.webhookUrl || undefined,
+        customScriptPath: undefined,
+        triggerOnComplete: false,
+        triggerOnError: true,
+      });
+    }
   });
   engine.on('item_error', (err, item) => broadcast('item_error', { error: err.message, item }));
   engine.on('item_deleted', (id) => broadcast('item_deleted', { id }));
@@ -135,6 +196,43 @@ export async function createUnifiedServer(port: number = 8055) {
       const { url, auth, proxy } = req.body;
       if (!url) return res.status(400).json({ error: 'URL is required' });
       const probe = await ProbeService.probe(url, auth, proxy);
+
+      // Optional cloud threat-intelligence enrichment (URLhaus + VirusTotal)
+      const settings = db.getSettings();
+      if (settings.security?.threatIntelEnabled) {
+        try {
+          const intel = await ThreatIntelService.checkUrl(url, {
+            virusTotalApiKey: settings.security.virusTotalApiKey || undefined,
+            urlHausEnabled: settings.security.urlHausEnabled,
+          });
+          (probe as any).threatIntel = intel;
+
+          // Escalate the local scanner verdict when cloud reputation flags the URL
+          if (probe.safetyWarning && intel.riskScoreDelta > 0) {
+            const w = probe.safetyWarning;
+            w.riskScore = Math.min(100, w.riskScore + intel.riskScoreDelta);
+            w.isSafe = w.riskScore < 45;
+            for (const src of intel.sources) {
+              if (src.verdict === 'malicious' || src.verdict === 'suspicious') {
+                w.reasons.push(`Cloud reputation (${src.provider}): ${src.detail}`);
+              }
+            }
+            if (w.riskScore >= 70) {
+              w.riskLevel = 'CRITICAL_MALICIOUS';
+              w.warningTitle = '⛔ CRITICAL: URL flagged by cloud threat intelligence!';
+              w.warningDetails = 'One or more live threat-intelligence feeds identify this URL as an active malware or phishing endpoint.';
+              w.recommendation = 'DO NOT DOWNLOAD. This URL is listed in live malware databases.';
+              w.requireUserOverride = true;
+            } else if (w.riskScore >= 45 && w.riskLevel === 'SAFE') {
+              w.riskLevel = 'HIGH_RISK';
+              w.requireUserOverride = true;
+            }
+          }
+        } catch {
+          // Threat intel is best-effort; never block the probe on API failures
+        }
+      }
+
       res.json(probe);
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -291,6 +389,8 @@ export async function createUnifiedServer(port: number = 8055) {
     if (req.body.downloads?.globalSpeedLimitBytesPerSec !== undefined) {
       engine.setGlobalSpeedLimit(req.body.downloads.globalSpeedLimitBytesPerSec);
     }
+    // Re-apply remote-bot configuration (starts/stops Telegram polling as needed)
+    applyRemoteAndPowerSettings();
     res.json(db.getSettings());
   });
 
@@ -527,6 +627,41 @@ export async function createUnifiedServer(port: number = 8055) {
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
+  });
+
+  app.get('/api/remote/bot/status', (req, res) => {
+    res.json(ControlBot.getStatus());
+  });
+
+  app.post('/api/remote/bot/test', async (req, res) => {
+    const sent = await ControlBot.sendNotification(req.body?.message || 'Test notification from G1DM 🎉');
+    res.json({ sent });
+  });
+
+  // Cloud threat intelligence (URLhaus free + optional VirusTotal key)
+  app.post('/api/security/threat-intel/check', async (req, res) => {
+    try {
+      const { url } = req.body;
+      if (!url) return res.status(400).json({ error: 'URL is required' });
+      const settings = db.getSettings();
+      const intel = await ThreatIntelService.checkUrl(url, {
+        virusTotalApiKey: settings.security.virusTotalApiKey || undefined,
+        urlHausEnabled: settings.security.urlHausEnabled,
+      });
+      res.json(intel);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // OS Power Governor
+  app.get('/api/power/governor', (req, res) => {
+    res.json(PowerGovernor.getStatus());
+  });
+
+  app.post('/api/power/governor/cancel', (req, res) => {
+    PowerGovernor.cancelPending();
+    res.json({ cancelled: true });
   });
 
   // Mount Versioned API v1 Router
@@ -937,10 +1072,13 @@ export async function createUnifiedServer(port: number = 8055) {
   });
 
   return new Promise<{ server: any; app: any; db: AppDatabase; engine: DownloadEngine }>((resolve, reject) => {
+    // Bind to all interfaces so the mobile PWA / remote clients on the local
+    // network (or Tailscale) can reach the dashboard. Override with G1DM_HOST.
+    const host = process.env.G1DM_HOST || '0.0.0.0';
     server.once('error', reject);
-    server.listen(port, '127.0.0.1', () => {
+    server.listen(port, host, () => {
       server.off('error', reject);
-      console.log(`[G1DM] Application running at http://127.0.0.1:${port}`);
+      console.log(`[G1DM] Application running at http://${host === '0.0.0.0' ? '127.0.0.1' : host}:${port} (bound to ${host})`);
       resolve({ server, app, db, engine });
     });
   });

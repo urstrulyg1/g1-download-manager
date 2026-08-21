@@ -317,6 +317,9 @@ export interface AppSettings {
     antivirusCommand: string;
     redactDiagnostics: boolean;
     verifySslCertificates: boolean;
+    threatIntelEnabled: boolean;
+    virusTotalApiKey: string;
+    urlHausEnabled: boolean;
   };
   scheduler: {
     workingHoursEnabled: boolean;
@@ -324,6 +327,28 @@ export interface AppSettings {
     workingHoursEnd: string;
     workingHoursSpeedLimit: number;
     offHoursUnlimited: boolean;
+  };
+  automation: {
+    webhooksEnabled: boolean;
+    webhookUrl: string;
+    customScriptPath: string;
+    triggerOnComplete: boolean;
+    triggerOnError: boolean;
+    autoExtractArchives: boolean;
+    archivePasswords: string[];
+    deleteArchiveAfterExtract: boolean;
+  };
+  power: {
+    governorEnabled: boolean;
+    actionOnQueueDrained: 'none' | 'notify' | 'sleep' | 'shutdown' | 'hibernate';
+    graceSeconds: number;
+  };
+  remote: {
+    telegramBotEnabled: boolean;
+    telegramBotToken: string;
+    telegramAllowedChatIds: string[];
+    discordWebhookUrl: string;
+    notifyOnComplete: boolean;
   };
 }
 
