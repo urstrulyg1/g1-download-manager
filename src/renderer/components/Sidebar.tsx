@@ -106,7 +106,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   };
 
   return (
-    <aside className="w-64 bg-slate-900/95 dark:bg-slate-950/95 border-r border-slate-800 flex flex-col justify-between select-none h-[calc(100vh-4rem)] overflow-y-auto">
+    <aside className="w-64 shrink-0 bg-slate-900/95 dark:bg-slate-950/95 border-r border-slate-800 flex flex-col justify-between select-none h-full overflow-y-auto">
       <div className="p-3 space-y-6">
         {/* Main Navigation */}
         <div className="space-y-1">

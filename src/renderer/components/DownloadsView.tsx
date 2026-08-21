@@ -134,7 +134,7 @@ export const DownloadsView: React.FC<DownloadsViewProps> = ({
   };
 
   return (
-    <div className="p-6 space-y-4 max-w-7xl mx-auto overflow-y-auto h-[calc(100vh-4rem)] flex flex-col">
+    <div className="p-6 space-y-4 max-w-7xl mx-auto w-full flex flex-col">
       {/* Top Controls Bar */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-slate-900/80 border border-slate-800 rounded-2xl p-4 shadow-xl">
         {/* Search */}

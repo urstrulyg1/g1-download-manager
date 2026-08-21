@@ -170,7 +170,7 @@ export default function Home() {
 
   return (
     <div
-      className="theme-app min-h-screen"
+      className="theme-app h-screen flex flex-col overflow-hidden w-full"
       data-active-theme={resolvedTheme}
       suppressHydrationWarning
     >
@@ -194,7 +194,7 @@ export default function Home() {
       />
 
       {/* Main Layout */}
-      <div className="flex">
+      <div className="flex flex-1 min-h-0 w-full overflow-hidden">
         {/* Left Sidebar */}
         <Sidebar
           activeView={activeView}
@@ -213,7 +213,7 @@ export default function Home() {
         />
 
         {/* Center Viewport */}
-        <main className="flex-1 bg-slate-950/50">
+        <main className="flex-1 min-w-0 h-full overflow-y-auto overflow-x-hidden bg-slate-950/50">
           {activeView === 'dashboard' && (
             <DashboardView
               downloads={downloads}

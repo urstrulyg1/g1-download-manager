@@ -116,9 +116,9 @@ export const Navbar: React.FC<NavbarProps> = ({
   };
 
   return (
-    <header className="h-16 bg-slate-900/90 dark:bg-slate-950/90 backdrop-blur-md border-b border-slate-800 px-4 flex items-center justify-between sticky top-0 z-30 select-none">
+    <header className="h-16 w-full shrink-0 bg-slate-900/90 dark:bg-slate-950/90 backdrop-blur-md border-b border-slate-800 px-4 flex items-center justify-between sticky top-0 z-30 select-none">
       {/* Left: Brand, Core Status & Mode */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 shrink-0">
         <div
           className="flex items-center gap-2.5 cursor-pointer"
           onClick={() => {
@@ -191,7 +191,7 @@ export const Navbar: React.FC<NavbarProps> = ({
       </div>
 
       {/* Center: Controls & Profile Selector */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 shrink-0">
         <Button
           size="sm"
           variant="primary"
@@ -275,7 +275,7 @@ export const Navbar: React.FC<NavbarProps> = ({
       </div>
 
       {/* Right: Search, Action Center & Settings */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 shrink-0">
         <button
           onClick={() => {
             closeAllDropdowns();
