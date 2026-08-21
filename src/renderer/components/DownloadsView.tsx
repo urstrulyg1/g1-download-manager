@@ -19,6 +19,7 @@ import {
   Info,
   Layers,
   ArrowUpDown,
+  ShieldAlert,
 } from 'lucide-react';
 import { DownloadItem, DownloadQueue, CategoryRule } from '../../shared/types';
 import { Language, translations } from '../lib/i18n';
@@ -350,8 +351,17 @@ export const DownloadsView: React.FC<DownloadsViewProps> = ({
 
                       {/* File Name & Domain */}
                       <td className="p-3 max-w-xs">
-                        <div className="font-semibold text-slate-200 truncate group-hover:text-blue-400">
-                          {item.filename}
+                        <div className="font-semibold text-slate-200 truncate group-hover:text-blue-400 flex items-center gap-1.5">
+                          <span className="truncate">{item.filename}</span>
+                          {item.safetyWarning && !item.safetyWarning.isSafe && (
+                            <span
+                              className="px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300 font-mono text-[10px] font-bold flex items-center gap-1 flex-shrink-0"
+                              title={`${item.safetyWarning.warningTitle}: ${item.safetyWarning.reasons.join(', ')}`}
+                            >
+                              <ShieldAlert className="w-3 h-3 text-rose-400" />
+                              <span>Threat Warning</span>
+                            </span>
+                          )}
                         </div>
                         <div className="text-[11px] text-slate-400 flex items-center gap-1.5 mt-0.5 truncate">
                           <span className="px-1.5 py-0.2 rounded bg-slate-800 text-slate-300 font-mono text-[10px]">

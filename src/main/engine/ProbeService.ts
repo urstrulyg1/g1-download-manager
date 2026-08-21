@@ -7,6 +7,7 @@ import { Client as FtpClient } from 'basic-ftp';
 import { HttpsProxyAgent } from 'https-proxy-agent';
 import { SocksProxyAgent } from 'socks-proxy-agent';
 import { ServerCapabilities, DownloadAuth, ProxyConfig } from '../../shared/types';
+import { MaliciousLinkScanner, UrlSafetyScanResult } from '../security/MaliciousLinkScanner';
 
 export interface ProbeResult {
   filename: string;
@@ -14,6 +15,7 @@ export interface ProbeResult {
   capabilities: ServerCapabilities;
   mimeType: string;
   size: number;
+  safetyWarning?: UrlSafetyScanResult;
 }
 
 export class ProbeService {
@@ -102,11 +104,18 @@ export class ProbeService {
     const parsed = new URL(targetUrl);
     const protocol = parsed.protocol.replace(':', '').toLowerCase();
 
+    let probeRes: ProbeResult;
     if (protocol === 'ftp' || protocol === 'ftps') {
-      return this.probeFtp(targetUrl, auth, timeoutMs);
+      probeRes = await this.probeFtp(targetUrl, auth, timeoutMs);
+    } else {
+      probeRes = await this.probeHttp(targetUrl, auth, proxy, timeoutMs);
     }
 
-    return this.probeHttp(targetUrl, auth, proxy, timeoutMs);
+    // Perform Pre-Download Malicious Link Scan
+    const safetyWarning = MaliciousLinkScanner.scanUrl(targetUrl, probeRes);
+    probeRes.safetyWarning = safetyWarning;
+
+    return probeRes;
   }
 
   private static async probeFtp(
@@ -195,7 +204,7 @@ export class ProbeService {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36 G1DM/1.0',
         'Accept': '*/*',
         'Accept-Encoding': 'identity',
-        'Range': 'bytes=0-0', // Probe range support in one go!
+        'Range': 'bytes=0-0',
         ...(auth?.customHeaders || {}),
       };
 
@@ -239,7 +248,6 @@ export class ProbeService {
           const resHeaders = res.headers;
           const resStatusCode = res.statusCode || 200;
 
-          // Check TLS if HTTPS
           let tlsInfo: { cipher?: string; version?: string } | undefined;
           if (isHttps && (res.socket as any).getPeerCertificate) {
             const tlsSocket = res.socket as any;
@@ -251,7 +259,6 @@ export class ProbeService {
             };
           }
 
-          // Abort body stream immediately after receiving headers to save bandwidth
           res.destroy();
 
           if (
@@ -306,8 +313,6 @@ export class ProbeService {
       break;
     }
 
-    // Determine Range support
-    // If status code is 206, server honored bytes=0-0 range request!
     if (finalStatusCode === 206) {
       supportsRange = true;
     } else if (
@@ -317,10 +322,8 @@ export class ProbeService {
       supportsRange = true;
     }
 
-    // Determine Total Size
     let totalSize = -1;
     if (finalHeaders['content-range']) {
-      // Content-Range: bytes 0-0/10485760
       const crMatch = finalHeaders['content-range'].match(/\/(\d+|\*)/);
       if (crMatch && crMatch[1] && crMatch[1] !== '*') {
         totalSize = parseInt(crMatch[1], 10);

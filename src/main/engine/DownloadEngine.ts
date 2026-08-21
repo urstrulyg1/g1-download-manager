@@ -25,6 +25,7 @@ import { RecoveryJournal } from '../db/RecoveryJournal';
 import { SecretStore } from '../security/SecretStore';
 import { PathSanitizer } from '../storage/PathSanitizer';
 import { DownloadIntelligence } from './DownloadIntelligence';
+import { MaliciousLinkScanner } from '../security/MaliciousLinkScanner';
 
 export class DownloadEngine extends EventEmitter {
   private db: AppDatabase;
@@ -225,6 +226,9 @@ export class DownloadEngine extends EventEmitter {
         }
       : undefined;
 
+    // Pre-Download Malicious Link Scanning
+    const safetyWarning = MaliciousLinkScanner.scanUrl(params.url, probe);
+
     const item: DownloadItem = {
       id,
       url: params.url,
@@ -261,6 +265,7 @@ export class DownloadEngine extends EventEmitter {
       createdAt: Date.now(),
       durationMs: 0,
       securityScan: { status: 'unsupported' },
+      safetyWarning,
       logs: [
         {
           timestamp: Date.now(),
@@ -270,8 +275,25 @@ export class DownloadEngine extends EventEmitter {
       ],
     };
 
+    let startOk = params.startImmediately !== false;
+
+    if (!safetyWarning.isSafe) {
+      item.logs.push({
+        timestamp: Date.now(),
+        level: 'warn',
+        message: `Security Warning: ${safetyWarning.warningTitle} — ${safetyWarning.reasons.join('; ')}`,
+      });
+      if (safetyWarning.requireUserOverride) {
+        item.status = 'paused';
+        startOk = false;
+      }
+    }
+
     const sm = new DownloadStateMachine(id, 'CREATED');
     sm.transitionTo('QUEUED', 'Item enqueued');
+    if (item.status === 'paused') {
+      sm.transitionTo('PAUSED', 'Paused due to threat warning override requirement');
+    }
     this.stateMachines.set(id, sm);
 
     this.downloads.set(id, item);
@@ -279,7 +301,7 @@ export class DownloadEngine extends EventEmitter {
     this.db.saveDownload(item);
     this.emit('item_added', item);
 
-    if (params.startImmediately !== false) {
+    if (startOk) {
       const activeCount = Array.from(this.downloads.values()).filter((d) => d.status === 'downloading').length;
       if (activeCount < settings.downloads.maxConcurrentDownloads) {
         await this.startDownload(id);
