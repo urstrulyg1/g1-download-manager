@@ -61,6 +61,9 @@ export class AppDatabase {
       antivirusCommand: 'clamscan --no-summary',
       redactDiagnostics: true,
       verifySslCertificates: true,
+      threatIntelEnabled: false,
+      virusTotalApiKey: '',
+      urlHausEnabled: true,
     },
     scheduler: {
       workingHoursEnabled: false,
@@ -68,6 +71,28 @@ export class AppDatabase {
       workingHoursEnd: '18:00',
       workingHoursSpeedLimit: 524288, // 512 KB/s
       offHoursUnlimited: true,
+    },
+    automation: {
+      webhooksEnabled: false,
+      webhookUrl: '',
+      customScriptPath: '',
+      triggerOnComplete: true,
+      triggerOnError: false,
+      autoExtractArchives: false,
+      archivePasswords: [],
+      deleteArchiveAfterExtract: false,
+    },
+    power: {
+      governorEnabled: false,
+      actionOnQueueDrained: 'none',
+      graceSeconds: 60,
+    },
+    remote: {
+      telegramBotEnabled: false,
+      telegramBotToken: '',
+      telegramAllowedChatIds: [],
+      discordWebhookUrl: '',
+      notifyOnComplete: false,
     },
   };
 
@@ -769,6 +794,9 @@ export class AppDatabase {
         browser: { ...this.defaultSettings.browser, ...(parsed.browser || {}) },
         security: { ...this.defaultSettings.security, ...(parsed.security || {}) },
         scheduler: { ...this.defaultSettings.scheduler, ...(parsed.scheduler || {}) },
+        automation: { ...this.defaultSettings.automation, ...(parsed.automation || {}) },
+        power: { ...this.defaultSettings.power, ...(parsed.power || {}) },
+        remote: { ...this.defaultSettings.remote, ...(parsed.remote || {}) },
       };
     } catch {
       return this.defaultSettings;

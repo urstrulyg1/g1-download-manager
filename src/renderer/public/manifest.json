@@ -1,0 +1,31 @@
+{
+  "name": "G1DM — Internet Download Manager",
+  "short_name": "G1DM",
+  "description": "Next-generation download manager: monitor, pause, resume, and manage downloads from any device.",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0f172a",
+  "theme_color": "#3b82f6",
+  "icons": [
+    {
+      "src": "/icons/icon-192.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Add Download",
+      "url": "/?action=add",
+      "description": "Add a new download"
+    }
+  ]
+}

@@ -149,14 +149,26 @@ describe('G1DM Master Power Features Suite', () => {
       expect(typeof result).toBe('object');
     });
 
-    it('should auto-extract compressed archives with password list', async () => {
+    it('should reject corrupt archives instead of fabricating extraction results', async () => {
+      // Regression guard: the extractor previously "succeeded" on garbage bytes
+      // by writing a dummy file. Real extraction must fail gracefully here.
       const archivePath = path.join(tempDir, 'test_archive.zip');
       fs.writeFileSync(archivePath, Buffer.from('dummy zip file content'));
 
       const result = await AutoExtractor.extractArchive(archivePath, ['secret123'], false);
+      expect(result.extracted).toBe(false);
+      expect(result.extractedFiles.length).toBe(0);
+    });
+
+    it('should auto-extract real gzip archives', async () => {
+      const zlib = require('zlib');
+      const gzPath = path.join(tempDir, 'real_data.txt.gz');
+      fs.writeFileSync(gzPath, zlib.gzipSync(Buffer.from('real extraction works')));
+
+      const result = await AutoExtractor.extractArchive(gzPath, [], false);
       expect(result.extracted).toBe(true);
-      expect(result.matchedPassword).toBe('secret123');
-      expect(result.extractedFiles.length).toBeGreaterThan(0);
+      expect(result.extractedFiles.length).toBe(1);
+      expect(fs.readFileSync(result.extractedFiles[0], 'utf8')).toBe('real extraction works');
     });
   });
 
@@ -225,7 +237,8 @@ describe('G1DM Master Power Features Suite', () => {
       expect(addRes.responseText).toContain('Enqueued download');
 
       const statusRes = await ControlBot.processCommand('/status', engine);
-      expect(statusRes.responseText).toContain('Active Queue');
+      expect(statusRes.responseText).toContain('Queue');
+      expect(statusRes.responseText).toContain('bot_download.mp4');
 
       const pauseRes = await ControlBot.processCommand('/pause', engine);
       expect(pauseRes.responseText).toContain('paused');
