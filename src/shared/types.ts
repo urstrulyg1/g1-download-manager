@@ -181,6 +181,8 @@ export interface DownloadItem {
   safetyWarning?: UrlSafetyScanResult;
   archiveInfo?: ArchiveInfo;
   logs: { timestamp: number; level: 'info' | 'warn' | 'error'; message: string }[];
+  /** Session-level guard for queued items explicitly created without auto-start. */
+  manualStartRequired?: boolean;
 }
 
 export interface QueueSchedule {

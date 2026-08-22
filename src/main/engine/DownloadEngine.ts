@@ -139,7 +139,7 @@ export class DownloadEngine extends EventEmitter {
       const queueSlots = Math.min(slotsLeft, queueMax - queueActiveCount);
 
       const queuedItems = Array.from(this.downloads.values())
-        .filter((d) => d.queueId === queue.id && d.status === 'queued')
+        .filter((d) => d.queueId === queue.id && d.status === 'queued' && !(d as any).manualStartRequired)
         .sort((a, b) => {
           const priorityWeight: Record<Priority, number> = { urgent: 4, high: 3, normal: 2, low: 1 };
           const pDiff = (priorityWeight[b.priority] || 2) - (priorityWeight[a.priority] || 2);
@@ -236,8 +236,9 @@ export class DownloadEngine extends EventEmitter {
       /^YouTube_|^video(\.mp4)?$|^watch(\.mp4)?$|^stream(\.mp4)?$/i.test(initialFilename);
 
     if (mediaAnalysis && mediaAnalysis.title && isGenericFilename) {
-      const ext = (params as any).container || (params as any).format || 'mp4';
-      initialFilename = `${mediaAnalysis.title}.${ext}`;
+      const mediaContainer = (params as any).container || (params as any).format || mediaAnalysis.recommendedQuality?.container;
+      const ext = mediaContainer || path.extname(probe.filename || '').replace('.', '') || 'bin';
+      initialFilename = `${mediaAnalysis.title}.${ext.replace(/^\./, '')}`;
     }
 
     let filename = initialFilename || probe.filename;
@@ -317,6 +318,10 @@ export class DownloadEngine extends EventEmitter {
       durationMs: 0,
       securityScan: { status: 'unsupported' },
       safetyWarning,
+      // A queue action is an explicit user choice not to start yet. Keep this
+      // marker until the user invokes Start; the queue worker must not promote
+      // it automatically during this session.
+      manualStartRequired: params.startImmediately === false,
       logs: [
         {
           timestamp: Date.now(),
@@ -410,6 +415,7 @@ export class DownloadEngine extends EventEmitter {
 
     const sm = this.stateMachines.get(id);
     if (!sm) return;
+    (item as any).manualStartRequired = false;
 
     if (!sm.canTransitionTo('DOWNLOADING')) {
       if (item.status === 'downloading') return;

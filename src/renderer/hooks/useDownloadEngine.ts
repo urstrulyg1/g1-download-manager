@@ -66,20 +66,24 @@ export function useDownloadEngine() {
 
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const reconnectAttemptRef = useRef(0);
 
   const refreshAll = useCallback(async () => {
-    // Non-blocking concurrent hydration: UI updates progressively without stalling
-    api.getDownloads().then((dls) => {
-      setDownloads(dls || []);
-      setIsConnected(true);
-    }).catch(() => {});
-
-    api.getQueues().then((qs) => setQueues(qs || [])).catch(() => {});
-    api.getCategories().then((cats) => setCategories(cats || [])).catch(() => {});
-    api.getSettings().then((sets) => sets && setSettings(sets)).catch(() => {});
-    api.getMetrics().then((mets) => mets && setMetrics(mets)).catch(() => {});
-    api.getHistory().then((hists) => setHistory(hists || [])).catch(() => {});
-    api.getGrabberProjects().then((grabs) => setGrabberProjects(grabs || [])).catch(() => {});
+    // Hydrate concurrently, but return only after every request has settled so
+    // callers can deterministically reconcile UI after mutations.
+    const results = await Promise.allSettled([
+      api.getDownloads(), api.getQueues(), api.getCategories(), api.getSettings(),
+      api.getMetrics(), api.getHistory(), api.getGrabberProjects(),
+    ]);
+    const [dls, qs, cats, sets, mets, hists, grabs] = results;
+    if (dls.status === 'fulfilled') { setDownloads(dls.value || []); setIsConnected(true); }
+    if (qs.status === 'fulfilled') setQueues(qs.value || []);
+    if (cats.status === 'fulfilled') setCategories(cats.value || []);
+    if (sets.status === 'fulfilled' && sets.value) setSettings(sets.value);
+    if (mets.status === 'fulfilled' && mets.value) setMetrics(mets.value);
+    if (hists.status === 'fulfilled') setHistory(hists.value || []);
+    if (grabs.status === 'fulfilled') setGrabberProjects(grabs.value || []);
+    return results;
   }, []);
 
   const connectWebSocket = useCallback(() => {
@@ -100,8 +104,9 @@ export function useDownloadEngine() {
       wsRef.current = ws;
 
       ws.onopen = () => {
+        reconnectAttemptRef.current = 0;
         setIsConnected(true);
-        refreshAll();
+        void refreshAll();
       };
 
       ws.onmessage = (event) => {
@@ -200,9 +205,10 @@ export function useDownloadEngine() {
       ws.onclose = () => {
         setIsConnected(false);
         if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
+        const delay = Math.min(30_000, 1_000 * 2 ** reconnectAttemptRef.current++);
         reconnectTimerRef.current = setTimeout(() => {
           connectWebSocket();
-        }, 1000);
+        }, delay);
       };
 
       ws.onerror = () => {

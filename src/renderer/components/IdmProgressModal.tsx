@@ -42,7 +42,7 @@ export const IdmProgressModal: React.FC<IdmProgressModalProps> = ({
   };
 
   const formatEta = (seconds: number) => {
-    if (!seconds || seconds <= 0 || !isFinite(seconds)) return 'Calculating...';
+    if (!seconds || seconds <= 0 || !isFinite(seconds)) return '—';
     const hrs = Math.floor(seconds / 3600);
     const mins = Math.floor((seconds % 3600) / 60);
     const secs = Math.floor(seconds % 60);
@@ -83,7 +83,7 @@ export const IdmProgressModal: React.FC<IdmProgressModalProps> = ({
   };
 
   const handleRetry = () => {
-    api.resumeDownload(item.id);
+    void api.retryDownload(item.id);
   };
 
   const handleOpenFile = () => {
@@ -220,7 +220,7 @@ export const IdmProgressModal: React.FC<IdmProgressModalProps> = ({
                     : 'bg-gradient-to-r from-blue-600 via-cyan-500 to-indigo-500'
                 }`}
                 style={{
-                  width: `${isCompleted ? 100 : Math.max(item.progress || 0, isDownloading ? 2 : 0)}%`,
+                  width: `${Math.max(0, Math.min(100, item.progress || 0))}%`,
                 }}
               />
             </div>

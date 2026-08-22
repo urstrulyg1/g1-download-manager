@@ -14,14 +14,42 @@ import {
   ArchiveInfo,
 } from '../../shared/types';
 
-async function req<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-  const res = await fetch(`/api${endpoint}`, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(options.headers || {}),
-    },
-  });
+export class ApiError extends Error {
+  constructor(message: string, public readonly status?: number, public readonly requestId?: string) {
+    super(message);
+    this.name = 'ApiError';
+  }
+}
+
+export interface ApiRequestOptions extends RequestInit {
+  timeoutMs?: number;
+}
+
+async function req<T>(endpoint: string, options: ApiRequestOptions = {}): Promise<T> {
+  const { timeoutMs = 30_000, signal, ...request } = options;
+  const controller = new AbortController();
+  const requestId = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  const abortFromCaller = () => controller.abort();
+  signal?.addEventListener('abort', abortFromCaller, { once: true });
+  let res: Response;
+  try {
+    res = await fetch(`/api${endpoint}`, {
+      ...request,
+      signal: controller.signal,
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Request-ID': requestId,
+        ...(request.headers || {}),
+      },
+    });
+  } catch (error) {
+    if ((error as DOMException)?.name === 'AbortError') throw new ApiError('Request timed out or was cancelled', undefined, requestId);
+    throw new ApiError(error instanceof Error ? error.message : 'Network request failed', undefined, requestId);
+  } finally {
+    clearTimeout(timeout);
+    signal?.removeEventListener('abort', abortFromCaller);
+  }
 
   if (!res.ok) {
     let errMsg = `HTTP ${res.status} ${res.statusText}`;
@@ -29,7 +57,7 @@ async function req<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
       const errJson = await res.json();
       if (errJson.error) errMsg = errJson.error;
     } catch {}
-    throw new Error(errMsg);
+    throw new ApiError(errMsg, res.status, requestId);
   }
 
   return res.json();

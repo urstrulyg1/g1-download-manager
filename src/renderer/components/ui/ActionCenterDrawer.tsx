@@ -19,6 +19,9 @@ export interface ActionCenterDrawerProps {
   metrics: SystemMetrics | null;
   onRepairBrowser: () => void;
   onCleanStorage: () => void;
+  onRetryFailed: () => Promise<void> | void;
+  isRetrying?: boolean;
+  retryError?: string | null;
 }
 
 export const ActionCenterDrawer: React.FC<ActionCenterDrawerProps> = ({
@@ -28,6 +31,9 @@ export const ActionCenterDrawer: React.FC<ActionCenterDrawerProps> = ({
   metrics,
   onRepairBrowser,
   onCleanStorage,
+  onRetryFailed,
+  isRetrying = false,
+  retryError = null,
 }) => {
   if (!isOpen) return null;
 
@@ -71,9 +77,10 @@ export const ActionCenterDrawer: React.FC<ActionCenterDrawerProps> = ({
                 <div className="text-[11px] text-slate-300">
                   {failedItems.map((f) => f.filename).slice(0, 3).join(', ')}
                 </div>
-                <Button size="xs" variant="danger" onClick={() => failedItems.forEach((f) => f)}>
+                <Button size="xs" variant="danger" onClick={onRetryFailed} isLoading={isRetrying} disabled={isRetrying}>
                   Retry All Failed
                 </Button>
+                {retryError && <div role="alert" className="text-[11px] text-rose-300">{retryError}</div>}
               </div>
             )}
 
