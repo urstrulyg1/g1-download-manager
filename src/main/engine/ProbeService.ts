@@ -314,7 +314,8 @@ export class ProbeService {
       break;
     }
 
-    if (finalStatusCode >= 400) {
+    const authRequired = finalStatusCode === 401 || finalStatusCode === 407;
+    if (finalStatusCode >= 400 && !authRequired) {
       throw new Error(`Probe failed: Server returned HTTP ${finalStatusCode} (${http.STATUS_CODES[finalStatusCode] || 'Error'})`);
     }
 
