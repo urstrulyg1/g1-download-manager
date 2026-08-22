@@ -236,8 +236,9 @@ export class DownloadEngine extends EventEmitter {
       /^YouTube_|^video(\.mp4)?$|^watch(\.mp4)?$|^stream(\.mp4)?$/i.test(initialFilename);
 
     if (mediaAnalysis && mediaAnalysis.title && isGenericFilename) {
-      const ext = (params as any).container || (params as any).format || 'mp4';
-      initialFilename = `${mediaAnalysis.title}.${ext}`;
+      const mediaContainer = (params as any).container || (params as any).format || mediaAnalysis.recommendedQuality?.container;
+      const ext = mediaContainer || path.extname(probe.filename || '').replace('.', '') || 'bin';
+      initialFilename = `${mediaAnalysis.title}.${ext.replace(/^\./, '')}`;
     }
 
     let filename = initialFilename || probe.filename;
