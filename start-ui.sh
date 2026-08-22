@@ -262,10 +262,21 @@ _do_shutdown() {
     fi
     echo -e "${BRIGHT_GREEN}  ✔   G1DM stopped cleanly. Goodbye!${RESET}\n"
 }
+# ── Clean up any lingering process on the target port ────────────────────────
+if command -v lsof >/dev/null 2>&1; then
+    _EXISTING_PID=$(lsof -ti :"${PORT}" 2>/dev/null || true)
+    if [ -n "$_EXISTING_PID" ]; then
+        print_info "Reclaiming port ${PORT} (stopping existing process on port)..."
+        kill -9 $_EXISTING_PID 2>/dev/null || true
+        sleep 0.5
+    fi
+fi
+
+# ── Launch server ─────────────────────────────────────────────────────────────
+SERVER_PID=""
 trap '_do_shutdown; exit 0' INT TERM
 trap '_do_shutdown'          EXIT
 
-# ── Launch server ─────────────────────────────────────────────────────────────
 PORT="${PORT}" NODE_ENV=production node dist/main/server.js &
 SERVER_PID=$!
 

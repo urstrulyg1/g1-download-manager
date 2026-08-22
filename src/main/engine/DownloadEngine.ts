@@ -216,9 +216,10 @@ export class DownloadEngine extends EventEmitter {
     PathSanitizer.ensureDirectory(destDir);
 
     const isStreamPlatform =
-      /youtube\.com|youtu\.be|vimeo\.com|soundcloud\.com|twitch\.tv|twitter\.com|x\.com|tiktok\.com|instagram\.com/i.test(
+      /youtube\.com|youtu\.be|googlevideo\.com|vimeo\.com|soundcloud\.com|twitch\.tv|twitter\.com|x\.com|tiktok\.com|tiktokcdn\.com|instagram\.com|facebook\.com|fbcdn\.net|dailymotion\.com|reddit\.com|bilibili\.com|pinterest\.com|streamable\.com|rumble\.com|bitchute\.com|odysee\.com/i.test(
         params.url
       ) ||
+      params.url.includes('videoplayback') ||
       Boolean((params as any).mediaFormatSpec) ||
       Boolean((params as any).formatSpec);
 
@@ -440,9 +441,10 @@ export class DownloadEngine extends EventEmitter {
     let worker: HttpDownloader | Http2Downloader | FtpDownloader | HlsDownloader | MediaStreamDownloader;
     const protocol = item.serverCapabilities.protocol;
     const isStreamPlatform =
-      /youtube\.com|youtu\.be|vimeo\.com|soundcloud\.com|twitch\.tv|twitter\.com|x\.com|tiktok\.com|instagram\.com/i.test(
+      /youtube\.com|youtu\.be|googlevideo\.com|vimeo\.com|soundcloud\.com|twitch\.tv|twitter\.com|x\.com|tiktok\.com|tiktokcdn\.com|instagram\.com|facebook\.com|fbcdn\.net|dailymotion\.com|reddit\.com|bilibili\.com|pinterest\.com|streamable\.com|rumble\.com|bitchute\.com|odysee\.com/i.test(
         item.url
       ) ||
+      item.url.includes('videoplayback') ||
       Boolean((item as any).mediaFormatSpec) ||
       (protocol as string) === 'media_stream';
 
@@ -657,15 +659,19 @@ export class DownloadEngine extends EventEmitter {
 
   public deleteDownload(id: string, deleteFile: boolean = false): void {
     this.pauseDownload(id);
-    const item = this.downloads.get(id);
-    if (!item) return;
+    let item = this.downloads.get(id);
+    if (!item) {
+      item = this.db.getDownload(id) || undefined;
+    }
 
-    if (deleteFile) {
+    if (item && deleteFile) {
       try {
-        if (fs.existsSync(item.tempPath)) fs.unlinkSync(item.tempPath);
-        if (fs.existsSync(item.stateFilePath)) fs.unlinkSync(item.stateFilePath);
-        if (fs.existsSync(item.finalPath)) fs.unlinkSync(item.finalPath);
-      } catch {}
+        if (item.tempPath && fs.existsSync(item.tempPath)) fs.unlinkSync(item.tempPath);
+        if (item.stateFilePath && fs.existsSync(item.stateFilePath)) fs.unlinkSync(item.stateFilePath);
+        if (item.finalPath && fs.existsSync(item.finalPath)) fs.unlinkSync(item.finalPath);
+      } catch (err) {
+        console.error('Error unlinking files during deleteDownload:', err);
+      }
     }
 
     this.downloads.delete(id);

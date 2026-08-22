@@ -14,6 +14,7 @@ import {
 } from './VideoResolutionEngine';
 import { ProbeService } from '../engine/ProbeService';
 import { TlsPolicy } from '../security/TlsPolicy';
+import { BinaryLocator } from '../platform/BinaryLocator';
 
 export interface ComprehensiveMediaAnalysis {
   title: string;
@@ -94,22 +95,11 @@ export class SecureMediaDetector {
   }
 
   private static getYtDlpBinary(): string {
-    const candidates = [
-      '/opt/homebrew/bin/yt-dlp',
-      '/usr/local/bin/yt-dlp',
-      '/usr/bin/yt-dlp',
-    ];
-    for (const bin of candidates) {
-      if (fs.existsSync(bin)) return bin;
-    }
-    return 'yt-dlp';
+    return BinaryLocator.getYtDlpPath();
   }
 
   public static async isYtDlpAvailable(): Promise<boolean> {
-    const bin = this.getYtDlpBinary();
-    return new Promise((resolve) => {
-      execFile(bin, ['--version'], (err) => resolve(!err));
-    });
+    return BinaryLocator.isYtDlpAvailable();
   }
 
   private static async analyzeYtDlp(

@@ -21,6 +21,7 @@ import {
   ArrowUpDown,
   ShieldAlert,
   Film,
+  Zap,
 } from 'lucide-react';
 import { DownloadItem, DownloadQueue, CategoryRule } from '../../shared/types';
 import { Language, translations } from '../lib/i18n';
@@ -39,6 +40,8 @@ interface DownloadsViewProps {
   onQueueFilterChange: (q: string) => void;
   lang: Language;
   onSelectDownload: (item: DownloadItem) => void;
+  onOpenIdmProgress?: (item: DownloadItem) => void;
+  onRefresh?: () => void;
 }
 
 export const DownloadsView: React.FC<DownloadsViewProps> = ({
@@ -53,6 +56,8 @@ export const DownloadsView: React.FC<DownloadsViewProps> = ({
   onQueueFilterChange,
   lang,
   onSelectDownload,
+  onOpenIdmProgress,
+  onRefresh,
 }) => {
   const t = translations[lang] || translations.en;
   const [searchQuery, setSearchQuery] = useState('');
@@ -128,9 +133,11 @@ export const DownloadsView: React.FC<DownloadsViewProps> = ({
     selectedIds.forEach((id) => api.resumeDownload(id));
   };
 
-  const handleBatchDelete = (deleteFiles: boolean) => {
-    selectedIds.forEach((id) => api.deleteDownload(id, deleteFiles));
+  const handleBatchDelete = async (deleteFiles: boolean) => {
+    const ids = Array.from(selectedIds);
     setSelectedIds(new Set());
+    await Promise.all(ids.map((id) => api.deleteDownload(id, deleteFiles).catch(console.error)));
+    if (onRefresh) onRefresh();
   };
 
   return (
@@ -302,7 +309,14 @@ export const DownloadsView: React.FC<DownloadsViewProps> = ({
                     <tr
                       key={item.id}
                       onClick={() => onSelectDownload(item)}
-                      className={`hover:bg-slate-800/50 cursor-pointer transition-colors ${
+                      onDoubleClick={() => {
+                        if (onOpenIdmProgress) {
+                          onOpenIdmProgress(item);
+                        } else {
+                          onSelectDownload(item);
+                        }
+                      }}
+                      className={`hover:bg-slate-800/50 cursor-pointer transition-colors select-none ${
                         isSelected ? 'bg-blue-950/30' : ''
                       }`}
                     >
@@ -380,11 +394,20 @@ export const DownloadsView: React.FC<DownloadsViewProps> = ({
                         <div className="text-[10px] text-slate-400">{formatBytes(item.downloadedBytes)}</div>
                       </td>
 
-                      {/* Dynamic Segment Visualizer Progress Bar */}
-                      <td className="p-3">
+                      {/* Dynamic Segment Visualizer Progress Bar (Click to open IDM dialogue) */}
+                      <td
+                        className="p-3 cursor-pointer"
+                        onClick={(e) => {
+                          if (onOpenIdmProgress) {
+                            e.stopPropagation();
+                            onOpenIdmProgress(item);
+                          }
+                        }}
+                        title="Click to open IDM-Style Live Progress Dialogue"
+                      >
                         <div className="space-y-1">
                           <div className="flex justify-between text-[10px] text-slate-400 font-mono">
-                            <span>{item.progress.toFixed(1)}%</span>
+                            <span className="text-cyan-400 font-semibold">{item.progress.toFixed(1)}%</span>
                             <span>{item.activeConnections} conn</span>
                           </div>
 
@@ -472,6 +495,15 @@ export const DownloadsView: React.FC<DownloadsViewProps> = ({
                             >
                               <Play className="w-3.5 h-3.5 fill-emerald-400" />
                             </button>
+                          ) : item.status === 'completed' ? (
+                            <button
+                              onClick={() => api.openFolder(item.id)}
+                              className="p-1.5 rounded-lg bg-slate-800 hover:bg-blue-950 text-blue-400 hover:text-blue-300 active:scale-95 transition-all shadow-sm"
+                              title="Show in Folder"
+                              aria-label="Show in Folder"
+                            >
+                              <FolderOpen className="w-3.5 h-3.5" />
+                            </button>
                           ) : null}
 
                           {/* Media Live Preview Button */}
@@ -495,6 +527,18 @@ export const DownloadsView: React.FC<DownloadsViewProps> = ({
                             <RotateCcw className="w-3.5 h-3.5" />
                           </button>
 
+                          {/* IDM Progress Dialogue Box Button */}
+                          {onOpenIdmProgress && (
+                            <button
+                              onClick={() => onOpenIdmProgress(item)}
+                              className="p-1.5 rounded-lg bg-slate-800 hover:bg-cyan-950 text-cyan-400 hover:text-cyan-300 border border-cyan-500/30 active:scale-95 transition-all shadow-sm"
+                              title="Open IDM-Style Live Progress Dialogue Box"
+                              aria-label="Open IDM Progress Dialogue"
+                            >
+                              <Zap className="w-3.5 h-3.5 fill-cyan-400" />
+                            </button>
+                          )}
+
                           <button
                             onClick={() => onSelectDownload(item)}
                             className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-blue-400 active:scale-95 transition-all shadow-sm"
@@ -505,7 +549,11 @@ export const DownloadsView: React.FC<DownloadsViewProps> = ({
                           </button>
 
                           <button
-                            onClick={() => api.deleteDownload(item.id, false)}
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              await api.deleteDownload(item.id, false).catch(console.error);
+                              if (onRefresh) onRefresh();
+                            }}
                             className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-950 text-slate-400 hover:text-rose-400 active:scale-95 transition-all shadow-sm"
                             title="Remove download record from manager"
                             aria-label="Remove download record"

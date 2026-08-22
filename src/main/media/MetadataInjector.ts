@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { execFile } from 'child_process';
+import { BinaryLocator } from '../platform/BinaryLocator';
 
 export interface ChapterMetadata {
   startTimeSec: number;
@@ -29,9 +30,7 @@ export class MetadataInjector {
       throw new Error(`File not found: ${filePath}`);
     }
 
-    const available = await new Promise<boolean>((resolve) => {
-      execFile('ffmpeg', ['-version'], (err) => resolve(!err));
-    });
+    const available = await BinaryLocator.isFfmpegAvailable();
 
     if (!available) {
       return false;
@@ -69,7 +68,8 @@ export class MetadataInjector {
 
       const args = ['-y', '-i', metadataFile, '-i', filePath, '-map_metadata', '1', '-c', 'copy', outputPath];
 
-      execFile('ffmpeg', args, { maxBuffer: 64 * 1024 * 1024 }, (err) => {
+      const ffmpegBin = BinaryLocator.getFfmpegPath();
+      execFile(ffmpegBin, args, { maxBuffer: 64 * 1024 * 1024, env: { ...process.env } }, (err) => {
         fs.rmSync(metadataFile, { force: true });
         if (err) {
           reject(new Error(err.message || 'ffmpeg metadata injection failed'));

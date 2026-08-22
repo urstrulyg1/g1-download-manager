@@ -87,14 +87,15 @@ export const IdmProgressModal: React.FC<IdmProgressModalProps> = ({
   };
 
   const handleOpenFile = () => {
-    const isWindows = typeof navigator !== 'undefined' && navigator.userAgent.includes('Windows');
-    const isMac = typeof navigator !== 'undefined' && navigator.userAgent.includes('Mac');
-    // Call server open file API if available
-    window.open(`file://${item.finalPath}`, '_blank');
+    api.openFile(item.id).catch((err) => {
+      console.warn('Failed to open file via native host:', err);
+    });
   };
 
   const handleOpenFolder = () => {
-    window.open(`file://${item.destinationDir}`, '_blank');
+    api.openFolder(item.id).catch((err) => {
+      console.warn('Failed to open folder via native host:', err);
+    });
   };
 
   return (

@@ -57,6 +57,8 @@ export const api = {
     req<ChecksumInfo>(`/downloads/${id}/verify`, { method: 'POST', body: JSON.stringify({ checksum }) }),
   scanFile: (id: string) => req<SecurityScanInfo>(`/downloads/${id}/scan`, { method: 'POST' }),
   inspectArchive: (id: string) => req<ArchiveInfo>(`/downloads/${id}/archive`),
+  openFile: (id: string) => req<{ success: boolean }>(`/downloads/${id}/open-file`, { method: 'POST' }),
+  openFolder: (id: string) => req<{ success: boolean }>(`/downloads/${id}/open-folder`, { method: 'POST' }),
 
   // Queues
   getQueues: () => req<DownloadQueue[]>('/queues'),

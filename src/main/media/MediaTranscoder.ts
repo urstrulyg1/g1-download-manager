@@ -1,10 +1,12 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { execFile } from 'child_process';
+import { BinaryLocator } from '../platform/BinaryLocator';
 
 export interface TranscodeOptions {
   sourceFilePath: string;
-  outputFormat: 'mp4' | 'mkv' | 'webm' | 'mp3' | 'flac';
+  outputFormat: 'mp4' | 'mkv' | 'webm' | 'mp3' | 'aac' | 'flac' | 'wav';
+  outputDir?: string;
   startSec?: number;
   endSec?: number;
   extractAudioOnly?: boolean;
@@ -20,12 +22,12 @@ export interface TranscodeResult {
 }
 
 /**
- * Media transcoding / trimming / remuxing.
+ * Real media transcoding and format conversion.
  *
  * Uses ffmpeg when it is available on the host (real trim, container remux,
  * and audio-only extraction). When ffmpeg is missing — or fails on the input —
- * it falls back to a plain file copy so the pipeline never silently drops the
- * file, and clearly reports that no real transcode happened.
+ * it transparently falls back to a direct file copy so the pipeline never
+ * fails unrecoverably, while clearly reporting `realTranscode: false`.
  */
 export class MediaTranscoder {
   public static async transcode(options: TranscodeOptions): Promise<TranscodeResult> {
@@ -33,14 +35,20 @@ export class MediaTranscoder {
       throw new Error(`Source file does not exist: ${options.sourceFilePath}`);
     }
 
-    const dir = path.dirname(options.sourceFilePath);
-    const ext = path.extname(options.sourceFilePath);
-    const base = path.basename(options.sourceFilePath, ext);
-    const outputPath = path.join(dir, `${base}_transcoded.${options.outputFormat}`);
+    const dir = options.outputDir || path.dirname(options.sourceFilePath);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
 
-    const start = options.startSec || 0;
-    const end = options.endSec || 120;
-    const duration = Math.max(1, end - start);
+    const baseName = path.basename(
+      options.sourceFilePath,
+      path.extname(options.sourceFilePath)
+    );
+    const outputPath = path.join(dir, `${baseName}_transcoded.${options.outputFormat}`);
+
+    const start = options.startSec ?? 0;
+    const end = options.endSec ?? 0;
+    const duration = end > start ? end - start : 0;
 
     if (await this.isFfmpegAvailable()) {
       try {
@@ -52,7 +60,7 @@ export class MediaTranscoder {
           realTranscode: true,
         };
       } catch (err: any) {
-        // Fall through to a copy fallback but surface the reason.
+        // Fall back to direct copy if ffmpeg fails on this particular input.
         return this.copyFallback(options, outputPath, duration, `ffmpeg failed: ${err.message}`);
       }
     }
@@ -66,7 +74,9 @@ export class MediaTranscoder {
     duration: number,
     detail: string
   ): TranscodeResult {
-    fs.copyFileSync(options.sourceFilePath, outputPath);
+    if (options.sourceFilePath !== outputPath) {
+      fs.copyFileSync(options.sourceFilePath, outputPath);
+    }
     return {
       success: true,
       outputPath,
@@ -77,9 +87,7 @@ export class MediaTranscoder {
   }
 
   private static isFfmpegAvailable(): Promise<boolean> {
-    return new Promise((resolve) => {
-      execFile('ffmpeg', ['-version'], (err) => resolve(!err));
-    });
+    return BinaryLocator.isFfmpegAvailable();
   }
 
   private static runFfmpeg(
@@ -89,6 +97,7 @@ export class MediaTranscoder {
     end: number
   ): Promise<void> {
     return new Promise((resolve, reject) => {
+      const ffmpegBin = BinaryLocator.getFfmpegPath();
       const args: string[] = ['-y'];
 
       // Trim window
@@ -117,7 +126,7 @@ export class MediaTranscoder {
 
       args.push(outputPath);
 
-      execFile('ffmpeg', args, { maxBuffer: 64 * 1024 * 1024 }, (err) => {
+      execFile(ffmpegBin, args, { maxBuffer: 64 * 1024 * 1024, env: { ...process.env } }, (err) => {
         if (err) reject(new Error(err.message || 'ffmpeg exited with an error'));
         else resolve();
       });

@@ -1,9 +1,10 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { spawn, ChildProcess, execFile } from 'child_process';
+import { spawn, ChildProcess } from 'child_process';
 import { EventEmitter } from 'events';
 import { DownloadItem, SegmentInfo } from '../../shared/types';
 import { PathSanitizer } from '../storage/PathSanitizer';
+import { BinaryLocator } from '../platform/BinaryLocator';
 
 export class MediaStreamDownloader extends EventEmitter {
   private item: DownloadItem;
@@ -20,9 +21,7 @@ export class MediaStreamDownloader extends EventEmitter {
   }
 
   public static async isAvailable(): Promise<boolean> {
-    return new Promise((resolve) => {
-      execFile('yt-dlp', ['--version'], (err) => resolve(!err));
-    });
+    return BinaryLocator.isYtDlpAvailable();
   }
 
   public async start(): Promise<void> {
@@ -50,10 +49,13 @@ export class MediaStreamDownloader extends EventEmitter {
   }
 
   private async runDownloader(): Promise<void> {
-    const isYtDlp = await MediaStreamDownloader.isAvailable();
+    const isYtDlp = await BinaryLocator.isYtDlpAvailable();
     if (!isYtDlp) {
       throw new Error('Real media stream download requires yt-dlp. Please ensure yt-dlp is installed on your system.');
     }
+
+    const ytDlpBin = BinaryLocator.getYtDlpPath();
+    const ffmpegDir = BinaryLocator.getFfmpegDir();
 
     const outputTemplate = path.join(this.item.destinationDir, `${this.item.filename}.tmp.%(ext)s`);
     const formatSpec = (this.item as any).mediaFormatSpec || 'bestvideo+bestaudio/best';
@@ -63,6 +65,9 @@ export class MediaStreamDownloader extends EventEmitter {
       '--no-warnings',
       '--no-playlist',
       '--newline',
+      '--geo-bypass',
+      '--compat-options',
+      'no-youtube-unavailable-videos',
       '--progress-template',
       'download:%(progress._percent_str)s|%(progress._downloaded_bytes_str)s|%(progress._total_bytes_str)s|%(progress._speed_str)s|%(progress._eta_str)s|%(progress.status)s',
       '-f',
@@ -70,6 +75,10 @@ export class MediaStreamDownloader extends EventEmitter {
       '-o',
       outputTemplate,
     ];
+
+    if (ffmpegDir) {
+      args.push('--ffmpeg-location', ffmpegDir);
+    }
 
     if (targetExt === 'mp4' || targetExt === 'mkv' || targetExt === 'webm') {
       args.push('--merge-output-format', targetExt);
@@ -88,7 +97,6 @@ export class MediaStreamDownloader extends EventEmitter {
 
     // Authentication custom headers or cookies
     if (this.item.auth?.cookies) {
-      // Save temporary cookie file if needed or pass headers
       args.push('--add-header', `Cookie:${this.item.auth.cookies}`);
     }
 
@@ -98,8 +106,9 @@ export class MediaStreamDownloader extends EventEmitter {
     this.emitProgressThrottled(true);
 
     await new Promise<void>((resolve, reject) => {
-      this.childProcess = spawn('yt-dlp', args, {
+      this.childProcess = spawn(ytDlpBin, args, {
         stdio: ['ignore', 'pipe', 'pipe'],
+        env: { ...process.env },
       });
 
       let stdoutBuffer = '';

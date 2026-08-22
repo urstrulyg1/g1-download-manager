@@ -127,11 +127,30 @@ export const DownloadDetailModal: React.FC<DownloadDetailModalProps> = ({ item, 
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            {item.status === 'downloading' ? (
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {item.status === 'completed' ? (
+              <>
+                <button
+                  onClick={() => api.openFile(item.id)}
+                  className="px-2.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold flex items-center gap-1.5 active:scale-95 transition-all shadow-sm"
+                  title="Open file with default application"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  <span>Open File</span>
+                </button>
+                <button
+                  onClick={() => api.openFolder(item.id)}
+                  className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5 active:scale-95 transition-all shadow-sm"
+                  title="Reveal file in Finder / Explorer"
+                >
+                  <FolderOpen className="w-3.5 h-3.5" />
+                  <span>Show in Folder</span>
+                </button>
+              </>
+            ) : item.status === 'downloading' ? (
               <button
                 onClick={() => api.pauseDownload(item.id)}
-                className="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold flex items-center gap-1.5"
+                className="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold flex items-center gap-1.5 active:scale-95 transition-all shadow-sm"
               >
                 <Pause className="w-3.5 h-3.5 fill-white" />
                 <span>Pause</span>
@@ -139,12 +158,20 @@ export const DownloadDetailModal: React.FC<DownloadDetailModalProps> = ({ item, 
             ) : (
               <button
                 onClick={() => api.resumeDownload(item.id)}
-                className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold flex items-center gap-1.5"
+                className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold flex items-center gap-1.5 active:scale-95 transition-all shadow-sm"
               >
                 <Play className="w-3.5 h-3.5 fill-white" />
                 <span>Resume</span>
               </button>
             )}
+
+            <button
+              onClick={() => api.restartDownload(item.id)}
+              className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 active:scale-95 transition-all shadow-sm"
+              title="Restart download from beginning"
+            >
+              <RotateCcw className="w-4 h-4" />
+            </button>
 
             <button
               onClick={onClose}

@@ -314,6 +314,10 @@ export class ProbeService {
       break;
     }
 
+    if (finalStatusCode >= 400) {
+      throw new Error(`Probe failed: Server returned HTTP ${finalStatusCode} (${http.STATUS_CODES[finalStatusCode] || 'Error'})`);
+    }
+
     if (finalStatusCode === 206) {
       supportsRange = true;
     } else if (

@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { execFile } from 'child_process';
+import { BinaryLocator } from '../platform/BinaryLocator';
 
 /**
  * Segment muxing.
@@ -13,9 +14,7 @@ import { execFile } from 'child_process';
  */
 export class MediaMuxer {
   public static async isFFmpegAvailable(): Promise<boolean> {
-    return new Promise((resolve) => {
-      execFile('ffmpeg', ['-version'], (err) => resolve(!err));
-    });
+    return BinaryLocator.isFfmpegAvailable();
   }
 
   public static async remuxSegments(
@@ -41,6 +40,7 @@ export class MediaMuxer {
 
   private static remuxWithFfmpeg(segments: string[], targetFilePath: string): Promise<void> {
     return new Promise((resolve, reject) => {
+      const ffmpegBin = BinaryLocator.getFfmpegPath();
       const listPath = path.join(
         os.tmpdir(),
         `g1dm_concat_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.txt`
@@ -51,9 +51,9 @@ export class MediaMuxer {
       fs.writeFileSync(listPath, listContent, 'utf8');
 
       execFile(
-        'ffmpeg',
+        ffmpegBin,
         ['-y', '-f', 'concat', '-safe', '0', '-i', listPath, '-c', 'copy', targetFilePath],
-        { maxBuffer: 64 * 1024 * 1024 },
+        { maxBuffer: 64 * 1024 * 1024, env: { ...process.env } },
         (err) => {
           fs.rmSync(listPath, { force: true });
           if (err) reject(new Error(err.message || 'ffmpeg concat failed'));

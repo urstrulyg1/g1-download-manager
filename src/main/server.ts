@@ -333,6 +333,45 @@ export async function createUnifiedServer(port: number = 8055) {
     res.json({ success: true });
   });
 
+  app.post('/api/downloads/:id/open-file', async (req, res) => {
+    try {
+      const item = engine.getDownload(req.params.id);
+      if (!item) return res.status(404).json({ error: 'Download not found' });
+      const { execFile } = await import('child_process');
+      const platform = process.platform;
+      const targetPath = item.finalPath;
+      if (platform === 'darwin') {
+        execFile('open', [targetPath]);
+      } else if (platform === 'win32') {
+        execFile('cmd.exe', ['/c', 'start', '""', targetPath]);
+      } else {
+        execFile('xdg-open', [targetPath]);
+      }
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/downloads/:id/open-folder', async (req, res) => {
+    try {
+      const item = engine.getDownload(req.params.id);
+      if (!item) return res.status(404).json({ error: 'Download not found' });
+      const { execFile } = await import('child_process');
+      const platform = process.platform;
+      if (platform === 'darwin') {
+        execFile('open', ['-R', item.finalPath]);
+      } else if (platform === 'win32') {
+        execFile('explorer.exe', [`/select,${item.finalPath}`]);
+      } else {
+        execFile('xdg-open', [item.destinationDir]);
+      }
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   app.post('/api/downloads/:id/verify', async (req, res) => {
     try {
       const item = engine.getDownload(req.params.id);

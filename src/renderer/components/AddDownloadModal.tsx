@@ -17,7 +17,7 @@ import {
   ListOrdered,
   ShieldAlert,
 } from 'lucide-react';
-import { DownloadQueue, CategoryRule, Priority } from '../../shared/types';
+import { DownloadQueue, CategoryRule, Priority, DownloadItem } from '../../shared/types';
 import { api } from '../lib/api';
 
 interface AddDownloadModalProps {
@@ -27,6 +27,7 @@ interface AddDownloadModalProps {
   categories: CategoryRule[];
   defaultDownloadDir: string;
   initialUrl?: string;
+  onDownloadStarted?: (item: DownloadItem) => void;
 }
 
 export const AddDownloadModal: React.FC<AddDownloadModalProps> = ({
@@ -36,6 +37,7 @@ export const AddDownloadModal: React.FC<AddDownloadModalProps> = ({
   categories,
   defaultDownloadDir,
   initialUrl = '',
+  onDownloadStarted,
 }) => {
   if (!isOpen) return null;
 
@@ -151,7 +153,7 @@ export const AddDownloadModal: React.FC<AddDownloadModalProps> = ({
         ? { algorithm: checksumAlgo, expected: expectedChecksum.trim() }
         : undefined;
 
-      await api.addDownload({
+      const newItem = await api.addDownload({
         url: url.trim(),
         filename: filename.trim() || undefined,
         destinationDir: destinationDir.trim() || undefined,
@@ -165,6 +167,10 @@ export const AddDownloadModal: React.FC<AddDownloadModalProps> = ({
         checksum,
         startImmediately: action === 'now',
       });
+
+      if (onDownloadStarted && newItem && action === 'now') {
+        onDownloadStarted(newItem);
+      }
 
       onClose();
     } catch (err: any) {

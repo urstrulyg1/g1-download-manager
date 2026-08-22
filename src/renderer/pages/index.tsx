@@ -241,6 +241,8 @@ export default function Home() {
               onQueueFilterChange={setQueueFilter}
               lang={lang}
               onSelectDownload={(item) => setSelectedDownload(item)}
+              onOpenIdmProgress={(item) => setActiveIdmDownloadId(item.id)}
+              onRefresh={refreshAll}
             />
           )}
 
@@ -355,6 +357,7 @@ export default function Home() {
         queues={queues}
         categories={categories}
         defaultDownloadDir={settings?.general.defaultDownloadDir || '/home/user/Downloads'}
+        onDownloadStarted={(item) => setActiveIdmDownloadId(item.id)}
       />
 
       <DownloadDetailModal
@@ -393,7 +396,8 @@ export default function Home() {
         onDismiss={() => setClipboardUrl(null)}
         onDownloadNow={async (u) => {
           setClipboardUrl(null);
-          await api.addDownload({ url: u, startImmediately: true });
+          const item = await api.addDownload({ url: u, startImmediately: true });
+          if (item) setActiveIdmDownloadId(item.id);
         }}
         onAddToQueue={async (u) => {
           setClipboardUrl(null);

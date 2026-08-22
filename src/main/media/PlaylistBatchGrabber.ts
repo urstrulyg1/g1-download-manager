@@ -1,5 +1,6 @@
 import { execFile } from 'child_process';
 import { DownloadEngine } from '../engine/DownloadEngine';
+import { BinaryLocator } from '../platform/BinaryLocator';
 
 export interface PlaylistTrack {
   trackNumber: number;
@@ -37,24 +38,23 @@ interface YtDlpEntry {
  */
 export class PlaylistBatchGrabber {
   public static isYtDlpAvailable(): Promise<boolean> {
-    return new Promise((resolve) => {
-      execFile('yt-dlp', ['--version'], (err) => resolve(!err));
-    });
+    return BinaryLocator.isYtDlpAvailable();
   }
 
   public static async parsePlaylist(playlistUrl: string): Promise<PlaylistResult> {
     if (!(await this.isYtDlpAvailable())) {
       throw new Error(
         'Playlist extraction requires yt-dlp, which is not installed. ' +
-          'Install it (e.g. `pip install yt-dlp`) and try again.'
+          'Install it (e.g. `pip install yt-dlp` or `brew install yt-dlp`) and try again.'
       );
     }
 
+    const ytDlpBin = BinaryLocator.getYtDlpPath();
     const raw = await new Promise<string>((resolve, reject) => {
       execFile(
-        'yt-dlp',
-        ['-J', '--flat-playlist', '--no-warnings', playlistUrl],
-        { maxBuffer: 64 * 1024 * 1024 },
+        ytDlpBin,
+        ['-J', '--flat-playlist', '--no-warnings', '--geo-bypass', playlistUrl],
+        { maxBuffer: 64 * 1024 * 1024, env: { ...process.env } },
         (err, stdout) => {
           if (err) reject(new Error(err.message || 'yt-dlp failed to parse the playlist'));
           else resolve(stdout);

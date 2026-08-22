@@ -184,6 +184,13 @@ export function useDownloadEngine() {
               });
               break;
             }
+            case 'item_deleted': {
+              const deletedId = typeof data === 'string' ? data : data?.id;
+              if (deletedId) {
+                setDownloads((prev) => prev.filter((d) => d.id !== deletedId));
+              }
+              break;
+            }
           }
         } catch (err) {
           console.error('Error handling WS event:', err);

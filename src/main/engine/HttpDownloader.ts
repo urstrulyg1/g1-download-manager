@@ -369,6 +369,14 @@ export class HttpDownloader extends EventEmitter {
 
   // Single-stream fallback
   private async downloadSingleStream(): Promise<void> {
+    // Reset downloaded bytes and truncate temp file on single-stream start/retry
+    this.item.downloadedBytes = 0;
+    if (this.fileFd !== null) {
+      try {
+        fs.ftruncateSync(this.fileFd, 0);
+      } catch {}
+    }
+
     return new Promise<void>((resolve, reject) => {
       const targetUrl = this.getLatestUrl();
       const parsed = new URL(targetUrl);
@@ -420,6 +428,7 @@ export class HttpDownloader extends EventEmitter {
         }
 
         if (statusCode >= 400) {
+          res.destroy();
           reject(new Error(`HTTP ${statusCode} ${res.statusMessage || 'Error'}`));
           return;
         }
@@ -682,17 +691,59 @@ export class HttpDownloader extends EventEmitter {
     }
 
     const stat = fs.statSync(targetTemp);
+    if (stat.size === 0) {
+      try { fs.unlinkSync(targetTemp); } catch {}
+      this.handleDownloadError(new Error('Download failed: Received 0 bytes (empty file).'));
+      return;
+    }
+
     const ext = path.extname(this.item.filename).toLowerCase();
     const isMedia = ['.mp4', '.mkv', '.webm', '.mov', '.ts', '.mp3', '.flac', '.wav', '.aac', '.m4a'].includes(ext);
 
-    // Reject 31-byte or invalid small media files
-    if (isMedia && stat.size <= 100) {
-      try { fs.unlinkSync(targetTemp); } catch {}
-      if (fs.existsSync(this.item.stateFilePath)) {
-        try { fs.unlinkSync(this.item.stateFilePath); } catch {}
+    // Reject invalid small media files and error responses
+    if (isMedia) {
+      if (stat.size < 4096) {
+        try { fs.unlinkSync(targetTemp); } catch {}
+        if (fs.existsSync(this.item.stateFilePath)) {
+          try { fs.unlinkSync(this.item.stateFilePath); } catch {}
+        }
+        this.handleDownloadError(
+          new Error(`Download failed: Stream returned an invalid response (${stat.size} bytes). Never saving error responses as media.`)
+        );
+        return;
       }
+
+      // Inspect payload header for HTML / text error pages
+      try {
+        const readLen = Math.min(1024, stat.size);
+        const buf = Buffer.alloc(readLen);
+        const checkFd = fs.openSync(targetTemp, 'r');
+        fs.readSync(checkFd, buf, 0, readLen, 0);
+        fs.closeSync(checkFd);
+        const head = buf.toString('utf8').toLowerCase();
+        if (
+          head.includes('<!doctype') ||
+          head.includes('<html') ||
+          head.includes('403 forbidden') ||
+          head.includes('access denied') ||
+          head.includes('google error') ||
+          head.includes('<error>')
+        ) {
+          try { fs.unlinkSync(targetTemp); } catch {}
+          if (fs.existsSync(this.item.stateFilePath)) {
+            try { fs.unlinkSync(this.item.stateFilePath); } catch {}
+          }
+          this.handleDownloadError(
+            new Error(`Download failed: Server returned an error page / invalid payload (${stat.size} bytes).`)
+          );
+          return;
+        }
+      } catch {}
+    }
+
+    if (this.item.totalBytes > 0 && stat.size < this.item.totalBytes) {
       this.handleDownloadError(
-        new Error(`Download failed: Stream returned an invalid response (${stat.size} bytes). Never saving error responses as media.`)
+        new Error(`Download incomplete: Expected ${this.item.totalBytes} bytes, but received ${stat.size} bytes.`)
       );
       return;
     }
