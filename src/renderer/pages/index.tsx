@@ -67,6 +67,24 @@ export default function Home() {
   const [isActionCenterOpen, setIsActionCenterOpen] = useState(false);
   const [selectedDownload, setSelectedDownload] = useState<DownloadItem | null>(null);
   const [activeIdmDownloadId, setActiveIdmDownloadId] = useState<string | null>(null);
+  const [isRetryingFailed, setIsRetryingFailed] = useState(false);
+  const [retryFailedError, setRetryFailedError] = useState<string | null>(null);
+
+  const retryAllFailed = async () => {
+    if (isRetryingFailed) return;
+    const failed = downloads.filter((download) => download.status === 'failed');
+    if (failed.length === 0) return;
+    setRetryFailedError(null);
+    setIsRetryingFailed(true);
+    try {
+      await Promise.all(failed.map((download) => api.retryDownload(download.id)));
+      await refreshAll();
+    } catch (error) {
+      setRetryFailedError(error instanceof Error ? error.message : 'Retry failed. Please try again.');
+    } finally {
+      setIsRetryingFailed(false);
+    }
+  };
 
   const [clipboardUrl, setClipboardUrl] = useState<string | null>(null);
   const [inboxItems, setInboxItems] = useState<InboxItem[]>([]);
@@ -389,6 +407,9 @@ export default function Home() {
         metrics={metrics}
         onRepairBrowser={() => setActiveView('compatibility')}
         onCleanStorage={() => setActiveView('storageMaintenance')}
+        onRetryFailed={retryAllFailed}
+        isRetrying={isRetryingFailed}
+        retryError={retryFailedError}
       />
 
       <ClipboardToast
