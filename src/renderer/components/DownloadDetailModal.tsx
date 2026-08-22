@@ -174,6 +174,19 @@ export const DownloadDetailModal: React.FC<DownloadDetailModalProps> = ({ item, 
             </button>
 
             <button
+              onClick={async () => {
+                if (confirm(`Remove download record for "${item.filename}"?`)) {
+                  await api.deleteDownload(item.id, false);
+                  onClose();
+                }
+              }}
+              className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-950 text-slate-400 hover:text-rose-400 active:scale-95 transition-all shadow-sm"
+              title="Remove download record"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+
+            <button
               onClick={onClose}
               className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
             >

@@ -18,6 +18,9 @@ import {
   TrendingUp,
   XCircle,
   Zap,
+  FolderOpen,
+  RotateCcw,
+  Trash2,
 } from 'lucide-react';
 import { DownloadItem, SystemMetrics, CategoryRule } from '../../shared/types';
 import { Language, translations } from '../lib/i18n';
@@ -405,30 +408,40 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                     {item.status === 'downloading' ? (
                       <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          api.pauseDownload(item.id);
-                        }}
-                        className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-400 shadow-sm shadow-amber-500/15 hover:shadow-md hover:shadow-amber-500/30 transition-all duration-200 active:scale-95"
+                        onClick={() => api.pauseDownload(item.id)}
+                        className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-400 shadow-sm transition-all duration-200 active:scale-95"
                         title="Pause"
                       >
                         <Pause className="w-3.5 h-3.5 fill-amber-400" />
                       </button>
                     ) : item.status === 'paused' || item.status === 'failed' ? (
                       <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          api.resumeDownload(item.id);
-                        }}
-                        className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-emerald-400 shadow-sm shadow-emerald-500/15 hover:shadow-md hover:shadow-emerald-500/30 transition-all duration-200 active:scale-95"
+                        onClick={() => api.resumeDownload(item.id)}
+                        className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-emerald-400 shadow-sm transition-all duration-200 active:scale-95"
                         title="Resume"
                       >
                         <Play className="w-3.5 h-3.5 fill-emerald-400" />
                       </button>
+                    ) : item.status === 'completed' ? (
+                      <button
+                        onClick={() => api.openFolder(item.id)}
+                        className="p-1.5 rounded-lg bg-slate-800 hover:bg-blue-950 text-blue-400 hover:text-blue-300 shadow-sm transition-all duration-200 active:scale-95"
+                        title="Show in Folder"
+                      >
+                        <FolderOpen className="w-3.5 h-3.5" />
+                      </button>
                     ) : null}
+
+                    <button
+                      onClick={() => api.deleteDownload(item.id, false)}
+                      className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-950 text-slate-400 hover:text-rose-400 shadow-sm transition-all duration-200 active:scale-95"
+                      title="Remove record"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
                   </div>
                 </div>
               </div>
