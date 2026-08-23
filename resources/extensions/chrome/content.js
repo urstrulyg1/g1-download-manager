@@ -667,17 +667,14 @@
         height: item.height
       };
 
-      if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
-        chrome.runtime.sendMessage(msg);
-      } else if (typeof browser !== 'undefined' && browser.runtime && browser.runtime.sendMessage) {
-        browser.runtime.sendMessage(msg);
-      }
+      // Show the IDM-style Download File Info dialog box popup
+      showDownloadFileInfoModal(msg);
 
       // Visual feedback on pill
       pill.style.borderColor = '#10b981';
       pill.style.boxShadow = '0 0 20px rgba(16, 185, 129, 0.5)';
       const textSpan = pill.querySelector('span:not(.g1dm-res-badge)');
-      if (textSpan) textSpan.innerText = `✓ Added (${ext.toUpperCase()})!`;
+      if (textSpan) textSpan.innerText = `✓ Selected (${ext.toUpperCase()})!`;
 
       setTimeout(() => {
         pill.style.borderColor = 'rgba(59, 130, 246, 0.65)';
@@ -802,12 +799,314 @@
     });
   }
 
+  // ── Download File Info Modal Dialog (IDM-Style Popup) ────────────────────
+  function showDownloadFileInfoModal(params) {
+    const existing = document.getElementById('g1dm-file-info-modal-root');
+    if (existing) existing.remove();
+
+    const url = params.url || window.location.href;
+    let filename = params.filename || '';
+    if (!filename) {
+      try {
+        const p = new URL(url).pathname.split('/').pop();
+        if (p) filename = decodeURIComponent(p);
+      } catch {}
+      if (!filename) filename = 'download.bin';
+    }
+
+    let category = params.category || 'other';
+    const formatSpec = params.formatSpec;
+    const container = params.container;
+
+    const root = document.createElement('div');
+    root.id = 'g1dm-file-info-modal-root';
+    root.style.cssText = `
+      position: fixed;
+      inset: 0;
+      z-index: 2147483647;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0, 0, 0, 0.65);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      user-select: none;
+      animation: g1dm-fade-in 0.15s ease-out;
+    `;
+
+    const dialog = document.createElement('div');
+    dialog.style.cssText = `
+      width: 530px;
+      max-width: 95vw;
+      background: linear-gradient(180deg, #0f172a 0%, #020617 100%);
+      border: 1px solid rgba(59, 130, 246, 0.45);
+      border-radius: 12px;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.9), 0 0 30px rgba(59, 130, 246, 0.25);
+      color: #f3f4f6;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      animation: g1dm-scale-in 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    `;
+
+    dialog.innerHTML = `
+      <!-- Header -->
+      <div style="display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; background: linear-gradient(90deg, #1e293b, #0f172a); border-bottom: 1px solid rgba(255,255,255,0.08);">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <div style="width: 22px; height: 22px; border-radius: 5px; background: linear-gradient(135deg, #2563eb, #38bdf8); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800; color: #fff; box-shadow: 0 0 8px rgba(56,189,248,0.5);">⚡</div>
+          <span style="font-weight: 700; font-size: 14px; color: #f8fafc; letter-spacing: 0.3px;">Download File Info</span>
+        </div>
+        <button id="g1dm-modal-close" style="background: none; border: none; color: #94a3b8; cursor: pointer; font-size: 16px; width: 26px; height: 26px; border-radius: 6px; display: flex; align-items: center; justify-content: center; transition: all 0.15s;">✕</button>
+      </div>
+
+      <!-- Form Body -->
+      <div style="padding: 16px 20px; display: flex; flex-direction: column; gap: 12px; font-size: 13px;">
+        <!-- URL Row -->
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <label style="width: 70px; font-weight: 600; color: #cbd5e1; flex-shrink: 0;">URL</label>
+          <input id="g1dm-input-url" type="text" value="${url.replace(/"/g, '&quot;')}" style="flex: 1; padding: 7px 10px; background: #1e293b; border: 1px solid #334155; border-radius: 6px; color: #f1f5f9; font-size: 12px; font-family: monospace; outline: none;" />
+        </div>
+
+        <!-- Category Row -->
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <label style="width: 70px; font-weight: 600; color: #cbd5e1; flex-shrink: 0;">Category</label>
+          <select id="g1dm-select-cat" style="flex: 1; padding: 7px 10px; background: #1e293b; border: 1px solid #334155; border-radius: 6px; color: #f1f5f9; font-size: 12px; outline: none; cursor: pointer;">
+            <option value="compressed" ${category === 'compressed' || category === 'archive' ? 'selected' : ''}>📦 Compressed / Archives</option>
+            <option value="document" ${category === 'document' ? 'selected' : ''}>📄 Documents</option>
+            <option value="audio" ${category === 'audio' ? 'selected' : ''}>🎵 Music & Audio</option>
+            <option value="video" ${category === 'video' ? 'selected' : ''}>🎬 Video & Media</option>
+            <option value="program" ${category === 'program' ? 'selected' : ''}>💻 Programs & Software</option>
+            <option value="other" ${category === 'other' ? 'selected' : ''}>📁 General / Other</option>
+          </select>
+        </div>
+
+        <!-- Save As Row -->
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <label style="width: 70px; font-weight: 600; color: #cbd5e1; flex-shrink: 0;">Save As</label>
+          <div style="flex: 1; display: flex; gap: 6px;">
+            <input id="g1dm-input-filename" type="text" value="${filename.replace(/"/g, '&quot;')}" style="flex: 1; padding: 7px 10px; background: #1e293b; border: 1px solid #334155; border-radius: 6px; color: #f1f5f9; font-size: 12px; outline: none;" />
+            <button id="g1dm-btn-browse" style="padding: 0 10px; background: #334155; border: 1px solid #475569; border-radius: 6px; color: #f1f5f9; font-size: 12px; font-weight: 600; cursor: pointer;">📂</button>
+          </div>
+        </div>
+
+        <!-- File Info Preview Card -->
+        <div style="padding: 10px 14px; background: rgba(30, 41, 59, 0.7); border: 1px solid rgba(59, 130, 246, 0.25); border-radius: 8px; display: flex; align-items: center; justify-content: space-between;">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <div id="g1dm-cat-icon" style="font-size: 22px; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; background: rgba(15, 23, 42, 0.8); border-radius: 8px; border: 1px solid rgba(255,255,255,0.06);">📦</div>
+            <div>
+              <div id="g1dm-filesize-label" style="font-size: 13px; font-weight: 700; color: #38bdf8;">⏳ Probing file size...</div>
+              <div id="g1dm-resumable-label" style="font-size: 11px; color: #94a3b8;">Detecting transfer speed & range support...</div>
+            </div>
+          </div>
+          <div id="g1dm-safety-badge" style="background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.35); color: #34d399; padding: 3px 8px; border-radius: 6px; font-size: 10px; font-weight: 700; display: none;">✓ Verified Safe</div>
+        </div>
+
+        <!-- Description Row -->
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <label style="width: 70px; font-weight: 600; color: #cbd5e1; flex-shrink: 0;">Description</label>
+          <input id="g1dm-input-desc" type="text" placeholder="Optional notes / tags" style="flex: 1; padding: 7px 10px; background: #1e293b; border: 1px solid #334155; border-radius: 6px; color: #f1f5f9; font-size: 12px; outline: none;" />
+        </div>
+      </div>
+
+      <!-- Action Buttons Footer -->
+      <div style="padding: 12px 20px; background: #0f172a; border-top: 1px solid rgba(255,255,255,0.08); display: flex; align-items: center; justify-content: flex-end; gap: 10px;">
+        <button id="g1dm-btn-later" style="padding: 8px 16px; background: #1e293b; border: 1px solid #334155; border-radius: 6px; color: #cbd5e1; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.15s;">Download Later</button>
+        <button id="g1dm-btn-start" style="padding: 8px 20px; background: linear-gradient(135deg, #2563eb, #1d4ed8); border: 1px solid rgba(59, 130, 246, 0.6); border-radius: 6px; color: #fff; font-size: 12px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4); transition: all 0.15s;">Start Download</button>
+        <button id="g1dm-btn-cancel" style="padding: 8px 16px; background: transparent; border: 1px solid #334155; border-radius: 6px; color: #94a3b8; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.15s;">Cancel</button>
+      </div>
+    `;
+
+    root.appendChild(dialog);
+    document.body.appendChild(root);
+
+    // Elements
+    const urlInput = dialog.querySelector('#g1dm-input-url');
+    const filenameInput = dialog.querySelector('#g1dm-input-filename');
+    const catSelect = dialog.querySelector('#g1dm-select-cat');
+    const descInput = dialog.querySelector('#g1dm-input-desc');
+    const catIcon = dialog.querySelector('#g1dm-cat-icon');
+    const filesizeLabel = dialog.querySelector('#g1dm-filesize-label');
+    const resumableLabel = dialog.querySelector('#g1dm-resumable-label');
+    const safetyBadge = dialog.querySelector('#g1dm-safety-badge');
+
+    const updateCategoryIcon = (cat) => {
+      const icons = {
+        compressed: '📦',
+        archive: '📦',
+        document: '📄',
+        audio: '🎵',
+        video: '🎬',
+        program: '💻',
+        other: '📁'
+      };
+      if (catIcon) catIcon.innerText = icons[cat] || '📁';
+    };
+
+    updateCategoryIcon(catSelect.value);
+    catSelect.addEventListener('change', () => updateCategoryIcon(catSelect.value));
+
+    // Live probe via backend API
+    fetch('http://127.0.0.1:8055/api/probe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url })
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data && !data.error) {
+          if (data.filename && (!filename || filename === 'download.bin' || filename.startsWith('watch.') || filename.startsWith('video.'))) {
+            filenameInput.value = data.filename;
+          }
+          if (data.suggestedCategory && data.suggestedCategory !== 'other') {
+            catSelect.value = data.suggestedCategory;
+            updateCategoryIcon(data.suggestedCategory);
+          }
+          if (data.size && data.size > 0) {
+            filesizeLabel.innerText = formatBytes(data.size);
+          } else {
+            filesizeLabel.innerText = 'Dynamic Stream';
+          }
+          if (data.capabilities) {
+            resumableLabel.innerText = data.capabilities.supportsRange
+              ? '✓ Multi-Threaded Turbo Resumable'
+              : 'Single-Stream Download';
+          }
+          if (data.safetyWarning && data.safetyWarning.isSafe) {
+            safetyBadge.style.display = 'block';
+          }
+        }
+      })
+      .catch(() => {
+        filesizeLabel.innerText = 'Direct Download';
+        resumableLabel.innerText = 'Connected to Core Engine';
+      });
+
+    const closeModal = () => {
+      root.style.opacity = '0';
+      root.style.transition = 'opacity 0.2s ease';
+      setTimeout(() => root.remove(), 200);
+    };
+
+    const submit = (startImmediately) => {
+      const finalUrl = urlInput.value.trim() || url;
+      const finalName = filenameInput.value.trim() || filename;
+      const finalCat = catSelect.value || category;
+
+      const payload = {
+        url: finalUrl,
+        filename: finalName,
+        category: finalCat,
+        formatSpec: formatSpec,
+        container: container,
+        startImmediately: startImmediately
+      };
+
+      fetch('http://127.0.0.1:8055/api/downloads', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      })
+        .then(res => res.json())
+        .then(() => {
+          closeModal();
+          showDownloadToast(startImmediately ? '✓ Download Started' : '✓ Queued in G1DM', finalName);
+        })
+        .catch(() => {
+          if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+            chrome.runtime.sendMessage({
+              type: 'DOWNLOAD_URL',
+              ...payload
+            });
+          }
+          closeModal();
+          showDownloadToast(startImmediately ? '✓ Download Started' : '✓ Queued in G1DM', finalName);
+        });
+    };
+
+    dialog.querySelector('#g1dm-btn-start').addEventListener('click', () => submit(true));
+    dialog.querySelector('#g1dm-btn-later').addEventListener('click', () => submit(false));
+    dialog.querySelector('#g1dm-btn-cancel').addEventListener('click', closeModal);
+    dialog.querySelector('#g1dm-modal-close').addEventListener('click', closeModal);
+
+    root.addEventListener('click', (e) => {
+      if (e.target === root) closeModal();
+    });
+
+    const keyHandler = (e) => {
+      if (e.key === 'Escape') {
+        closeModal();
+        document.removeEventListener('keydown', keyHandler);
+      } else if (e.key === 'Enter' && e.target.tagName !== 'BUTTON') {
+        submit(true);
+        document.removeEventListener('keydown', keyHandler);
+      }
+    };
+    document.addEventListener('keydown', keyHandler);
+  }
+
+  function showDownloadToast(status, filename) {
+    const existing = document.getElementById('g1dm-toast-root');
+    if (existing) existing.remove();
+
+    const toast = document.createElement('div');
+    toast.id = 'g1dm-toast-root';
+    toast.style.cssText = `
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      z-index: 2147483647;
+      background: linear-gradient(135deg, rgba(15, 23, 42, 0.96), rgba(30, 41, 59, 0.96));
+      border: 1px solid rgba(16, 185, 129, 0.5);
+      box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.8), 0 0 20px rgba(16, 185, 129, 0.35);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border-radius: 10px;
+      padding: 12px 18px;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      animation: g1dm-scale-in 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    `;
+
+    toast.innerHTML = `
+      <div style="width: 24px; height: 24px; border-radius: 50%; background: #10b981; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800; color: #fff;">✓</div>
+      <div>
+        <div style="font-size: 13px; font-weight: 700; color: #34d399;">${status}</div>
+        <div style="font-size: 11px; color: #cbd5e1; max-width: 260px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${filename}</div>
+      </div>
+    `;
+
+    document.body.appendChild(toast);
+    setTimeout(() => {
+      toast.style.opacity = '0';
+      toast.style.transition = 'opacity 0.3s ease';
+      setTimeout(() => toast.remove(), 300);
+    }, 3500);
+  }
+
+  // Runtime message listener for background actions
+  if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
+    chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+      if (message.type === 'SHOW_DOWNLOAD_MODAL') {
+        showDownloadFileInfoModal(message);
+        sendResponse({ success: true });
+      }
+    });
+  }
+
   // Inject CSS keyframes
   const styleEl = document.createElement('style');
   styleEl.textContent = `
     @keyframes g1dm-scale-in {
       from { opacity: 0; transform: scale(0.92) translateY(-8px); }
       to { opacity: 1; transform: scale(1) translateY(0); }
+    }
+    @keyframes g1dm-fade-in {
+      from { opacity: 0; }
+      to { opacity: 1; }
     }
   `;
   document.head?.appendChild(styleEl);

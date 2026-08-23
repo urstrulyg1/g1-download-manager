@@ -63,6 +63,7 @@ export default function Home() {
   const [viewMode, setViewMode] = useState<ViewMode>('advanced');
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [addModalInitialUrl, setAddModalInitialUrl] = useState('');
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isActionCenterOpen, setIsActionCenterOpen] = useState(false);
   const [selectedDownload, setSelectedDownload] = useState<DownloadItem | null>(null);
@@ -174,8 +175,32 @@ export default function Home() {
       }
     };
 
-    window.addEventListener('focus', handleFocus);
-    return () => window.removeEventListener('focus', handleFocus);
+  }, []);
+
+  // Hash Navigation Handler (#add?url=..., #batch, #media)
+  useEffect(() => {
+    const handleHashChange = () => {
+      const hash = window.location.hash;
+      if (hash.startsWith('#add')) {
+        const queryIdx = hash.indexOf('?');
+        if (queryIdx !== -1) {
+          const params = new URLSearchParams(hash.slice(queryIdx));
+          const urlParam = params.get('url');
+          if (urlParam) {
+            setAddModalInitialUrl(decodeURIComponent(urlParam));
+          }
+        }
+        setIsAddModalOpen(true);
+      } else if (hash.startsWith('#batch')) {
+        setActiveView('batch');
+      } else if (hash.startsWith('#media')) {
+        setActiveView('media');
+      }
+    };
+
+    handleHashChange();
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);
 
   const handleSpeedLimitChange = async (limit: number) => {
@@ -371,10 +396,14 @@ export default function Home() {
       {/* Modals & Drawers */}
       <AddDownloadModal
         isOpen={isAddModalOpen}
-        onClose={() => setIsAddModalOpen(false)}
+        onClose={() => {
+          setIsAddModalOpen(false);
+          setAddModalInitialUrl('');
+        }}
         queues={queues}
         categories={categories}
         defaultDownloadDir={settings?.general.defaultDownloadDir || '/home/user/Downloads'}
+        initialUrl={addModalInitialUrl}
         onDownloadStarted={(item) => setActiveIdmDownloadId(item.id)}
       />
 
