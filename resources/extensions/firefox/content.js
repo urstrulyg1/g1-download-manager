@@ -218,7 +218,9 @@
     const vWidth = video.videoWidth || 1920;
     const vHeight = video.videoHeight || 1080;
     const durationSec = video.duration;
+    const isStreamSite = /youtube\.com|youtu\.be|googlevideo\.com|vimeo\.com|twitch\.tv|twitter\.com|x\.com|tiktok\.com|instagram\.com|facebook\.com|dailymotion\.com|reddit\.com|bilibili\.com|rumble\.com|bitchute\.com|odysee\.com/i.test(window.location.hostname);
     const bestSrc = getBestMediaSource(video);
+    const pageUrl = window.location.href;
     const results = [];
 
     // 1. Live Sniffed Streams (.m3u8 / .mpd / direct stream)
@@ -238,11 +240,13 @@
           badge,
           color: isHls ? '#10b981' : isDash ? '#f59e0b' : '#38bdf8',
           url: sUrl,
+          formatSpec: 'bestvideo+bestaudio/best',
           resolution: `${vWidth}×${vHeight}`,
           container: isHls ? 'mkv' : isDash ? 'mkv' : 'mp4',
           codec: 'ORIGINAL',
           estimatedSize: estSize,
-          isStream: true
+          isStream: true,
+          isDirectStream: true
         });
       }
     }
@@ -260,12 +264,24 @@
 
         const estSize = estimateFileSize(durationSec, res.height, cfg.codec, false);
 
+        let formatSpec = `bestvideo[height<=${res.height}]+bestaudio/best[height<=${res.height}]/best`;
+        if (cfg.codec === 'H264') {
+          formatSpec = `bestvideo[height<=${res.height}][vcodec^=avc1]+bestaudio[ext=m4a]/bestvideo[height<=${res.height}][vcodec^=avc]+bestaudio/bestvideo[height<=${res.height}]+bestaudio/best[height<=${res.height}]/best`;
+        } else if (cfg.codec === 'HEVC') {
+          formatSpec = `bestvideo[height<=${res.height}][vcodec^=hev1]+bestaudio[ext=m4a]/bestvideo[height<=${res.height}][vcodec^=hvc1]+bestaudio/bestvideo[height<=${res.height}][vcodec^=h265]+bestaudio/bestvideo[height<=${res.height}]+bestaudio/best[height<=${res.height}]/best`;
+        } else if (cfg.codec === 'AV1') {
+          formatSpec = `bestvideo[height<=${res.height}][vcodec^=av01]+bestaudio[ext=m4a]/bestvideo[height<=${res.height}][vcodec^=av1]+bestaudio/bestvideo[height<=${res.height}]+bestaudio/best[height<=${res.height}]/best`;
+        } else if (cfg.codec === 'VP9') {
+          formatSpec = `bestvideo[height<=${res.height}][vcodec^=vp9]+bestaudio[ext=webm]/bestvideo[height<=${res.height}]+bestaudio/best[height<=${res.height}]/best`;
+        }
+
         results.push({
           label: `${res.label}${isCurrentPlayback ? ' (Current Stream)' : ''}`,
           formatLabel: cfg.description,
           badge: `${res.badge} ${cfg.codec}`,
           color: cfg.badgeColor,
-          url: bestSrc,
+          url: isStreamSite ? pageUrl : bestSrc,
+          formatSpec,
           resolution: `${calcWidth}×${res.height} • ${res.bitrate}`,
           container: cfg.container,
           codec: cfg.codec,
@@ -280,12 +296,14 @@
     if (filter === 'ALL' || filter === 'AUDIO') {
       for (const aud of AUDIO_FORMATS) {
         const estSize = estimateFileSize(durationSec, 0, aud.codec, true);
+        const formatSpec = aud.container === 'm4a' || aud.codec === 'AAC' ? 'bestaudio[ext=m4a]/bestaudio/best' : 'bestaudio/best';
         results.push({
           label: aud.label,
           formatLabel: aud.sublabel,
           badge: aud.badge,
           color: aud.color,
-          url: bestSrc,
+          url: isStreamSite ? pageUrl : bestSrc,
+          formatSpec,
           container: aud.container,
           codec: aud.codec,
           estimatedSize: estSize,
@@ -565,18 +583,29 @@
     }
 
     function triggerDownload(item, title) {
-      const ext = item.container || (item.isAudio ? 'mp3' : 'mkv');
-      const codecTag = item.codec ? `_${item.codec.replace(/[^a-zA-Z0-9]/g, '')}` : '';
-      const filename = `${title}_${item.badge || 'video'}${codecTag}.${ext}`.replace(/\s+/g, '_');
+      const ext = item.container || (item.isAudio ? 'mp3' : 'mp4');
+      const filename = `${title}.${ext}`;
+      const isStreamSite = /youtube\.com|youtu\.be|googlevideo\.com|vimeo\.com|twitch\.tv|twitter\.com|x\.com|tiktok\.com|instagram\.com|facebook\.com|dailymotion\.com|reddit\.com|bilibili\.com|rumble\.com|bitchute\.com|odysee\.com/i.test(window.location.hostname);
+      const targetUrl = (isStreamSite && !item.isDirectStream) ? window.location.href : (item.url || window.location.href);
 
-      chrome.runtime.sendMessage({
+      const msg = {
         type: 'DOWNLOAD_URL',
-        url: item.url,
+        url: targetUrl,
         filename,
         category: item.isAudio ? 'audio' : 'video',
         format: ext,
-        codec: item.codec
-      });
+        container: ext,
+        formatSpec: item.formatSpec || (item.isAudio ? 'bestaudio/best' : 'bestvideo+bestaudio/best'),
+        mediaFormatSpec: item.formatSpec || (item.isAudio ? 'bestaudio/best' : 'bestvideo+bestaudio/best'),
+        codec: item.codec,
+        height: item.height
+      };
+
+      if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
+        chrome.runtime.sendMessage(msg);
+      } else if (typeof browser !== 'undefined' && browser.runtime && browser.runtime.sendMessage) {
+        browser.runtime.sendMessage(msg);
+      }
 
       // Visual feedback on pill
       pill.style.borderColor = '#10b981';

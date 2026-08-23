@@ -76,6 +76,8 @@ function handleMessage(msg) {
         url: msg.url,
         filename: msg.filename,
         category: msg.category,
+        formatSpec: msg.formatSpec || msg.mediaFormatSpec,
+        container: msg.container || msg.format,
         startImmediately: true,
       })
     );

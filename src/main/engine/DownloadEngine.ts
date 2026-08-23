@@ -339,8 +339,8 @@ export class DownloadEngine extends EventEmitter {
       (isStreamPlatform ? 'bestvideo+bestaudio/best' : undefined);
     (item as any).mediaMetadata = {
       title: mediaAnalysis?.title || filename,
-      resolution: mediaAnalysis?.recommendedQuality?.resolutionLabel,
-      codec: mediaAnalysis?.recommendedQuality?.videoCodec,
+      resolution: (params as any).height ? `${(params as any).height}p` : mediaAnalysis?.recommendedQuality?.resolutionLabel,
+      codec: (params as any).codec || mediaAnalysis?.recommendedQuality?.videoCodec,
       container: (params as any).container || mediaAnalysis?.recommendedQuality?.container || path.extname(filename).replace('.', ''),
     };
 

@@ -80,7 +80,10 @@ export class MediaStreamDownloader extends EventEmitter {
       args.push('--ffmpeg-location', ffmpegDir);
     }
 
-    if (targetExt === 'mp4' || targetExt === 'mkv' || targetExt === 'webm') {
+    if (this.item.category === 'audio' || ['mp3', 'm4a', 'flac', 'wav', 'opus', 'aac', 'ogg'].includes(targetExt)) {
+      const audioFmt = targetExt === 'opus' ? 'opus' : targetExt === 'wav' ? 'wav' : targetExt === 'flac' ? 'flac' : targetExt === 'm4a' ? 'm4a' : 'mp3';
+      args.push('-x', '--audio-format', audioFmt, '--audio-quality', '0');
+    } else if (targetExt === 'mp4' || targetExt === 'mkv' || targetExt === 'webm') {
       args.push('--merge-output-format', targetExt);
     }
 
