@@ -29,9 +29,6 @@ WHITE="${ESC}[38;5;255m"
 GRAY="${ESC}[38;5;242m"
 DARK_GRAY="${ESC}[38;5;238m"
 
-# Gradient Accents
-BG_DARK="${ESC}[48;5;234m"
-
 # ── Terminal Utilities ────────────────────────────────────────────────────────
 # Hide / Restore cursor on exit
 cleanup() {
@@ -91,16 +88,13 @@ run_with_spinner() {
 # ── Hero Banner ───────────────────────────────────────────────────────────────
 clear 2>/dev/null || true
 echo ""
-echo -e "  ${PURPLE}╭───────────────────────────────────────────────────────────────────────────────╮${RESET}"
-echo -e "  ${PURPLE}│                                                                               │${RESET}"
-echo -e "  ${PURPLE}│   ${CYAN}${BOLD}██████╗  ██╗ ██████╗  ███╗   ███╗${RESET}                                           ${PURPLE}│${RESET}"
-echo -e "  ${PURPLE}│   ${CYAN}${BOLD}██╔════╝ ███║ ██╔══██╗ ████╗ ████║${RESET}   ${WHITE}${BOLD}G1DM DOWNLOAD MANAGER · PRO${RESET}           ${PURPLE}│${RESET}"
-echo -e "  ${PURPLE}│   ${AQUA}${BOLD}██║ ███╗  ██║ ██║  ██║ ██╔████╔██║${RESET}   ${DIM}High-Throughput Autonomous Engine${RESET}       ${PURPLE}│${RESET}"
-echo -e "  ${PURPLE}│   ${AQUA}${BOLD}██║  ██║  ██║ ██║  ██║ ██║╚██╔╝██║${RESET}   ${EMERALD}● ONLINE${RESET} ${GRAY}·${RESET} ${YELLOW}v2.0-PRO${RESET} ${GRAY}·${RESET} ${AQUA}Multi-Threaded${RESET}   ${PURPLE}│${RESET}"
-echo -e "  ${PURPLE}│   ${BLUE}${BOLD}╚██████╔╝  ██║ ██████╔╝ ██║ ╚═╝ ██║${RESET}   ${GRAY}Media Stream Acceleration & Studio${RESET}      ${PURPLE}│${RESET}"
-echo -e "  ${PURPLE}│    ${BLUE}${BOLD}╚═════╝   ╚═╝ ╚═════╝  ╚═╝     ╚═╝${RESET}                                           ${PURPLE}│${RESET}"
-echo -e "  ${PURPLE}│                                                                               │${RESET}"
-echo -e "  ${PURPLE}╰───────────────────────────────────────────────────────────────────────────────╯${RESET}"
+echo -e "  ${CYAN}${BOLD}██████╗  ██╗ ██████╗  ███╗   ███╗${RESET}   ${WHITE}${BOLD}G1DM DOWNLOAD MANAGER${RESET}  ${YELLOW}${BOLD}v2.0-PRO${RESET}"
+echo -e "  ${CYAN}${BOLD}██╔════╝ ███║ ██╔══██╗ ████╗ ████║${RESET}   ${GRAY}High-Performance Universal Core Engine${RESET}"
+echo -e "  ${AQUA}${BOLD}██║ ███╗  ██║ ██║  ██║ ██╔████╔██║${RESET}   ${EMERALD}● ONLINE${RESET}  ${GRAY}·${RESET}  ${AQUA}Multi-Threaded Turbo Pipeline${RESET}"
+echo -e "  ${AQUA}${BOLD}██║  ██║  ██║ ██║  ██║ ██║╚██╔╝██║${RESET}   ${PURPLE}Production Ready & Native Companion${RESET}"
+echo -e "  ${BLUE}${BOLD}╚██████╔╝  ██║ ██████╔╝ ██║ ╚═╝ ██║${RESET}"
+echo -e "  ${BLUE}${BOLD} ╚═════╝   ╚═╝ ╚═════╝  ╚═╝     ╚═╝${RESET}"
+echo -e "  ${DARK_GRAY}───────────────────────────────────────────────────────────────────────────────${RESET}"
 echo ""
 
 # ── Resolve Workspace Directory ───────────────────────────────────────────────
@@ -336,15 +330,15 @@ fi
 echo ""
 
 # ── HUD Status Card ───────────────────────────────────────────────────────────
-echo -e "  ${GREEN}╔═══════════════════════════════════════════════════════════════════════════════╗${RESET}"
-echo -e "  ${GREEN}║${RESET}   ${BOLD}${WHITE}🚀  G1DM CORE ENGINE & ACCELERATED SERVICE ONLINE${RESET}                           ${GREEN}║${RESET}"
-echo -e "  ${GREEN}╠═══════════════════════════════════════════════════════════════════════════════╣${RESET}"
-echo -e "  ${GREEN}║${RESET}   ${CYAN}${BOLD}🌐  Web Dashboard${RESET}    ➜   ${WHITE}${UNDERLINE}${URL}${RESET}                                       ${GREEN}║${RESET}"
-echo -e "  ${GREEN}║${RESET}   ${BLUE}${BOLD}⚡  REST API v1${RESET}      ➜   ${WHITE}${URL}/api/v1${RESET}                                ${GREEN}║${RESET}"
-echo -e "  ${GREEN}║${RESET}   ${MAGENTA}${BOLD}📋  OpenAPI Spec${RESET}     ➜   ${WHITE}${URL}/api/v1/openapi.json${RESET}                   ${GREEN}║${RESET}"
-echo -e "  ${GREEN}║${RESET}   ${ORANGE}${BOLD}🧩  Companion Ext${RESET}    ➜   ${GRAY}${CHROME_EXT_DIR}${RESET}   ${GREEN}║${RESET}"
-echo -e "  ${GREEN}║${RESET}   ${EMERALD}${BOLD}🛡️   Security Mode${RESET}    ➜   ${EMERALD}Loopback Only (127.0.0.1) · Zero-Leakage${RESET}       ${GREEN}║${RESET}"
-echo -e "  ${GREEN}╚═══════════════════════════════════════════════════════════════════════════════╝${RESET}"
+echo -e "  ${GREEN}┌── ${WHITE}${BOLD}🚀 G1DM Core Service Active${RESET} ${DARK_GRAY}─────────────────────────────────────────${RESET}"
+echo -e "  ${GREEN}│${RESET}"
+echo -e "  ${GREEN}│${RESET}  ${CYAN}${BOLD}🌐 Web Dashboard${RESET}    ➜  ${WHITE}${BOLD}${UNDERLINE}${URL}${RESET}"
+echo -e "  ${GREEN}│${RESET}  ${BLUE}${BOLD}⚡ REST API v1${RESET}      ➜  ${WHITE}${URL}/api/v1${RESET}"
+echo -e "  ${GREEN}│${RESET}  ${MAGENTA}${BOLD}📋 OpenAPI Spec${RESET}     ➜  ${WHITE}${URL}/api/v1/openapi.json${RESET}"
+echo -e "  ${GREEN}│${RESET}  ${ORANGE}${BOLD}🧩 Companion Ext${RESET}    ➜  ${GRAY}${CHROME_EXT_DIR}${RESET}"
+echo -e "  ${GREEN}│${RESET}  ${EMERALD}${BOLD}🛡️  Security Mode${RESET}    ➜  ${EMERALD}Loopback Only (127.0.0.1) · Zero-Leakage${RESET}"
+echo -e "  ${GREEN}│${RESET}"
+echo -e "  ${GREEN}└── ${EMERALD}${BOLD}ONLINE${RESET} ${DARK_GRAY}──────────────────────────────────────────────────────────────${RESET}"
 echo ""
 
 # Launch target browser

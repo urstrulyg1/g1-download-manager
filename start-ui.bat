@@ -33,16 +33,13 @@ set "BWHITE=%ESC%[97m"
 
 REM ── Banner ────────────────────────────────────────────────────────────────────
 echo.
-echo %BCYAN%%BOLD%  ^╔═══════════════════════════════════════════════════════════════════════^╗%R%
-echo %BCYAN%%BOLD%  ^║                                                                       ^║%R%
-echo   %BCYAN%%BOLD%^║  %BMAGENTA%^█^█^█^█^█^█^╗  ^█^╗ ^█^█^█^█^█^█^╗  ^█^█^█^╗   ^█^█^█^╗                                   %BCYAN%^║%R%
-echo   %BCYAN%%BOLD%^║  %BMAGENTA%^█^█^╔^═^═^═^═^╝ ^█^█^█^║ ^█^█^╔^═^═^█^█^╗ ^█^█^█^█^╗ ^█^█^█^█^║  %BWHITE%%BOLD%Next-Gen Internet Download Mgr  %BCYAN%^║%R%
-echo   %BCYAN%%BOLD%^║  %BMAGENTA%^█^█^║ ^█^█^█^╗  ^█^║ ^█^█^║  ^█^█^║ ^█^█^╔^█^█^█^█^╔^█^█^║  %DIM%Universal Core Engine ^& Web UI  %R%%BCYAN%%BOLD%^║%R%
-echo   %BCYAN%%BOLD%^║  %BMAGENTA%^█^█^║  ^█^█^║  ^█^║ ^█^█^║  ^█^█^║ ^█^█^║^╚^█^█^╔^╝^█^█^║  %BYELLOW%v2.0-PRO%BCYAN% · %BGREEN%Production Ready     %BCYAN%^║%R%
-echo   %BCYAN%%BOLD%^║  %BMAGENTA%^╚^█^█^█^█^█^█^╔^╝  ^█^║ ^█^█^█^█^█^█^╔^╝ ^█^█^║ ^╚^═^╝ ^█^█^║  %GRAY%High-Performance Core Engine    %BCYAN%^║%R%
-echo   %BCYAN%%BOLD%^║   %BMAGENTA%^╚^═^═^═^═^═^╝   ^╚^═^╝ ^╚^═^═^═^═^═^╝  ^╚^═^╝     ^╚^═^╝                                  %BCYAN%^║%R%
-echo %BCYAN%%BOLD%  ^║                                                                       ^║%R%
-echo %BCYAN%%BOLD%  ^╚═══════════════════════════════════════════════════════════════════════^╝%R%
+echo   %BCYAN%%BOLD%██████╗  ██╗ ██████╗  ███╗   ███╗%R%   %BWHITE%%BOLD%G1DM DOWNLOAD MANAGER%R%  %BYELLOW%%BOLD%v2.0-PRO%R%
+echo   %BCYAN%%BOLD%██╔════╝ ███║ ██╔══██╗ ████╗ ████║%R%   %GRAY%High-Performance Universal Core Engine%R%
+echo   %BCYAN%%BOLD%██║ ███╗  ██║ ██║  ██║ ██╔████╔██║%R%   %BGREEN%● ONLINE%R%  %GRAY%·%R%  %BCYAN%Multi-Threaded Turbo Pipeline%R%
+echo   %BCYAN%%BOLD%██║  ██║  ██║ ██║  ██║ ██║╚██╔╝██║%R%   %BMAGENTA%Production Ready ^& Native Companion%R%
+echo   %BBLUE%%BOLD%╚██████╔╝  ██║ ██████╔╝ ██║ ╚═╝ ██║%R%
+echo   %BBLUE%%BOLD% ╚═════╝   ╚═╝ ╚═════╝  ╚═╝     ╚═╝%R%
+echo   %GRAY%───────────────────────────────────────────────────────────────────────────────%R%
 echo.
 
 REM ── Move to script directory ──────────────────────────────────────────────────
@@ -233,16 +230,20 @@ set "BROWSER_TAG_!BROWSER_COUNT!=headless"
 set "BROWSER_CMD_!BROWSER_COUNT!=__NONE__"
 
 REM ── Print browser menu ────────────────────────────────────────────────────
-echo %BCYAN%%BOLD%  ┌─ Browser Selection ─────────────────────────────────────────────────┐%R%
+echo %BCYAN%%BOLD%  🌐  SELECT LAUNCH TARGET%R%
+echo   %GRAY%───────────────────────────────────────────────────────────────────────────────%R%
 for /L %%i in (1,1,%BROWSER_COUNT%) do (
     set "_TAG=!BROWSER_TAG_%%i!"
     set "_NAME=!BROWSER_NAME_%%i!"
-    if "!_TAG!"=="ext"      set "_BADGE=%GREEN%%BOLD%[Extension]%R%"
-    if "!_TAG!"=="plain"    set "_BADGE=%CYAN%[Browser]  %R%"
-    if "!_TAG!"=="headless" set "_BADGE=%GRAY%[Headless] %R%"
-    echo   %BCYAN%%BOLD%^║%R%  %BYELLOW%%%i)%R%  !_BADGE!  %BWHITE%!_NAME!%R%
+    if "!_TAG!"=="ext"      set "_BADGE=%BGREEN%%BOLD%[Extension Active]%R%"
+    if "!_TAG!"=="plain"    set "_BADGE=%BCYAN%[Browser]%R%         "
+    if "!_TAG!"=="headless" set "_BADGE=%GRAY%[Headless API]%R%    "
+    if %%i equ 1 (
+        echo   %BYELLOW%%BOLD% %%i^)%R%  %BWHITE%!_NAME!%R%  !_BADGE!  %BCYAN%★ Recommended%R%
+    ) else (
+        echo   %BYELLOW%%BOLD% %%i^)%R%  %BWHITE%!_NAME!%R%  !_BADGE!
+    )
 )
-echo %BCYAN%%BOLD%  └─────────────────────────────────────────────────────────────────────┘%R%
 
 REM Default = first extension browser, else last entry
 set /a DEFAULT_OPTION=%BROWSER_COUNT%
@@ -290,14 +291,15 @@ echo %BBLUE%└── Initialized.%R%
 echo.
 
 REM ── Status dashboard ──────────────────────────────────────────────────────
-echo %BGREEN%%BOLD%  ^╔═══════════════════════════════════════════════════════════════════════^╗%R%
-echo %BGREEN%%BOLD%  ^║           ^🚀  G1DM CORE ENGINE ^& WEB UI  ·  ACTIVE                   ^║%R%
-echo %BGREEN%%BOLD%  ^╠═══════════════════════════════════════════════════════════════════════^╣%R%
-echo %BGREEN%%BOLD%  ^║%R%  %BCYAN%%BOLD%^🌐  Web Dashboard%R%   %BWHITE%%UL%%URL%%R%
-echo %BGREEN%%BOLD%  ^║%R%  %BBLUE%%BOLD%^⚡  REST API%R%        %BWHITE%%URL%/api/v1%R%
-echo %BGREEN%%BOLD%  ^║%R%  %BMAGENTA%%BOLD%^📋  OpenAPI Docs%R%    %BWHITE%%URL%/api/v1/openapi.json%R%
-echo %BGREEN%%BOLD%  ^║%R%  %BYELLOW%%BOLD%^🧩  Extension%R%       %GRAY%%CHROME_EXT_DIR%%R%
-echo %BGREEN%%BOLD%  ^╚═══════════════════════════════════════════════════════════════════════^╝%R%
+echo %BGREEN%┌── %BWHITE%%BOLD%🚀 G1DM Core Service Active%R% %GRAY%─────────────────────────────────────────%R%
+echo %BGREEN%│%R%
+echo %BGREEN%│%R%  %BCYAN%%BOLD%🌐 Web Dashboard%R%    ➜  %BWHITE%%BOLD%%UL%%URL%%R%
+echo %BGREEN%│%R%  %BBLUE%%BOLD%⚡ REST API v1%R%      ➜  %BWHITE%%URL%/api/v1%R%
+echo %BGREEN%│%R%  %BMAGENTA%%BOLD%📋 OpenAPI Spec%R%     ➜  %BWHITE%%URL%/api/v1/openapi.json%R%
+echo %BGREEN%│%R%  %BYELLOW%%BOLD%🧩 Companion Ext%R%    ➜  %GRAY%%CHROME_EXT_DIR%%R%
+echo %BGREEN%│%R%  %BGREEN%%BOLD%🛡️  Security Mode%R%    ➜  %BGREEN%Loopback Only (127.0.0.1) · Zero-Leakage%R%
+echo %BGREEN%│%R%
+echo %BGREEN%└── %BGREEN%%BOLD%ONLINE%R% %GRAY%──────────────────────────────────────────────────────────────%R%
 echo.
 
 REM ── Launch browser ────────────────────────────────────────────────────────
