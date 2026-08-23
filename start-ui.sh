@@ -49,7 +49,7 @@ run_with_spinner() {
     
     # Run command in background with output captured
     local tmp_log
-    tmp_log=$(mktemp /tmp/g1dm_step_XXXXXX.log)
+    tmp_log=$(mktemp /tmp/g1dm_step_XXXXXX 2>/dev/null || mktemp -t g1dm_step)
     "${cmd[@]}" >"$tmp_log" 2>&1 &
     local pid=$!
     
@@ -89,8 +89,8 @@ run_with_spinner() {
 clear 2>/dev/null || true
 echo ""
 
-TERM_WIDTH=$(tput cols 2>/dev/null || echo "80")
 BOX_WIDTH=72
+TERM_WIDTH=$(tput cols 2>/dev/null || echo 80)
 if [ "$TERM_WIDTH" -gt "$BOX_WIDTH" ]; then
     PAD_LEN=$(( (TERM_WIDTH - BOX_WIDTH) / 2 ))
     PAD=$(printf '%*s' "$PAD_LEN" '')
@@ -108,7 +108,7 @@ echo -e "${PAD}${PURPLE}│${RESET}                 ${BLUE}${BOLD}╚███�
 echo -e "${PAD}${PURPLE}│${RESET}                  ${BLUE}${BOLD}╚═════╝   ╚═╝  ╚═════╝  ╚═╝     ╚═╝${RESET}                 ${PURPLE}│${RESET}"
 echo -e "${PAD}${PURPLE}│                                                                      │${RESET}"
 echo -e "${PAD}${PURPLE}├──────────────────────────────────────────────────────────────────────┤${RESET}"
-echo -e "${PAD}${PURPLE}│${RESET}           ${WHITE}${BOLD}G1DM DOWNLOAD MANAGER${RESET}  ${GRAY}·${RESET}  ${YELLOW}${BOLD}v2.0-PRO${RESET}  ${GRAY}·${RESET}  ${EMERALD}${BOLD}[ONLINE]${RESET}           ${PURPLE}│${RESET}"
+echo -e "${PAD}${PURPLE}│${RESET}           ${WHITE}${BOLD}G1DM DOWNLOAD MANAGER${RESET}  ${GRAY}·${RESET}  ${YELLOW}${BOLD}v2.0-PRO${RESET}  ${GRAY}·${RESET}  ${EMERALD}${BOLD}[ONLINE]${RESET}            ${PURPLE}│${RESET}"
 echo -e "${PAD}${PURPLE}│${RESET}    ${GRAY}High-Performance Core Engine  ·  Multi-Threaded Turbo Pipeline${RESET}    ${PURPLE}│${RESET}"
 echo -e "${PAD}${PURPLE}╰──────────────────────────────────────────────────────────────────────╯${RESET}"
 echo ""
