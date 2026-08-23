@@ -115,6 +115,14 @@ export async function createUnifiedServer(port: number = 8055) {
   );
   app.use(express.json({ limit: '10mb' }));
 
+  // Transparently rewrite /api/v1/* calls to /api/* for backward & future API version compatibility
+  app.use((req, _res, next) => {
+    if (req.url.startsWith('/api/v1/')) {
+      req.url = req.url.replace('/api/v1/', '/api/');
+    }
+    next();
+  });
+
   // Authentication for the control plane (optional user-defined token)
   RequestAuth.setApiKeyProvider(() => db.getSettings().security?.apiKey || undefined);
   app.use(RequestAuth.middleware());

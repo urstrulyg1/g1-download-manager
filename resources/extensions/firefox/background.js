@@ -1,6 +1,6 @@
-// G1DM Chrome/Chromium Companion Extension Background Service Worker
+// G1DM Firefox Companion Extension Background Script
 const G1DM_PORT = 8055;
-const G1DM_API_BASE = `http://127.0.0.1:${G1DM_PORT}/api/v1`;
+const G1DM_API_BASE = `http://127.0.0.1:${G1DM_PORT}/api`;
 
 const DEFAULT_EXTENSIONS = [
   'zip', 'rar', '7z', 'tar', 'gz', 'bz2', 'xz', 'iso', 'dmg', 'tgz',
@@ -10,11 +10,11 @@ const DEFAULT_EXTENSIONS = [
   'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'
 ];
 
-chrome.runtime.onInstalled.addListener(() => {
-  chrome.storage.local.get(['interceptionEnabled', 'interceptExtensions', 'excludeDomains'], (data) => {
+browser.runtime.onInstalled.addListener(() => {
+  browser.storage.local.get(['interceptionEnabled', 'interceptExtensions', 'excludeDomains'], (data) => {
     if (data.interceptionEnabled === undefined) {
-      chrome.storage.local.set({
-        interceptionEnabled: true,
+      browser.storage.local.set({
+        interceptionEnabled: false,
         interceptExtensions: DEFAULT_EXTENSIONS,
         excludeDomains: [],
       });
