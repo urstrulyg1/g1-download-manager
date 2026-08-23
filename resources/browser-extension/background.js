@@ -29,10 +29,10 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
   }
 });
 
-// Download Interception (manual opt-in only)
+// Download Interception
 chrome.downloads.onCreated.addListener((downloadItem) => {
   chrome.storage.local.get(["interceptionEnabled"], (data) => {
-    if (data.interceptionEnabled === true) {
+    if (data.interceptionEnabled !== false) {
       // Send to G1DM and cancel browser download
       sendToG1DM(downloadItem.url, downloadItem.filename);
       chrome.downloads.cancel(downloadItem.id);

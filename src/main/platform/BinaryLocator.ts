@@ -10,18 +10,37 @@ export class BinaryLocator {
   public static ensurePath(): void {
     if (this.pathAugmented) return;
 
+    const isWin = process.platform === 'win32';
+    const isMac = process.platform === 'darwin';
+    const home = process.env.HOME || process.env.USERPROFILE || '';
+    const localAppData = process.env.LOCALAPPDATA || '';
+    const programFiles = process.env.ProgramFiles || 'C:\\Program Files';
+    const programFilesX86 = process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)';
+
     const extraPaths = [
+      // macOS paths
       '/opt/homebrew/bin',
       '/opt/homebrew/sbin',
       '/opt/homebrew/opt/ffmpeg-full/bin',
       '/opt/homebrew/opt/ffmpeg/bin',
       '/usr/local/bin',
+      // Linux & Unix paths
       '/usr/bin',
       '/bin',
       '/usr/sbin',
       '/sbin',
-      path.join(process.env.HOME || '', '.local/bin'),
-      path.join(process.env.HOME || '', 'bin'),
+      '/snap/bin',
+      '/var/lib/flatpak/exports/bin',
+      path.join(home, '.local/bin'),
+      path.join(home, 'bin'),
+      // Windows paths
+      path.join(localAppData, 'Programs', 'yt-dlp'),
+      path.join(localAppData, 'Programs', 'ffmpeg', 'bin'),
+      path.join(home, 'scoop', 'shims'),
+      'C:\\ProgramData\\chocolatey\\bin',
+      path.join(programFiles, 'yt-dlp'),
+      path.join(programFiles, 'ffmpeg', 'bin'),
+      'C:\\ffmpeg\\bin',
     ];
 
     const currentPath = process.env.PATH || '';
@@ -29,7 +48,7 @@ export class BinaryLocator {
     const newSegments = [...currentSegments];
 
     for (const p of extraPaths) {
-      if (fs.existsSync(p) && !newSegments.includes(p)) {
+      if (p && fs.existsSync(p) && !newSegments.includes(p)) {
         newSegments.unshift(p);
       }
     }
@@ -44,13 +63,27 @@ export class BinaryLocator {
     }
 
     this.ensurePath();
+    const isWin = process.platform === 'win32';
+    const home = process.env.HOME || process.env.USERPROFILE || '';
+    const localAppData = process.env.LOCALAPPDATA || '';
+    const programFiles = process.env.ProgramFiles || 'C:\\Program Files';
 
     const candidates = [
+      // macOS candidates
       '/opt/homebrew/bin/yt-dlp',
       '/usr/local/bin/yt-dlp',
+      // Linux candidates
       '/usr/bin/yt-dlp',
-      path.join(process.env.HOME || '', '.local/bin/yt-dlp'),
-      path.join(process.env.HOME || '', 'bin/yt-dlp'),
+      '/snap/bin/yt-dlp',
+      path.join(home, '.local/bin/yt-dlp'),
+      path.join(home, 'bin/yt-dlp'),
+      // Windows candidates
+      path.join(localAppData, 'Programs', 'yt-dlp', 'yt-dlp.exe'),
+      path.join(home, 'scoop', 'shims', 'yt-dlp.exe'),
+      'C:\\ProgramData\\chocolatey\\bin\\yt-dlp.exe',
+      path.join(programFiles, 'yt-dlp', 'yt-dlp.exe'),
+      'C:\\yt-dlp\\yt-dlp.exe',
+      isWin ? 'yt-dlp.exe' : 'yt-dlp',
     ];
 
     for (const bin of candidates) {
@@ -60,8 +93,8 @@ export class BinaryLocator {
       }
     }
 
-    this.cachedYtDlp = 'yt-dlp';
-    return 'yt-dlp';
+    this.cachedYtDlp = isWin ? 'yt-dlp.exe' : 'yt-dlp';
+    return this.cachedYtDlp;
   }
 
   public static getFfmpegPath(): string {
@@ -70,15 +103,29 @@ export class BinaryLocator {
     }
 
     this.ensurePath();
+    const isWin = process.platform === 'win32';
+    const home = process.env.HOME || process.env.USERPROFILE || '';
+    const localAppData = process.env.LOCALAPPDATA || '';
+    const programFiles = process.env.ProgramFiles || 'C:\\Program Files';
 
     const candidates = [
+      // macOS candidates
       '/opt/homebrew/opt/ffmpeg-full/bin/ffmpeg',
       '/opt/homebrew/opt/ffmpeg/bin/ffmpeg',
       '/opt/homebrew/bin/ffmpeg',
       '/usr/local/bin/ffmpeg',
+      // Linux candidates
       '/usr/bin/ffmpeg',
-      path.join(process.env.HOME || '', '.local/bin/ffmpeg'),
-      path.join(process.env.HOME || '', 'bin/ffmpeg'),
+      '/snap/bin/ffmpeg',
+      path.join(home, '.local/bin/ffmpeg'),
+      path.join(home, 'bin/ffmpeg'),
+      // Windows candidates
+      path.join(localAppData, 'Programs', 'ffmpeg', 'bin', 'ffmpeg.exe'),
+      path.join(home, 'scoop', 'shims', 'ffmpeg.exe'),
+      'C:\\ProgramData\\chocolatey\\bin\\ffmpeg.exe',
+      path.join(programFiles, 'ffmpeg', 'bin', 'ffmpeg.exe'),
+      'C:\\ffmpeg\\bin\\ffmpeg.exe',
+      isWin ? 'ffmpeg.exe' : 'ffmpeg',
     ];
 
     for (const bin of candidates) {
@@ -88,8 +135,8 @@ export class BinaryLocator {
       }
     }
 
-    this.cachedFfmpeg = 'ffmpeg';
-    return 'ffmpeg';
+    this.cachedFfmpeg = isWin ? 'ffmpeg.exe' : 'ffmpeg';
+    return this.cachedFfmpeg;
   }
 
   public static getFfmpegDir(): string | null {

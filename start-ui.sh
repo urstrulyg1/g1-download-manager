@@ -226,7 +226,13 @@ else
     fi
 fi
 
-_add_browser "Default System Browser" "open" "🌐" "plain"
+if [[ "$OS_PLATFORM" == "Darwin" ]]; then
+    _DEFAULT_OPEN="open"
+else
+    _DEFAULT_OPEN="xdg-open"
+fi
+
+_add_browser "Default System Browser" "$_DEFAULT_OPEN" "🌐" "plain"
 _add_browser "Headless / Daemon Only (no browser window)" "" "🛡️" "headless"
 
 echo -e "  ${CYAN}${BOLD}🌐  SELECT LAUNCH TARGET${RESET}"
