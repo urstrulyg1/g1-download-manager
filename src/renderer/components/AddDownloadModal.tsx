@@ -39,8 +39,6 @@ export const AddDownloadModal: React.FC<AddDownloadModalProps> = ({
   initialUrl = '',
   onDownloadStarted,
 }) => {
-  if (!isOpen) return null;
-
   const [url, setUrl] = useState(initialUrl);
   const [filename, setFilename] = useState('');
   const [destinationDir, setDestinationDir] = useState(defaultDownloadDir);
@@ -71,6 +69,36 @@ export const AddDownloadModal: React.FC<AddDownloadModalProps> = ({
   const [checksumAlgo, setChecksumAlgo] = useState<'sha256' | 'sha512' | 'md5'>('sha256');
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [probeError, setProbeError] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setUrl(initialUrl);
+    setFilename('');
+    setDestinationDir(defaultDownloadDir);
+    setCategory('other');
+    setQueueId('default');
+    setPriority('normal');
+    setMaxConnections(8);
+    setSpeedLimitKbps(0);
+    setIsProbing(false);
+    setProbeResult(null);
+    setProbeError(null);
+    setSubmitError(null);
+    setShowAuth(false);
+    setAuthUsername('');
+    setAuthPassword('');
+    setAuthToken('');
+    setAuthCookies('');
+    setShowProxy(false);
+    setProxyEnabled(false);
+    setProxyType('http');
+    setProxyHost('');
+    setProxyPort(8080);
+    setExpectedChecksum('');
+    setChecksumAlgo('sha256');
+  }, [isOpen, initialUrl, defaultDownloadDir]);
 
   const formatBytes = (bytes: number) => {
     if (bytes <= 0) return '0 B';
@@ -82,13 +110,16 @@ export const AddDownloadModal: React.FC<AddDownloadModalProps> = ({
 
   // Debounced URL probe
   useEffect(() => {
+    if (!isOpen) return;
     if (!url.trim() || (!url.startsWith('http://') && !url.startsWith('https://') && !url.startsWith('ftp://'))) {
       setProbeResult(null);
+      setProbeError(null);
       return;
     }
 
     const timer = setTimeout(async () => {
       setIsProbing(true);
+      setProbeError(null);
       try {
         const authPayload =
           authUsername || authPassword || authToken || authCookies
@@ -116,17 +147,22 @@ export const AddDownloadModal: React.FC<AddDownloadModalProps> = ({
         }
       } catch (err: any) {
         console.warn('Probe error:', err.message);
+        setProbeResult(null);
+        setProbeError(err?.message || 'Unable to inspect this URL.');
       } finally {
         setIsProbing(false);
       }
     }, 500);
 
     return () => clearTimeout(timer);
-  }, [url, authUsername, authPassword, authToken, authCookies, proxyEnabled, proxyHost, proxyPort, categories]);
+  }, [isOpen, url, authUsername, authPassword, authToken, authCookies, proxyEnabled, proxyHost, proxyPort, categories]);
+
+  if (!isOpen) return null;
 
   const handleSubmit = async (action: 'now' | 'later' | 'queue') => {
     if (!url.trim()) return;
 
+    setSubmitError(null);
     setIsSubmitting(true);
     try {
       const auth =
@@ -174,15 +210,15 @@ export const AddDownloadModal: React.FC<AddDownloadModalProps> = ({
 
       onClose();
     } catch (err: any) {
-      alert(`Failed to add download: ${err.message}`);
+      setSubmitError(err?.message || 'Failed to add download.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <div className="theme-overlay fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
-      <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-2xl max-h-[90vh] shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+    <div className="theme-overlay fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4" data-testid="add-download-modal">
+      <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-2xl max-h-[90vh] shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150" role="dialog" aria-modal="true" aria-label="Add download">
         {/* Header */}
         <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-950/60">
           <div className="flex items-center gap-2.5">
@@ -222,8 +258,16 @@ export const AddDownloadModal: React.FC<AddDownloadModalProps> = ({
               onChange={(e) => setUrl(e.target.value)}
               className="w-full bg-slate-950 border border-slate-800 focus:border-blue-500 rounded-xl px-3 py-2 text-slate-200 font-mono text-xs focus:outline-none"
               autoFocus
+              data-testid="download-url-input"
+              aria-label="Download URL"
             />
           </div>
+
+          {probeError && (
+            <div className="p-3 rounded-xl bg-rose-950/40 border border-rose-500/40 text-rose-200 text-xs" data-testid="download-probe-error">
+              {probeError}
+            </div>
+          )}
 
           {/* Pre-Download Malicious Link Threat Warning Banner */}
           {probeResult?.safetyWarning && !probeResult.safetyWarning.isSafe && (
@@ -306,6 +350,8 @@ export const AddDownloadModal: React.FC<AddDownloadModalProps> = ({
                 value={filename}
                 onChange={(e) => setFilename(e.target.value)}
                 className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-200 font-mono text-xs focus:outline-none focus:border-blue-500"
+                data-testid="download-filename-input"
+                aria-label="File Name"
               />
             </div>
 
@@ -316,6 +362,8 @@ export const AddDownloadModal: React.FC<AddDownloadModalProps> = ({
                 value={destinationDir}
                 onChange={(e) => setDestinationDir(e.target.value)}
                 className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-200 font-mono text-xs focus:outline-none focus:border-blue-500"
+                data-testid="download-destination-input"
+                aria-label="Destination Directory"
               />
             </div>
           </div>
@@ -467,6 +515,12 @@ export const AddDownloadModal: React.FC<AddDownloadModalProps> = ({
           </div>
         </div>
 
+        {submitError && (
+          <div className="mx-5 mb-0 p-3 rounded-xl bg-rose-950/40 border border-rose-500/40 text-rose-200 text-xs" data-testid="download-submit-error">
+            {submitError}
+          </div>
+        )}
+
         {/* Footer Actions */}
         <div className="p-4 border-t border-slate-800 bg-slate-950/80 flex items-center justify-between">
           <button
@@ -481,6 +535,7 @@ export const AddDownloadModal: React.FC<AddDownloadModalProps> = ({
               onClick={() => handleSubmit('later')}
               disabled={isSubmitting || !url.trim()}
               className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold transition-colors"
+              data-testid="download-later-button"
             >
               Download Later
             </button>
@@ -489,6 +544,7 @@ export const AddDownloadModal: React.FC<AddDownloadModalProps> = ({
               onClick={() => handleSubmit('queue')}
               disabled={isSubmitting || !url.trim()}
               className="px-3.5 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-semibold transition-colors flex items-center gap-1.5"
+              data-testid="add-to-queue-button"
             >
               <ListOrdered className="w-3.5 h-3.5" />
               <span>Add to Queue</span>
@@ -502,6 +558,7 @@ export const AddDownloadModal: React.FC<AddDownloadModalProps> = ({
                   ? 'bg-gradient-to-r from-amber-600 to-rose-600 hover:from-amber-500 hover:to-rose-500 shadow-amber-600/30'
                   : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 shadow-blue-600/30'
               }`}
+              data-testid="download-now-button"
             >
               {isSubmitting ? (
                 <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -510,8 +567,8 @@ export const AddDownloadModal: React.FC<AddDownloadModalProps> = ({
               )}
               <span>
                 {probeResult?.safetyWarning && !probeResult.safetyWarning.isSafe
-                  ? 'Proceed Anyway'
-                  : 'Start Download'}
+                  ? 'Download Now Anyway'
+                  : 'Download Now'}
               </span>
             </button>
           </div>

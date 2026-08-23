@@ -19,7 +19,7 @@ export class SecretStore {
   private static legacyKey: Buffer | null = null;
 
   private static dataDir(): string {
-    const dir = path.join(process.env.HOME || os.homedir() || '/tmp', '.g1dm');
+    const dir = process.env.G1DM_SECRET_DIR || process.env.G1DM_DATA_DIR || path.join(process.env.HOME || os.homedir() || '/tmp', '.g1dm');
     return dir;
   }
 

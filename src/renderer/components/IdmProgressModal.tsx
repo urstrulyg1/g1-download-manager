@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import {
   X,
   Play,
@@ -31,7 +31,8 @@ export const IdmProgressModal: React.FC<IdmProgressModalProps> = ({
   onClose,
   onMinimize,
 }) => {
-  if (!item) return null;
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  const previouslyFocusedRef = useRef<HTMLElement | null>(null);
 
   const formatBytes = (bytes: number) => {
     if (bytes <= 0) return '0 B';
@@ -52,23 +53,85 @@ export const IdmProgressModal: React.FC<IdmProgressModalProps> = ({
     return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')} remaining`;
   };
 
-  const isCompleted = item.status === 'completed';
-  const isFailed = item.status === 'failed';
-  const isPaused = item.status === 'paused';
-  const isCancelled = item.status === 'cancelled';
-  const isDownloading = item.status === 'downloading';
+  const isCompleted = item?.status === 'completed';
+  const isFailed = item?.status === 'failed';
+  const isPaused = item?.status === 'paused';
+  const isCancelled = item?.status === 'cancelled';
+  const isDownloading = item?.status === 'downloading';
 
-  const phase = (item as any).phase || (isCompleted ? 'completed' : isDownloading ? 'downloading' : item.status);
+  const phase = item ? (item as any).phase || (isCompleted ? 'completed' : isDownloading ? 'downloading' : item.status) : 'idle';
   const isMerging = phase === 'merging';
   const isVerifying = phase === 'verifying';
-  const statusMessage = (item as any).statusMessage;
+  const statusMessage = item ? (item as any).statusMessage : undefined;
 
-  const metadata = (item as any).mediaMetadata || {};
-  const displayTitle = metadata.title || item.filename;
-  const qualityBadge = metadata.resolution || (item.filename.match(/(4320p|2160p|1440p|1080p|720p|480p|360p|8K|4K|2K)/i)?.[0]) || 'HD';
-  const codecBadge = metadata.codec || (item.filename.match(/(HEVC|AV1|VP9|H\.264|AVC|AAC|OPUS|MP3)/i)?.[0]) || 'Video';
-  const containerBadge = (metadata.container || item.filename.split('.').pop() || 'MP4').toUpperCase();
-  const thumbnailUrl = (item as any).thumbnailUrl;
+  const metadata = item ? (item as any).mediaMetadata || {} : {};
+  const displayTitle = metadata.title || item?.filename || '';
+  const qualityBadge = metadata.resolution || (item?.filename.match(/(4320p|2160p|1440p|1080p|720p|480p|360p|8K|4K|2K)/i)?.[0]) || 'HD';
+  const codecBadge = metadata.codec || (item?.filename.match(/(HEVC|AV1|VP9|H\.264|AVC|AAC|OPUS|MP3)/i)?.[0]) || 'Video';
+  const containerBadge = (metadata.container || item?.filename.split('.').pop() || 'MP4').toUpperCase();
+  const thumbnailUrl = item ? (item as any).thumbnailUrl : undefined;
+
+  const etaDisplay = isCompleted ? 'Done' : isPaused ? 'Paused' : item && item.speed > 0 ? formatEta(item.eta) : '—';
+  const statusLabel = isCompleted
+    ? 'Completed'
+    : isMerging
+    ? 'Multiplexing Media'
+    : isVerifying
+    ? 'Verifying Container'
+    : isPaused
+    ? 'Paused'
+    : isCancelled
+    ? 'Cancelled'
+    : isFailed
+    ? 'Failed'
+    : 'Downloading';
+
+  const focusableElements = useMemo(
+    () =>
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+    []
+  );
+
+  useEffect(() => {
+    if (!item) return;
+    previouslyFocusedRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const root = dialogRef.current;
+    root?.focus();
+    const timer = window.setTimeout(() => {
+      const first = root?.querySelector<HTMLElement>(focusableElements);
+      first?.focus();
+    }, 16);
+    return () => {
+      window.clearTimeout(timer);
+      previouslyFocusedRef.current?.focus?.();
+    };
+  }, [item, focusableElements]);
+
+  if (!item) return null;
+
+  const handleKeyDown: React.KeyboardEventHandler<HTMLDivElement> = (event) => {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      onClose();
+      return;
+    }
+
+    if (event.key !== 'Tab') return;
+    const root = dialogRef.current;
+    const focusable = root ? Array.from(root.querySelectorAll<HTMLElement>(focusableElements)).filter((el) => !el.hasAttribute('disabled')) : [];
+    if (focusable.length === 0) return;
+    const currentIndex = focusable.indexOf(document.activeElement as HTMLElement);
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+
+    if (event.shiftKey && (currentIndex <= 0 || document.activeElement === first)) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && (currentIndex === -1 || document.activeElement === last)) {
+      event.preventDefault();
+      first.focus();
+    }
+  };
 
   const handlePauseResume = () => {
     if (isDownloading) {
@@ -99,15 +162,26 @@ export const IdmProgressModal: React.FC<IdmProgressModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
-      <div className="bg-slate-900 border border-slate-700/80 rounded-2xl w-full max-w-2xl shadow-2xl shadow-blue-950/40 flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+    <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4" data-testid="idm-progress-modal-overlay">
+      <div
+        ref={dialogRef}
+        className="bg-slate-900 border border-slate-700/80 rounded-2xl w-full max-w-2xl shadow-2xl shadow-blue-950/40 flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="idm-progress-title"
+        aria-describedby="idm-progress-description"
+        data-testid="idm-progress-modal"
+        data-download-id={item.id}
+        onKeyDown={handleKeyDown}
+        tabIndex={-1}
+      >
         {/* Top Window Bar (IDM Style) */}
         <div className="px-4 py-3 border-b border-slate-800 bg-slate-950/90 flex items-center justify-between select-none">
           <div className="flex items-center gap-2">
             <div className="w-6 h-6 rounded-lg bg-gradient-to-tr from-blue-600 to-cyan-500 flex items-center justify-center text-white shadow-md shadow-blue-500/20">
               <Zap className="w-3.5 h-3.5 fill-white" />
             </div>
-            <span className="text-xs font-extrabold tracking-wide text-white uppercase">
+            <span id="idm-progress-title" className="text-xs font-extrabold tracking-wide text-white uppercase">
               {isCompleted
                 ? 'Download Complete'
                 : isMerging
@@ -127,6 +201,8 @@ export const IdmProgressModal: React.FC<IdmProgressModalProps> = ({
               <button
                 onClick={onMinimize}
                 title="Minimize dialog"
+                aria-label="Minimize progress popup"
+                data-testid="idm-minimize-button"
                 className="p-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
               >
                 <Minus className="w-3.5 h-3.5" />
@@ -135,6 +211,8 @@ export const IdmProgressModal: React.FC<IdmProgressModalProps> = ({
             <button
               onClick={onClose}
               title="Close window"
+              aria-label="Close progress popup"
+              data-testid="idm-close-button"
               className="p-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
             >
               <X className="w-3.5 h-3.5" />
@@ -144,6 +222,9 @@ export const IdmProgressModal: React.FC<IdmProgressModalProps> = ({
 
         {/* Dialog Body */}
         <div className="p-5 space-y-4">
+          <p id="idm-progress-description" className="sr-only" aria-live="polite">
+            Tracking download {item.filename} with status {statusLabel} and progress {item.progress.toFixed(1)} percent.
+          </p>
           {/* Video Metadata Header Card */}
           <div className="p-3.5 rounded-xl bg-slate-950/70 border border-slate-800/80 flex items-center gap-3.5">
             {thumbnailUrl ? (
@@ -160,7 +241,7 @@ export const IdmProgressModal: React.FC<IdmProgressModalProps> = ({
             )}
 
             <div className="min-w-0 flex-1 space-y-1">
-              <h2 className="text-sm font-bold text-white truncate" title={displayTitle}>
+              <h2 className="text-sm font-bold text-white truncate" title={displayTitle} data-testid="idm-filename">
                 {displayTitle}
               </h2>
               <div className="flex flex-wrap items-center gap-1.5 text-xs font-mono">
@@ -174,6 +255,25 @@ export const IdmProgressModal: React.FC<IdmProgressModalProps> = ({
                   {containerBadge}
                 </span>
               </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] font-mono">
+            <div className="p-2.5 rounded-xl bg-slate-950/50 border border-slate-800/80">
+              <span className="text-[10px] text-slate-500 uppercase block mb-0.5">Download ID</span>
+              <span className="font-bold text-slate-200 break-all" data-testid="idm-download-id">{item.id}</span>
+            </div>
+            <div className="p-2.5 rounded-xl bg-slate-950/50 border border-slate-800/80">
+              <span className="text-[10px] text-slate-500 uppercase block mb-0.5">Status</span>
+              <span className="font-bold text-slate-200" data-testid="idm-status">{statusLabel}</span>
+            </div>
+            <div className="p-2.5 rounded-xl bg-slate-950/50 border border-slate-800/80">
+              <span className="text-[10px] text-slate-500 uppercase block mb-0.5">Filename</span>
+              <span className="font-bold text-slate-200 break-all" data-testid="idm-filename-inline">{item.filename}</span>
+            </div>
+            <div className="p-2.5 rounded-xl bg-slate-950/50 border border-slate-800/80">
+              <span className="text-[10px] text-slate-500 uppercase block mb-0.5">File Type</span>
+              <span className="font-bold text-slate-200" data-testid="idm-file-type">{containerBadge}</span>
             </div>
           </div>
 
@@ -195,7 +295,7 @@ export const IdmProgressModal: React.FC<IdmProgressModalProps> = ({
               ) : isVerifying ? (
                 <span className="text-amber-400 font-bold animate-pulse">VERIFYING CONTAINER</span>
               ) : (
-                <span className="text-cyan-400 font-extrabold text-base">
+                <span className="text-cyan-400 font-extrabold text-base" data-testid="idm-progress-value">
                   {item.progress ? item.progress.toFixed(1) : (isCompleted ? '100.0' : '0.0')}%
                 </span>
               )}
@@ -204,7 +304,7 @@ export const IdmProgressModal: React.FC<IdmProgressModalProps> = ({
 
           {/* IDM Segmented Progress Bar */}
           <div className="w-full bg-slate-950 rounded-xl p-1 border border-slate-800 shadow-inner">
-            <div className="h-3 w-full bg-slate-900 rounded-lg overflow-hidden relative">
+            <div className="h-3 w-full bg-slate-900 rounded-lg overflow-hidden relative" role="progressbar" aria-label="Download progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.max(0, Math.min(100, item.progress || 0))}>
               <div
                 className={`h-full transition-all duration-200 rounded-lg ${
                   isCompleted
@@ -222,6 +322,7 @@ export const IdmProgressModal: React.FC<IdmProgressModalProps> = ({
                 style={{
                   width: `${Math.max(0, Math.min(100, item.progress || 0))}%`,
                 }}
+                data-testid="idm-progress-bar"
               />
             </div>
           </div>
@@ -235,11 +336,11 @@ export const IdmProgressModal: React.FC<IdmProgressModalProps> = ({
           )}
 
           {isFailed && item.error && (
-            <div className="p-3 rounded-xl bg-rose-950/40 border border-rose-500/40 text-rose-300 text-xs flex items-start gap-2.5">
+            <div className="p-3 rounded-xl bg-rose-950/40 border border-rose-500/40 text-rose-300 text-xs flex items-start gap-2.5" data-testid="idm-error-message">
               <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
               <div className="space-y-0.5">
                 <span className="font-bold text-rose-200 block">Download Error</span>
-                <span className="font-mono text-[11px]">{item.error.message}</span>
+                <span className="font-mono text-[11px]" data-testid="idm-error-text">{item.error.message}</span>
               </div>
             </div>
           )}
@@ -248,15 +349,15 @@ export const IdmProgressModal: React.FC<IdmProgressModalProps> = ({
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs font-mono">
             <div className="p-2.5 rounded-xl bg-slate-950/50 border border-slate-800/80">
               <span className="text-[10px] text-slate-500 uppercase block mb-0.5">Current Speed</span>
-              <span className="font-bold text-emerald-400 text-xs">
+              <span className="font-bold text-emerald-400 text-xs" data-testid="idm-speed">
                 {item.speed > 0 ? `↓ ${formatBytes(item.speed)}/s` : '0 B/s'}
               </span>
             </div>
 
             <div className="p-2.5 rounded-xl bg-slate-950/50 border border-slate-800/80">
               <span className="text-[10px] text-slate-500 uppercase block mb-0.5">Time Remaining</span>
-              <span className="font-bold text-slate-200 text-xs">
-                {isCompleted ? 'Done' : item.speed > 0 ? formatEta(item.eta) : 'Paused'}
+              <span className="font-bold text-slate-200 text-xs" data-testid="idm-eta">
+                {etaDisplay}
               </span>
             </div>
 
@@ -269,14 +370,14 @@ export const IdmProgressModal: React.FC<IdmProgressModalProps> = ({
 
             <div className="p-2.5 rounded-xl bg-slate-950/50 border border-slate-800/80">
               <span className="text-[10px] text-slate-500 uppercase block mb-0.5">Average Speed</span>
-              <span className="font-bold text-slate-300 text-xs">
+              <span className="font-bold text-slate-300 text-xs" data-testid="idm-average-speed">
                 {item.avgSpeed > 0 ? `${formatBytes(item.avgSpeed)}/s` : '—'}
               </span>
             </div>
           </div>
 
           {/* Destination Path */}
-          <div className="p-2.5 rounded-xl bg-slate-950/40 border border-slate-800/60 flex items-center gap-2 text-xs font-mono text-slate-400 truncate">
+          <div className="p-2.5 rounded-xl bg-slate-950/40 border border-slate-800/60 flex items-center gap-2 text-xs font-mono text-slate-400 truncate" data-testid="idm-destination">
             <HardDrive className="w-3.5 h-3.5 text-slate-500 shrink-0" />
             <span className="truncate" title={item.finalPath}>
               {item.finalPath}
@@ -292,6 +393,7 @@ export const IdmProgressModal: React.FC<IdmProgressModalProps> = ({
                 <button
                   onClick={handleOpenFile}
                   className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold shadow-lg shadow-emerald-600/30 flex items-center gap-1.5"
+                  data-testid="idm-open-file-button"
                 >
                   <CheckCircle2 className="w-3.5 h-3.5" />
                   <span>Open File</span>
@@ -300,6 +402,7 @@ export const IdmProgressModal: React.FC<IdmProgressModalProps> = ({
                 <button
                   onClick={handleOpenFolder}
                   className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5"
+                  data-testid="idm-open-folder-button"
                 >
                   <FolderOpen className="w-3.5 h-3.5" />
                   <span>Open Folder</span>
@@ -311,6 +414,7 @@ export const IdmProgressModal: React.FC<IdmProgressModalProps> = ({
               <button
                 onClick={handleRetry}
                 className="px-4 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white text-xs font-bold shadow-lg shadow-blue-600/30 flex items-center gap-1.5"
+                data-testid="idm-retry-button"
               >
                 <RotateCcw className="w-3.5 h-3.5" />
                 <span>Retry Download</span>
@@ -325,6 +429,7 @@ export const IdmProgressModal: React.FC<IdmProgressModalProps> = ({
                     ? 'bg-amber-600 hover:bg-amber-500 shadow-amber-600/30'
                     : 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-600/30'
                 }`}
+                              data-testid={isDownloading ? 'idm-pause-button' : 'idm-resume-button'}
               >
                 {isDownloading ? (
                   <>
@@ -346,6 +451,7 @@ export const IdmProgressModal: React.FC<IdmProgressModalProps> = ({
               <button
                 onClick={handleCancel}
                 className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-rose-900/60 hover:text-rose-200 text-slate-300 text-xs font-semibold transition-colors"
+                data-testid="idm-cancel-button"
               >
                 Cancel
               </button>
@@ -354,6 +460,7 @@ export const IdmProgressModal: React.FC<IdmProgressModalProps> = ({
             <button
               onClick={onClose}
               className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold"
+              data-testid="idm-hide-button"
             >
               {isCompleted ? 'Close' : 'Hide'}
             </button>

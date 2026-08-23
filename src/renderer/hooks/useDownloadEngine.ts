@@ -161,7 +161,22 @@ export function useDownloadEngine() {
               playChime('error');
               break;
             }
-            case 'metrics_updated': {
+            case 'item_error': {
+              const failedItem = data?.item;
+              if (failedItem) {
+                setDownloads((prev) => {
+                  const idx = prev.findIndex((d) => d.id === failedItem.id);
+                  if (idx === -1) return [failedItem, ...prev];
+                  const copy = [...prev];
+                  copy[idx] = failedItem;
+                  return copy;
+                });
+              }
+              playChime('error');
+              break;
+            }
+            case 'metrics_updated':
+            case 'metrics_tick': {
               setMetrics(data);
               break;
             }
@@ -179,7 +194,8 @@ export function useDownloadEngine() {
               });
               break;
             }
-            case 'grabber_updated': {
+            case 'grabber_updated':
+            case 'grabber_project_updated': {
               setGrabberProjects((prev) => {
                 const idx = prev.findIndex((p) => p.id === data.id);
                 if (idx === -1) return [data, ...prev];

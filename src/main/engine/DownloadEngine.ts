@@ -313,7 +313,7 @@ export class DownloadEngine extends EventEmitter {
       speedLimitBytesPerSec: params.speedLimitBytesPerSec || 0,
       error: null,
       retryCount: 0,
-      maxRetries: settings.downloads.maxRetries || 5,
+      maxRetries: settings.downloads.maxRetries ?? 5,
       createdAt: Date.now(),
       durationMs: 0,
       securityScan: { status: 'unsupported' },

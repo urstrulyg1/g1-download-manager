@@ -16,12 +16,25 @@ export class AppDatabase {
   private dbPath: string;
   private isDirty = false;
   private saveTimer: NodeJS.Timeout | null = null;
+
+  private static resolveHomeDir(): string {
+    return process.env.G1DM_HOME || process.env.HOME || '/home/user';
+  }
+
+  private static resolveDataDir(): string {
+    return process.env.G1DM_DATA_DIR || path.join(AppDatabase.resolveHomeDir(), '.g1dm');
+  }
+
+  private static resolveDefaultDownloadDir(): string {
+    return process.env.G1DM_DOWNLOAD_DIR || path.join(AppDatabase.resolveHomeDir(), 'Downloads');
+  }
+
   private readonly defaultSettings: AppSettings = {
     general: {
       theme: 'dark',
       accentColor: '#3b82f6',
       language: 'en',
-      defaultDownloadDir: path.join(process.env.HOME || '/home/user', 'Downloads'),
+      defaultDownloadDir: AppDatabase.resolveDefaultDownloadDir(),
       playSounds: true,
       desktopNotifications: true,
       startOnBoot: false,
@@ -98,13 +111,14 @@ export class AppDatabase {
   };
 
   constructor(customPath?: string) {
-    const dataDir = customPath
-      ? path.dirname(customPath)
-      : path.join(process.env.HOME || '/home/user', '.g1dm');
+    const configuredDbPath = customPath || process.env.G1DM_DB_PATH;
+    const dataDir = configuredDbPath
+      ? path.dirname(configuredDbPath)
+      : AppDatabase.resolveDataDir();
     if (!fs.existsSync(dataDir)) {
       fs.mkdirSync(dataDir, { recursive: true });
     }
-    this.dbPath = customPath || path.join(dataDir, 'g1dm.db');
+    this.dbPath = configuredDbPath || path.join(dataDir, 'g1dm.db');
   }
 
   public async init(): Promise<void> {
@@ -952,6 +966,7 @@ export class AppDatabase {
     try {
       const data = this.db.export();
       const tempPath = `${this.dbPath}.tmp.${Date.now()}`;
+      fs.mkdirSync(path.dirname(this.dbPath), { recursive: true });
       fs.writeFileSync(tempPath, Buffer.from(data));
       fs.renameSync(tempPath, this.dbPath);
       this.isDirty = false;
