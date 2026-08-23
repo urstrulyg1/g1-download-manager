@@ -214,9 +214,70 @@
     return isDefault ? `~${formatted} (10m)` : `~${formatted}`;
   }
 
+  function detectMaxAvailableResolution(video) {
+    let maxH = 0;
+
+    // 1. Check YouTube Player API quality levels
+    try {
+      const ytPlayer = document.getElementById('movie_player') || document.querySelector('.html5-video-player');
+      if (ytPlayer && typeof ytPlayer.getAvailableQualityLevels === 'function') {
+        const levels = ytPlayer.getAvailableQualityLevels();
+        if (Array.isArray(levels) && levels.length > 0) {
+          for (const lvl of levels) {
+            let h = 0;
+            if (lvl === 'hd4320' || lvl === 'highres') h = 4320;
+            else if (lvl === 'hd2880') h = 2880;
+            else if (lvl === 'hd2160') h = 2160;
+            else if (lvl === 'hd1440') h = 1440;
+            else if (lvl === 'hd1080') h = 1080;
+            else if (lvl === 'hd720') h = 720;
+            else if (lvl === 'large' || lvl === '480p') h = 480;
+            else if (lvl === 'medium' || lvl === '360p') h = 360;
+            else if (lvl === 'small' || lvl === '240p') h = 240;
+            else if (lvl === 'tiny' || lvl === '144p') h = 144;
+            if (h > maxH) maxH = h;
+          }
+        }
+      }
+    } catch {}
+
+    // 2. Check YouTube page streamingData adaptiveFormats
+    if (!maxH) {
+      try {
+        const pr = window.ytInitialPlayerResponse || (window.ytplayer && window.ytplayer.config && window.ytplayer.config.args && JSON.parse(window.ytplayer.config.args.player_response));
+        if (pr && pr.streamingData && Array.isArray(pr.streamingData.adaptiveFormats)) {
+          for (const f of pr.streamingData.adaptiveFormats) {
+            if (f.height && typeof f.height === 'number' && f.height > maxH) {
+              maxH = f.height;
+            }
+          }
+        }
+      } catch {}
+    }
+
+    // 3. Check HTML5 Video element dimensions
+    if (video) {
+      if (video.videoHeight && video.videoHeight > maxH) {
+        maxH = video.videoHeight;
+      }
+    }
+
+    // 4. Sniffed stream URLs
+    for (const u of detectedMediaUrls) {
+      const m = u.match(/(4320|2160|1440|1080|720|480|360)p?/i);
+      if (m && m[1]) {
+        const val = parseInt(m[1], 10);
+        if (val > maxH) maxH = val;
+      }
+    }
+
+    return maxH || (video && video.videoHeight ? video.videoHeight : 1080);
+  }
+
   function buildAllCombinations(video, filter) {
-    const vWidth = video.videoWidth || 1920;
-    const vHeight = video.videoHeight || 1080;
+    const maxAvailableHeight = detectMaxAvailableResolution(video);
+    const vWidth = video.videoWidth || Math.round(maxAvailableHeight * (16 / 9));
+    const vHeight = video.videoHeight || maxAvailableHeight;
     const durationSec = video.duration;
     const isStreamSite = /youtube\.com|youtu\.be|googlevideo\.com|vimeo\.com|twitch\.tv|twitter\.com|x\.com|tiktok\.com|instagram\.com|facebook\.com|dailymotion\.com|reddit\.com|bilibili\.com|rumble\.com|bitchute\.com|odysee\.com/i.test(window.location.hostname);
     const bestSrc = getBestMediaSource(video);
@@ -251,8 +312,13 @@
       }
     }
 
-    // 2. Video Resolution & Container & Codec Combinations (Show all tiers up to 8K / 4K / HD)
+    // 2. Video Resolution & Container & Codec Combinations (Capped at true max available resolution)
     for (const res of RESOLUTION_TIERS) {
+      // Exclude tiers higher than the video's true available maximum resolution
+      if (res.height > maxAvailableHeight) {
+        continue;
+      }
+
       const calcWidth = Math.round(res.height * (16 / 9));
       const isCurrentPlayback = (vHeight >= res.height * 0.9 && vHeight <= res.height * 1.1) || (res.height === 1080 && vHeight <= 1080 && vHeight > 720);
 
@@ -395,8 +461,8 @@
     function updateResBadge() {
       const badgeEl = pill.querySelector('.g1dm-res-badge');
       if (!badgeEl) return;
-      const h = video.videoHeight || 1080;
-      const resStr = h >= 3600 ? '8K' : h >= 2160 ? '4K' : h >= 1440 ? '2K' : h >= 1080 ? '1080p' : h >= 720 ? '720p' : `${h}p`;
+      const h = detectMaxAvailableResolution(video);
+      const resStr = h >= 3600 ? '8K' : h >= 2000 ? '4K' : h >= 1400 ? '2K' : h >= 1000 ? '1080p' : h >= 700 ? '720p' : `${h}p`;
       badgeEl.innerText = `${resStr} • ${activeFilter}`;
     }
 
