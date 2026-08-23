@@ -214,64 +214,85 @@
     return isDefault ? `~${formatted} (10m)` : `~${formatted}`;
   }
 
-  function detectMaxAvailableResolution(video) {
-    let maxH = 0;
-
-    // 1. Check YouTube Player API quality levels
+  // ── Main World Bridge (Reads YouTube/Site Player APIs directly) ───────────
+  function injectMainWorldBridge() {
+    if (document.getElementById('g1dm-main-bridge')) return;
     try {
-      const ytPlayer = document.getElementById('movie_player') || document.querySelector('.html5-video-player');
-      if (ytPlayer && typeof ytPlayer.getAvailableQualityLevels === 'function') {
-        const levels = ytPlayer.getAvailableQualityLevels();
-        if (Array.isArray(levels) && levels.length > 0) {
-          for (const lvl of levels) {
-            let h = 0;
-            if (lvl === 'hd4320' || lvl === 'highres') h = 4320;
-            else if (lvl === 'hd2880') h = 2880;
-            else if (lvl === 'hd2160') h = 2160;
-            else if (lvl === 'hd1440') h = 1440;
-            else if (lvl === 'hd1080') h = 1080;
-            else if (lvl === 'hd720') h = 720;
-            else if (lvl === 'large' || lvl === '480p') h = 480;
-            else if (lvl === 'medium' || lvl === '360p') h = 360;
-            else if (lvl === 'small' || lvl === '240p') h = 240;
-            else if (lvl === 'tiny' || lvl === '144p') h = 144;
-            if (h > maxH) maxH = h;
+      const script = document.createElement('script');
+      script.id = 'g1dm-main-bridge';
+      script.textContent = `
+        (function() {
+          function syncQualities() {
+            try {
+              let maxH = 0;
+              const ytPlayer = document.getElementById('movie_player') || document.querySelector('.html5-video-player');
+              if (ytPlayer && typeof ytPlayer.getAvailableQualityLevels === 'function') {
+                const levels = ytPlayer.getAvailableQualityLevels();
+                if (Array.isArray(levels) && levels.length > 0) {
+                  for (const lvl of levels) {
+                    let h = 0;
+                    if (lvl === 'hd4320' || lvl === 'highres') h = 4320;
+                    else if (lvl === 'hd2880') h = 2880;
+                    else if (lvl === 'hd2160') h = 2160;
+                    else if (lvl === 'hd1440') h = 1440;
+                    else if (lvl === 'hd1080') h = 1080;
+                    else if (lvl === 'hd720') h = 720;
+                    else if (lvl === 'large' || lvl === '480p') h = 480;
+                    else if (lvl === 'medium' || lvl === '360p') h = 360;
+                    else if (lvl === 'small' || lvl === '240p') h = 240;
+                    else if (lvl === 'tiny' || lvl === '144p') h = 144;
+                    if (h > maxH) maxH = h;
+                  }
+                }
+              }
+              if (!maxH && window.ytInitialPlayerResponse && window.ytInitialPlayerResponse.streamingData) {
+                const formats = window.ytInitialPlayerResponse.streamingData.adaptiveFormats || [];
+                for (const f of formats) {
+                  if (f.height && typeof f.height === 'number' && f.height > maxH) {
+                    maxH = f.height;
+                  }
+                }
+              }
+              if (maxH > 0) {
+                document.documentElement.setAttribute('data-g1dm-max-height', String(maxH));
+              }
+            } catch (e) {}
           }
-        }
-      }
-    } catch {}
+          syncQualities();
+          setInterval(syncQualities, 1500);
+          window.addEventListener('load', syncQualities);
+        })();
+      `;
+      (document.head || document.documentElement).appendChild(script);
+    } catch (e) {}
+  }
 
-    // 2. Check YouTube page streamingData adaptiveFormats
-    if (!maxH) {
-      try {
-        const pr = window.ytInitialPlayerResponse || (window.ytplayer && window.ytplayer.config && window.ytplayer.config.args && JSON.parse(window.ytplayer.config.args.player_response));
-        if (pr && pr.streamingData && Array.isArray(pr.streamingData.adaptiveFormats)) {
-          for (const f of pr.streamingData.adaptiveFormats) {
-            if (f.height && typeof f.height === 'number' && f.height > maxH) {
-              maxH = f.height;
-            }
-          }
-        }
-      } catch {}
+  function detectMaxAvailableResolution(video) {
+    // 1. Read from main-world DOM bridge (populated from YouTube player API)
+    const domMax = document.documentElement.getAttribute('data-g1dm-max-height');
+    if (domMax) {
+      const parsed = parseInt(domMax, 10);
+      if (parsed > 0) return parsed;
     }
 
-    // 3. Check HTML5 Video element dimensions
-    if (video) {
-      if (video.videoHeight && video.videoHeight > maxH) {
-        maxH = video.videoHeight;
-      }
+    // 2. Read HTML5 video element decoded height
+    if (video && video.videoHeight && video.videoHeight > 0) {
+      return video.videoHeight;
     }
 
-    // 4. Sniffed stream URLs
+    // 3. Sniffed manifest / stream URLs with explicit resolution pattern
+    let sniffedMax = 0;
     for (const u of detectedMediaUrls) {
-      const m = u.match(/(4320|2160|1440|1080|720|480|360)p?/i);
+      const m = u.match(/[/_-](\d{3,4})p[._/-]/i);
       if (m && m[1]) {
         const val = parseInt(m[1], 10);
-        if (val > maxH) maxH = val;
+        if (val >= 144 && val <= 4320 && val > sniffedMax) sniffedMax = val;
       }
     }
+    if (sniffedMax > 0) return sniffedMax;
 
-    return maxH || (video && video.videoHeight ? video.videoHeight : 1080);
+    // 4. Default fallback: 1080p
+    return 1080;
   }
 
   function buildAllCombinations(video, filter) {
@@ -1120,14 +1141,19 @@
   document.head?.appendChild(styleEl);
 
   // Initialize
+  injectMainWorldBridge();
   scanForVideos();
   snifferMediaRequests();
 
   // Polling sniffer and mutation observer
-  const observer = new MutationObserver(() => scanForVideos());
+  const observer = new MutationObserver(() => {
+    injectMainWorldBridge();
+    scanForVideos();
+  });
   observer.observe(document.documentElement || document.body, { childList: true, subtree: true });
 
   setInterval(() => {
+    injectMainWorldBridge();
     snifferMediaRequests();
     scanForVideos();
   }, 2000);
