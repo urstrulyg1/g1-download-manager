@@ -18,8 +18,30 @@
     <span>Automatic Interception</span>
     <input type="checkbox" id="interceptToggle" checked>
   </div>
+  <button id="downloadCurrentBtn" style="background: linear-gradient(135deg, #10b981, #059669); margin-bottom: 8px;">⚡ Download Current Video / Page</button>
   <button id="openApp">Open Download Manager</button>
   <script>
+    document.getElementById('downloadCurrentBtn')?.addEventListener('click', async () => {
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (tab && tab.id) {
+        chrome.tabs.sendMessage(
+          tab.id,
+          {
+            type: 'SHOW_DOWNLOAD_MODAL',
+            url: tab.url,
+            filename: tab.title ? `${tab.title}.mp4` : 'download.mp4',
+            category: 'video'
+          },
+          (res) => {
+            if (chrome.runtime.lastError || !res?.success) {
+              chrome.tabs.create({ url: `http://127.0.0.1:8055/#add?url=${encodeURIComponent(tab.url)}` });
+            }
+          }
+        );
+        window.close();
+      }
+    });
+
     document.getElementById('openApp').addEventListener('click', () => {
       chrome.tabs.create({ url: 'http://127.0.0.1:8055' });
     });

@@ -3,6 +3,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const currentSpeed = document.getElementById('currentSpeed');
   const interceptToggle = document.getElementById('interceptToggle');
   const openAppBtn = document.getElementById('openAppBtn');
+  const downloadCurrentBtn = document.getElementById('downloadCurrentBtn');
 
   // Load saved interception state
   chrome.storage.local.get(['interceptionEnabled'], (data) => {
@@ -14,6 +15,29 @@ document.addEventListener('DOMContentLoaded', async () => {
   interceptToggle.addEventListener('change', () => {
     chrome.storage.local.set({ interceptionEnabled: interceptToggle.checked });
   });
+
+  if (downloadCurrentBtn) {
+    downloadCurrentBtn.addEventListener('click', async () => {
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (tab && tab.id) {
+        chrome.tabs.sendMessage(
+          tab.id,
+          {
+            type: 'SHOW_DOWNLOAD_MODAL',
+            url: tab.url,
+            filename: tab.title ? `${tab.title}.mp4` : 'download.mp4',
+            category: 'video'
+          },
+          (res) => {
+            if (chrome.runtime.lastError || !res?.success) {
+              chrome.tabs.create({ url: `http://127.0.0.1:8055/#add?url=${encodeURIComponent(tab.url)}` });
+            }
+          }
+        );
+        window.close();
+      }
+    });
+  }
 
   openAppBtn.addEventListener('click', () => {
     chrome.tabs.create({ url: 'http://127.0.0.1:8055' });

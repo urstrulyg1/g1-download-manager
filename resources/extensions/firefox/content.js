@@ -978,7 +978,7 @@
     `;
 
     root.appendChild(dialog);
-    document.body.appendChild(root);
+    (document.fullscreenElement || document.body || document.documentElement).appendChild(root);
 
     // Elements
     const urlInput = dialog.querySelector('#g1dm-input-url');
