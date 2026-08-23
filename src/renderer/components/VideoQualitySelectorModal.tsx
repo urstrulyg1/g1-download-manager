@@ -52,6 +52,7 @@ export const VideoQualitySelectorModal: React.FC<VideoQualitySelectorModalProps>
     'RECOMMENDED' | 'HIGHEST_QUALITY' | 'LOWEST_QUALITY' | 'BEST_BITRATE' | 'SMALLEST_FILE'
   >('RECOMMENDED');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const sortedQualities = VideoResolutionEngine.sortQualities(
     analysis.availableVideoQualities,
@@ -64,6 +65,7 @@ export const VideoQualitySelectorModal: React.FC<VideoQualitySelectorModalProps>
   const handleStartDownload = async (action: 'now' | 'later' | 'queue') => {
     if (!selectedQuality) return;
 
+    setSubmitError(null);
     setIsSubmitting(true);
     try {
       const sanitizedTitle = (analysis.title || 'video')
@@ -88,7 +90,7 @@ export const VideoQualitySelectorModal: React.FC<VideoQualitySelectorModalProps>
         startImmediately: action === 'now',
       });
 
-      if (onDownloadStarted && item) {
+      if (onDownloadStarted && item && action === 'now') {
         onDownloadStarted(item);
       }
       if (onDownloadEnqueued) {
@@ -96,7 +98,7 @@ export const VideoQualitySelectorModal: React.FC<VideoQualitySelectorModalProps>
       }
       onClose();
     } catch (err: any) {
-      alert(`Download error: ${err.message}`);
+      setSubmitError(err?.message || 'Unable to create download.');
     } finally {
       setIsSubmitting(false);
     }
@@ -264,6 +266,12 @@ export const VideoQualitySelectorModal: React.FC<VideoQualitySelectorModalProps>
           )}
         </div>
 
+        {submitError && (
+          <div className="mx-5 mb-0 p-3 rounded-xl bg-rose-950/40 border border-rose-500/40 text-rose-200 text-xs" data-testid="quality-download-error">
+            {submitError}
+          </div>
+        )}
+
         {/* Footer Actions */}
         <div className="p-4 border-t border-slate-800 bg-slate-950/80 flex items-center justify-between">
           <button
@@ -279,7 +287,7 @@ export const VideoQualitySelectorModal: React.FC<VideoQualitySelectorModalProps>
               disabled={isSubmitting || !selectedQuality || analysis.isProtected}
               className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold"
             >
-              Download Later
+              Start Later
             </button>
 
             <button
@@ -297,7 +305,7 @@ export const VideoQualitySelectorModal: React.FC<VideoQualitySelectorModalProps>
               className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white text-xs font-bold shadow-lg shadow-amber-600/30 flex items-center gap-1.5"
             >
               {isSubmitting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
-              <span>Download ({selectedQuality?.resolutionLabel || 'Selected'})</span>
+              <span>Download Now ({selectedQuality?.resolutionLabel || 'Selected'})</span>
             </button>
           </div>
         </div>

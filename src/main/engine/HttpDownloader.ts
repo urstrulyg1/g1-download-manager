@@ -172,6 +172,30 @@ export class HttpDownloader extends EventEmitter {
 
     if (this.isAllSegmentsComplete() && !this.isPaused && !this.isCancelled) {
       this.finalizeCompletion();
+      return;
+    }
+
+    if (!this.isPaused && !this.isCancelled) {
+      const hasInFlightWork =
+        this.activeSockets.size > 0 ||
+        this.item.segments.some((segment) => segment.status === 'pending' || segment.status === 'downloading');
+
+      if (hasInFlightWork) {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        await this.runSegmentEngine();
+        return;
+      }
+
+      const failedSegment = this.item.segments.find((segment) => segment.status === 'failed');
+      if (failedSegment) {
+        this.handleDownloadError(new Error(failedSegment.error || `Segment ${failedSegment.id} failed`));
+        return;
+      }
+
+      const incompleteSegment = this.item.segments.find((segment) => segment.status !== 'completed');
+      if (incompleteSegment) {
+        this.handleDownloadError(new Error(`Segment ${incompleteSegment.id} did not complete successfully.`));
+      }
     }
   }
 

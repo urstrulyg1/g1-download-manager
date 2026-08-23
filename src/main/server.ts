@@ -220,6 +220,14 @@ export async function createUnifiedServer(port: number = 8055) {
   // Local / private addresses are allowed for actual downloads (NAS, dev
   // servers), but NOT for server-side content proxies.
   const assertPublicUrl = async (url: string) => {
+    if (process.env.G1DM_E2E === '1') {
+      try {
+        const parsed = new URL(url);
+        if (['127.0.0.1', 'localhost', '::1'].includes(parsed.hostname)) {
+          return;
+        }
+      } catch {}
+    }
     await UrlGuard.assertSafePublicUrl(url);
   };
 
@@ -1142,6 +1150,68 @@ export async function createUnifiedServer(port: number = 8055) {
     const result = clipboardMonitor.checkClipboardText(text);
     res.json(result);
   });
+
+  if (process.env.G1DM_E2E === '1') {
+    app.post('/api/test/reset', async (req, res) => {
+      try {
+        engine.pauseAll();
+
+        for (const item of [...engine.getAllDownloads()]) {
+          engine.deleteDownload(item.id, true);
+        }
+
+        const settings = db.getSettings();
+        settings.downloads.maxRetries = typeof req.body?.maxRetries === 'number' ? req.body.maxRetries : 5;
+        settings.downloads.globalSpeedLimitBytesPerSec = 0;
+        db.saveSettings(settings);
+
+        const roots = new Set<string>([settings.general.defaultDownloadDir]);
+        for (const category of db.getCategories()) {
+          if (category.defaultDestination) roots.add(category.defaultDestination);
+        }
+        for (const queue of db.getQueues()) {
+          if (queue.destinationDir) roots.add(queue.destinationDir);
+        }
+
+        for (const root of roots) {
+          if (!root) continue;
+          try {
+            fs.rmSync(root, { recursive: true, force: true });
+          } catch {}
+          fs.mkdirSync(root, { recursive: true });
+        }
+
+        db.clearHistory();
+        db.flush();
+
+        res.json({
+          success: true,
+          downloads: engine.getAllDownloads().length,
+          downloadDir: settings.general.defaultDownloadDir,
+        });
+      } catch (err: any) {
+        res.status(500).json({ error: err.message });
+      }
+    });
+
+    app.get('/api/test/state', (req, res) => {
+      res.json({
+        downloads: engine.getAllDownloads(),
+        settings: db.getSettings(),
+        history: db.getHistory(),
+        wsClients: clients.size,
+      });
+    });
+
+    app.post('/api/test/ws/disconnect', (req, res) => {
+      for (const ws of [...clients]) {
+        try {
+          ws.close(4000, 'E2E forced disconnect');
+        } catch {}
+      }
+      res.json({ success: true });
+    });
+  }
 
   // Export / Import State
   app.get('/api/export', (req, res) => {

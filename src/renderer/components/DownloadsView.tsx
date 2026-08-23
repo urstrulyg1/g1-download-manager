@@ -298,7 +298,7 @@ export const DownloadsView: React.FC<DownloadsViewProps> = ({
             <tbody className="divide-y divide-slate-800/60 text-xs">
               {filteredDownloads.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="text-center py-16 text-slate-500">
+                  <td colSpan={7} className="text-center py-16 text-slate-500" data-testid="downloads-empty-state">
                     No matching downloads found.
                   </td>
                 </tr>
@@ -308,6 +308,8 @@ export const DownloadsView: React.FC<DownloadsViewProps> = ({
                   return (
                     <tr
                       key={item.id}
+                      data-testid={`download-row-${item.id}`}
+                      data-download-id={item.id}
                       onClick={() => onSelectDownload(item)}
                       onDoubleClick={() => {
                         if (onOpenIdmProgress) {
@@ -363,13 +365,19 @@ export const DownloadsView: React.FC<DownloadsViewProps> = ({
                               <span className="text-[11px]">Failed</span>
                             </div>
                           )}
+                          {item.status === 'cancelled' && (
+                            <div className="flex items-center gap-1.5 text-slate-400 font-semibold">
+                              <XCircle className="w-4 h-4" />
+                              <span className="text-[11px]">Cancelled</span>
+                            </div>
+                          )}
                         </div>
                       </td>
 
                       {/* File Name & Domain */}
                       <td className="p-3 max-w-xs">
                         <div className="font-semibold text-slate-200 truncate group-hover:text-blue-400 flex items-center gap-1.5">
-                          <span className="truncate">{item.filename}</span>
+                          <span className="truncate" data-testid={`download-filename-${item.id}`}>{item.filename}</span>
                           {item.safetyWarning && !item.safetyWarning.isSafe && (
                             <span
                               className="px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300 font-mono text-[10px] font-bold flex items-center gap-1 flex-shrink-0"
@@ -534,6 +542,7 @@ export const DownloadsView: React.FC<DownloadsViewProps> = ({
                               className="p-1.5 rounded-lg bg-slate-800 hover:bg-cyan-950 text-cyan-400 hover:text-cyan-300 border border-cyan-500/30 active:scale-95 transition-all shadow-sm"
                               title="Open IDM-Style Live Progress Dialogue Box"
                               aria-label="Open IDM Progress Dialogue"
+                              data-testid={`open-idm-progress-${item.id}`}
                             >
                               <Zap className="w-3.5 h-3.5 fill-cyan-400" />
                             </button>
