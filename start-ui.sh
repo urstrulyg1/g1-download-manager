@@ -147,19 +147,19 @@ if [[ "$(uname -s)" == "Darwin" ]]; then
     if [ -d "/Applications/Google Chrome.app" ]; then
         _add_browser \
             "Google Chrome  +  G1DM Extension" \
-            "'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' --load-extension='${CHROME_EXT_DIR}' --new-window" \
+            "'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' --load-extension='${CHROME_EXT_DIR}'" \
             "ext"
     fi
     if [ -d "/Applications/Brave Browser.app" ]; then
         _add_browser \
             "Brave Browser  +  G1DM Extension" \
-            "'/Applications/Brave Browser.app/Contents/MacOS/Brave Browser' --load-extension='${CHROME_EXT_DIR}' --new-window" \
+            "'/Applications/Brave Browser.app/Contents/MacOS/Brave Browser' --load-extension='${CHROME_EXT_DIR}'" \
             "ext"
     fi
     if [ -d "/Applications/Microsoft Edge.app" ]; then
         _add_browser \
             "Microsoft Edge  +  G1DM Extension" \
-            "'/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge' --load-extension='${CHROME_EXT_DIR}' --new-window" \
+            "'/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge' --load-extension='${CHROME_EXT_DIR}'" \
             "ext"
     fi
     if [ -d "/Applications/Firefox.app" ]; then
@@ -175,7 +175,7 @@ else
         if command -v "$_bin" >/dev/null 2>&1; then
             _add_browser \
                 "Google Chrome / Chromium  +  G1DM Extension" \
-                "${_bin} --load-extension='${CHROME_EXT_DIR}' --new-window" \
+                "${_bin} --load-extension='${CHROME_EXT_DIR}'" \
                 "ext"
             break
         fi
@@ -183,14 +183,14 @@ else
     if command -v brave-browser >/dev/null 2>&1; then
         _add_browser \
             "Brave Browser  +  G1DM Extension" \
-            "brave-browser --load-extension='${CHROME_EXT_DIR}' --new-window" \
+            "brave-browser --load-extension='${CHROME_EXT_DIR}'" \
             "ext"
     fi
     if command -v microsoft-edge >/dev/null 2>&1 || command -v microsoft-edge-stable >/dev/null 2>&1; then
         _EDGE_BIN=$(command -v microsoft-edge-stable 2>/dev/null || command -v microsoft-edge)
         _add_browser \
             "Microsoft Edge  +  G1DM Extension" \
-            "${_EDGE_BIN} --load-extension='${CHROME_EXT_DIR}' --new-window" \
+            "${_EDGE_BIN} --load-extension='${CHROME_EXT_DIR}'" \
             "ext"
     fi
     if command -v firefox >/dev/null 2>&1; then

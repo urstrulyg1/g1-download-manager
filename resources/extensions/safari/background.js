@@ -41,6 +41,19 @@ chrome.runtime.onInstalled.addListener(() => {
   });
 });
 
+function openOrFocusG1DMTab(url) {
+  chrome.tabs.query({ url: `http://127.0.0.1:${G1DM_PORT}/*` }, (tabs) => {
+    if (tabs && tabs.length > 0) {
+      chrome.tabs.update(tabs[0].id, { url, active: true });
+      if (tabs[0].windowId) {
+        chrome.windows.update(tabs[0].windowId, { focused: true });
+      }
+    } else {
+      chrome.tabs.create({ url });
+    }
+  });
+}
+
 // Context menu click listener
 chrome.contextMenus.onClicked.addListener((info, tab) => {
   if (info.menuItemId === 'g1dm-download-link') {
@@ -50,10 +63,10 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
     }
   } else if (info.menuItemId === 'g1dm-download-page-links') {
     if (tab && tab.url) {
-      chrome.tabs.create({ url: `http://127.0.0.1:${G1DM_PORT}/#batch?url=${encodeURIComponent(tab.url)}` });
+      openOrFocusG1DMTab(`http://127.0.0.1:${G1DM_PORT}/#batch?url=${encodeURIComponent(tab.url)}`);
     }
   } else if (info.menuItemId === 'g1dm-open-manager') {
-    chrome.tabs.create({ url: `http://127.0.0.1:${G1DM_PORT}` });
+    openOrFocusG1DMTab(`http://127.0.0.1:${G1DM_PORT}`);
   }
 });
 
@@ -100,7 +113,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     sendResponse({ success: true });
   } else if (message.type === 'OPEN_G1DM_STUDIO') {
     const target = message.url ? `http://127.0.0.1:${G1DM_PORT}/#media?url=${encodeURIComponent(message.url)}` : `http://127.0.0.1:${G1DM_PORT}/#media`;
-    chrome.tabs.create({ url: target });
+    openOrFocusG1DMTab(target);
     sendResponse({ success: true });
   } else if (message.type === 'TEST_CONNECTION') {
     testG1DMConnection().then(sendResponse);

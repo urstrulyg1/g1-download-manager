@@ -174,7 +174,7 @@ if defined CHROME_EXE (
     set /a BROWSER_COUNT+=1
     set "BROWSER_NAME_!BROWSER_COUNT!=Google Chrome  +  G1DM Extension"
     set "BROWSER_TAG_!BROWSER_COUNT!=ext"
-    set "BROWSER_CMD_!BROWSER_COUNT!="!CHROME_EXE!" --load-extension="!CHROME_EXT_DIR!" --new-window"
+    set "BROWSER_CMD_!BROWSER_COUNT!="!CHROME_EXE!" --load-extension="!CHROME_EXT_DIR!""
 )
 
 REM ── Probe real Edge binary ────────────────────────────────────────────────
@@ -188,7 +188,7 @@ if defined EDGE_EXE (
     set /a BROWSER_COUNT+=1
     set "BROWSER_NAME_!BROWSER_COUNT!=Microsoft Edge  +  G1DM Extension"
     set "BROWSER_TAG_!BROWSER_COUNT!=ext"
-    set "BROWSER_CMD_!BROWSER_COUNT!="!EDGE_EXE!" --load-extension="!CHROME_EXT_DIR!" --new-window"
+    set "BROWSER_CMD_!BROWSER_COUNT!="!EDGE_EXE!" --load-extension="!CHROME_EXT_DIR!""
 )
 
 REM ── Probe real Brave binary ───────────────────────────────────────────────
@@ -204,7 +204,7 @@ if defined BRAVE_EXE (
     set /a BROWSER_COUNT+=1
     set "BROWSER_NAME_!BROWSER_COUNT!=Brave Browser  +  G1DM Extension"
     set "BROWSER_TAG_!BROWSER_COUNT!=ext"
-    set "BROWSER_CMD_!BROWSER_COUNT!="!BRAVE_EXE!" --load-extension="!CHROME_EXT_DIR!" --new-window"
+    set "BROWSER_CMD_!BROWSER_COUNT!="!BRAVE_EXE!" --load-extension="!CHROME_EXT_DIR!""
 )
 
 REM ── Probe Firefox binary ──────────────────────────────────────────────────
