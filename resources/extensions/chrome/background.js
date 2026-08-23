@@ -73,7 +73,8 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
 // Download Interception Engine
 chrome.downloads.onCreated.addListener(async (downloadItem) => {
   const data = await chrome.storage.local.get(['interceptionEnabled', 'interceptExtensions', 'excludeDomains']);
-  if (data.interceptionEnabled === false) return;
+  // Automatic interception is disabled by default to prevent unwanted downloads
+  if (!data.interceptionEnabled) return;
 
   const url = downloadItem.url;
   if (!url || url.startsWith('blob:') || url.startsWith('data:') || url.startsWith('chrome-extension:')) {
