@@ -88,12 +88,15 @@ run_with_spinner() {
 # ── Hero Banner ───────────────────────────────────────────────────────────────
 clear 2>/dev/null || true
 echo ""
-echo -e "  ${CYAN}${BOLD}██████╗  ██╗ ██████╗  ███╗   ███╗${RESET}   ${WHITE}${BOLD}G1DM DOWNLOAD MANAGER${RESET}  ${YELLOW}${BOLD}v2.0-PRO${RESET}"
-echo -e "  ${CYAN}${BOLD}██╔════╝ ███║ ██╔══██╗ ████╗ ████║${RESET}   ${GRAY}High-Performance Universal Core Engine${RESET}"
-echo -e "  ${AQUA}${BOLD}██║ ███╗  ██║ ██║  ██║ ██╔████╔██║${RESET}   ${EMERALD}● ONLINE${RESET}  ${GRAY}·${RESET}  ${AQUA}Multi-Threaded Turbo Pipeline${RESET}"
-echo -e "  ${AQUA}${BOLD}██║  ██║  ██║ ██║  ██║ ██║╚██╔╝██║${RESET}   ${PURPLE}Production Ready & Native Companion${RESET}"
-echo -e "  ${BLUE}${BOLD}╚██████╔╝  ██║ ██████╔╝ ██║ ╚═╝ ██║${RESET}"
-echo -e "  ${BLUE}${BOLD} ╚═════╝   ╚═╝ ╚═════╝  ╚═╝     ╚═╝${RESET}"
+echo -e "  ${CYAN}${BOLD} ██████╗   ██╗  ██████╗  ███╗   ███╗${RESET}"
+echo -e "  ${CYAN}${BOLD}██╔════╝  ███║  ██╔══██╗ ████╗ ████║${RESET}"
+echo -e "  ${AQUA}${BOLD}██║  ███╗  ██║  ██║  ██║ ██╔████╔██║${RESET}"
+echo -e "  ${AQUA}${BOLD}██║   ██║  ██║  ██║  ██║ ██║╚██╔╝██║${RESET}"
+echo -e "  ${BLUE}${BOLD}╚██████╔╝  ██║  ██████╔╝ ██║ ╚═╝ ██║${RESET}"
+echo -e "  ${BLUE}${BOLD} ╚═════╝   ╚═╝  ╚═════╝  ╚═╝     ╚═╝${RESET}"
+echo ""
+echo -e "  ${WHITE}${BOLD}⚡  G1DM DOWNLOAD MANAGER${RESET}  ${GRAY}·${RESET}  ${YELLOW}${BOLD}v2.0-PRO${RESET}  ${GRAY}·${RESET}  ${EMERALD}${BOLD}● ACTIVE${RESET}"
+echo -e "  ${GRAY}High-Performance Universal Core Engine  ·  Multi-Threaded Turbo Pipeline${RESET}"
 echo -e "  ${DARK_GRAY}───────────────────────────────────────────────────────────────────────────────${RESET}"
 echo ""
 

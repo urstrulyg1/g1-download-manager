@@ -33,12 +33,15 @@ set "BWHITE=%ESC%[97m"
 
 REM ── Banner ────────────────────────────────────────────────────────────────────
 echo.
-echo   %BCYAN%%BOLD%██████╗  ██╗ ██████╗  ███╗   ███╗%R%   %BWHITE%%BOLD%G1DM DOWNLOAD MANAGER%R%  %BYELLOW%%BOLD%v2.0-PRO%R%
-echo   %BCYAN%%BOLD%██╔════╝ ███║ ██╔══██╗ ████╗ ████║%R%   %GRAY%High-Performance Universal Core Engine%R%
-echo   %BCYAN%%BOLD%██║ ███╗  ██║ ██║  ██║ ██╔████╔██║%R%   %BGREEN%● ONLINE%R%  %GRAY%·%R%  %BCYAN%Multi-Threaded Turbo Pipeline%R%
-echo   %BCYAN%%BOLD%██║  ██║  ██║ ██║  ██║ ██║╚██╔╝██║%R%   %BMAGENTA%Production Ready ^& Native Companion%R%
-echo   %BBLUE%%BOLD%╚██████╔╝  ██║ ██████╔╝ ██║ ╚═╝ ██║%R%
-echo   %BBLUE%%BOLD% ╚═════╝   ╚═╝ ╚═════╝  ╚═╝     ╚═╝%R%
+echo   %BCYAN%%BOLD% ██████╗   ██╗  ██████╗  ███╗   ███╗%R%
+echo   %BCYAN%%BOLD%██╔════╝  ███║  ██╔══██╗ ████╗ ████║%R%
+echo   %BCYAN%%BOLD%██║  ███╗  ██║  ██║  ██║ ██╔████╔██║%R%
+echo   %BCYAN%%BOLD%██║   ██║  ██║  ██║  ██║ ██║╚██╔╝██║%R%
+echo   %BBLUE%%BOLD%╚██████╔╝  ██║  ██████╔╝ ██║ ╚═╝ ██║%R%
+echo   %BBLUE%%BOLD% ╚═════╝   ╚═╝  ╚═════╝  ╚═╝     ╚═╝%R%
+echo.
+echo   %BWHITE%%BOLD%⚡  G1DM DOWNLOAD MANAGER%R%  %GRAY%·%R%  %BYELLOW%%BOLD%v2.0-PRO%R%  %GRAY%·%R%  %BGREEN%%BOLD%● ACTIVE%R%
+echo   %GRAY%High-Performance Universal Core Engine  ·  Multi-Threaded Turbo Pipeline%R%
 echo   %GRAY%───────────────────────────────────────────────────────────────────────────────%R%
 echo.
 
