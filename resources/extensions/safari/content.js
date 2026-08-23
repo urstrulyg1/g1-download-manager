@@ -298,25 +298,40 @@
   }
 
   function detectMaxAvailableResolution(video) {
+    let detected = 0;
+
     // 1. Probed analysis from backend media engine
     if (probedMaxResolution > 0) {
-      return probedMaxResolution;
+      detected = Math.max(detected, probedMaxResolution);
     }
 
     // 2. Read from main-world DOM bridge (populated from YouTube player API)
     const domMax = document.documentElement.getAttribute('data-g1dm-max-height');
     if (domMax) {
       const parsed = parseInt(domMax, 10);
-      if (parsed > 0) return parsed;
+      if (parsed > 0) detected = Math.max(detected, parsed);
     }
 
-    // 3. Read HTML5 video element decoded height
+    // 3. Inspect YouTube in-player quality menu items if present in DOM
+    const ytMenuItems = document.querySelectorAll('.ytp-panel-menu .ytp-menuitem, .ytp-quality-menu .ytp-menuitem');
+    if (ytMenuItems && ytMenuItems.length > 0) {
+      for (const item of ytMenuItems) {
+        const text = item.textContent || '';
+        const m = text.match(/(4320|2880|2160|1440|1080|720|480|360|240|144)p?/i);
+        if (m && m[1]) {
+          const val = parseInt(m[1], 10);
+          if (val > detected) detected = val;
+        }
+      }
+    }
+
+    // 4. Read HTML5 video element decoded height
     if (video && video.videoHeight && video.videoHeight > 0) {
-      return video.videoHeight;
+      detected = Math.max(detected, video.videoHeight);
     }
 
-    // 4. Default fallback: 1080p
-    return 1080;
+    // 5. Return detected maximum height (default to 1080p if video not yet loaded)
+    return detected > 0 ? detected : 1080;
   }
 
   function buildAllCombinations(video, filter) {
