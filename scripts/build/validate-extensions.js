@@ -85,7 +85,11 @@ function main() {
   ];
 
   let totalErrors = 0;
-  console.log('🔍 Validating browser companion extensions...');
+  const isQuiet = process.argv.includes('--quiet') || process.env.QUIET === '1';
+
+  if (!isQuiet) {
+    console.log('🔍 Validating browser companion extensions...');
+  }
 
   for (const ext of extensions) {
     const errs = validateExtensionDir(ext.path, ext.name);
@@ -95,7 +99,7 @@ function main() {
         console.error(`   - ${err}`);
       }
       totalErrors += errs.length;
-    } else {
+    } else if (!isQuiet) {
       console.log(`✓ [${ext.name}] Verified valid.`);
     }
   }
@@ -104,7 +108,9 @@ function main() {
     console.error(`\n🚨 Extension validation failed with ${totalErrors} error(s)!`);
     process.exit(1);
   } else {
-    console.log('🎉 All browser extensions validated successfully.\n');
+    if (!isQuiet) {
+      console.log('🎉 All browser extensions validated successfully.\n');
+    }
     process.exit(0);
   }
 }

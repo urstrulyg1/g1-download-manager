@@ -109,7 +109,7 @@ REM ═════════════════════════�
 echo %BBLUE%%BOLD%┌── [3/5] Browser Extension Integrity%R%
 
 echo %CYAN%│  • Generating icons ^& dynamic assets...%R%
-call node scripts\build\generate-extension-icons.js
+call node scripts\build\generate-extension-icons.js --quiet
 if !errorlevel! neq 0 (
     echo %RED%%BOLD%│  ^✖  Failed to generate extension icons.%R%
     echo %RED%└── Aborted.%R%
@@ -118,7 +118,7 @@ if !errorlevel! neq 0 (
 )
 
 echo %CYAN%│  • Validating manifest ^& sandbox permissions...%R%
-call node scripts\build\validate-extensions.js
+call node scripts\build\validate-extensions.js --quiet
 if !errorlevel! neq 0 (
     echo %RED%%BOLD%│  ^✖  Extension integrity check failed — inspect manifest before launching.%R%
     echo %RED%└── Aborted.%R%

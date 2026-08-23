@@ -29,6 +29,7 @@ async function generateIcons() {
     const isPublicIcons = dir.endsWith(path.join('public', 'icons'));
     const applicableSizes = isPublicIcons ? sizes : [16, 32, 48, 128];
 
+    const isQuiet = process.argv.includes('--quiet') || process.env.QUIET === '1';
     for (const size of applicableSizes) {
       const filename = isPublicIcons ? `icon-${size}.png` : `icon${size}.png`;
       const outPath = path.join(dir, filename);
@@ -42,7 +43,9 @@ async function generateIcons() {
         .png({ compressionLevel: 9 })
         .toFile(outPath);
 
-      console.log(`Generated ${size}x${size} -> ${outPath}`);
+      if (!isQuiet) {
+        console.log(`Generated ${size}x${size} -> ${outPath}`);
+      }
     }
   }
 
@@ -57,7 +60,10 @@ async function generateIcons() {
     }
   }
 
-  console.log('All brand & extension icons generated successfully from master transparent logo!');
+  const isQuiet = process.argv.includes('--quiet') || process.env.QUIET === '1';
+  if (!isQuiet) {
+    console.log('All brand & extension icons generated successfully from master transparent logo!');
+  }
 }
 
 if (require.main === module) {

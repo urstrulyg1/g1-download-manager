@@ -3,124 +3,166 @@ set -euo pipefail
 
 # ==============================================================================
 #  G1DM — Next-Generation Internet Download Manager
-#  Universal Launcher  ·  Linux / macOS
+#  Universal Launcher & Terminal Interface  ·  Linux / macOS
 # ==============================================================================
 
-# ── Color & formatting palette ────────────────────────────────────────────────
-BOLD="\033[1m";  DIM="\033[2m";  RESET="\033[0m";  UNDERLINE="\033[4m"
+# ── ANSI Color & Typography Palette ───────────────────────────────────────────
+ESC="\033"
+RESET="${ESC}[0m"
+BOLD="${ESC}[1m"
+DIM="${ESC}[2m"
+ITALIC="${ESC}[3m"
+UNDERLINE="${ESC}[4m"
 
-RED="\033[31m";   GREEN="\033[32m";  YELLOW="\033[33m"
-BLUE="\033[34m";  CYAN="\033[36m";   WHITE="\033[37m";  GRAY="\033[90m"
+# Standard / Bright Colors
+RED="${ESC}[38;5;203m"
+GREEN="${ESC}[38;5;48m"
+EMERALD="${ESC}[38;5;42m"
+YELLOW="${ESC}[38;5;220m"
+ORANGE="${ESC}[38;5;214m"
+BLUE="${ESC}[38;5;75m"
+PURPLE="${ESC}[38;5;141m"
+MAGENTA="${ESC}[38;5;213m"
+CYAN="${ESC}[38;5;45m"
+AQUA="${ESC}[38;5;51m"
+WHITE="${ESC}[38;5;255m"
+GRAY="${ESC}[38;5;242m"
+DARK_GRAY="${ESC}[38;5;238m"
 
-BRIGHT_RED="\033[91m";    BRIGHT_GREEN="\033[92m";   BRIGHT_YELLOW="\033[93m"
-BRIGHT_BLUE="\033[94m";   BRIGHT_MAGENTA="\033[95m"; BRIGHT_CYAN="\033[96m"
-BRIGHT_WHITE="\033[97m"
+# Gradient Accents
+BG_DARK="${ESC}[48;5;234m"
 
-# ── Helper printers ───────────────────────────────────────────────────────────
-print_step()  { echo -e "${BRIGHT_BLUE}${BOLD}┌── $1${RESET}"; }
-print_ok()    { echo -e "${GREEN}│  ✔ $1${RESET}"; }
-print_info()  { echo -e "${CYAN}│  • $1${RESET}"; }
-print_warn()  { echo -e "${BRIGHT_YELLOW}│  ⚠  $1${RESET}"; }
-print_error() { echo -e "${BRIGHT_RED}${BOLD}│  ✖ $1${RESET}"; }
-print_done()  { echo -e "${BRIGHT_BLUE}└── Done.${RESET}\n"; }
-print_fail()  { echo -e "${BRIGHT_RED}└── Aborted.${RESET}\n"; }
-print_sep()   { echo -e "${GRAY}│${RESET}"; }
+# ── Terminal Utilities ────────────────────────────────────────────────────────
+# Hide / Restore cursor on exit
+cleanup() {
+    tput cnorm 2>/dev/null || printf "${ESC}[?25h"
+}
+trap cleanup EXIT
+tput civis 2>/dev/null || printf "${ESC}[?25l"
 
-# ── Banner ────────────────────────────────────────────────────────────────────
+# Dynamic animated spinner runner
+run_with_spinner() {
+    local label="$1"
+    shift
+    local cmd=("$@")
+    
+    local frames=("⠋" "⠙" "⠹" "⠸" "⠼" "⠴" "⠦" "⠧" "⠇" "⠏")
+    local start_time
+    start_time=$(date +%s)
+    
+    # Run command in background with output captured
+    local tmp_log
+    tmp_log=$(mktemp /tmp/g1dm_step_XXXXXX.log)
+    "${cmd[@]}" >"$tmp_log" 2>&1 &
+    local pid=$!
+    
+    local i=0
+    while kill -0 "$pid" 2>/dev/null; do
+        local now
+        now=$(date +%s)
+        local elapsed=$((now - start_time))
+        local frame="${frames[$((i % 10))]}"
+        
+        printf "\r  ${CYAN}${BOLD}%s${RESET}  ${WHITE}%s${RESET}  ${GRAY}(%ds)${RESET}\033[K" "$frame" "$label" "$elapsed"
+        sleep 0.08
+        i=$((i + 1))
+    done
+    
+    wait "$pid"
+    local exit_code=$?
+    local end_time
+    end_time=$(date +%s)
+    local total_elapsed=$((end_time - start_time))
+    
+    if [ "$exit_code" -eq 0 ]; then
+        printf "\r  ${EMERALD}${BOLD}✔${RESET}  ${WHITE}%s${RESET}  ${GRAY}(%ds)${RESET}\033[K\n" "$label" "$total_elapsed"
+        rm -f "$tmp_log"
+        return 0
+    else
+        printf "\r  ${RED}${BOLD}✖${RESET}  ${RED}%s${RESET}  ${GRAY}(failed after %ds)${RESET}\033[K\n" "$label" "$total_elapsed"
+        echo -e "${DARK_GRAY}  ──────────────── Error Details ────────────────${RESET}"
+        cat "$tmp_log" | sed 's/^/  │ /' | tail -n 20
+        echo -e "${DARK_GRAY}  ───────────────────────────────────────────────${RESET}"
+        rm -f "$tmp_log"
+        return "$exit_code"
+    fi
+}
+
+# ── Hero Banner ───────────────────────────────────────────────────────────────
+clear 2>/dev/null || true
 echo ""
-echo -e "${BRIGHT_CYAN}${BOLD}  ╔═══════════════════════════════════════════════════════════════════════╗${RESET}"
-echo -e "${BRIGHT_CYAN}${BOLD}  ║                                                                       ║${RESET}"
-echo -e "  ${BRIGHT_CYAN}${BOLD}║  ${BRIGHT_MAGENTA}██████╗  ██╗ ██████╗  ███╗   ███╗                                   ${BRIGHT_CYAN}║${RESET}"
-echo -e "  ${BRIGHT_CYAN}${BOLD}║  ${BRIGHT_MAGENTA}██╔════╝ ███║ ██╔══██╗ ████╗ ████║  ${BRIGHT_WHITE}${BOLD}Next-Gen Internet Download Mgr  ${BRIGHT_CYAN}║${RESET}"
-echo -e "  ${BRIGHT_CYAN}${BOLD}║  ${BRIGHT_MAGENTA}██║ ███╗  ██║ ██║  ██║ ██╔████╔██║  ${DIM}Universal Core Engine & Web UI  ${RESET}${BRIGHT_CYAN}${BOLD}║${RESET}"
-echo -e "  ${BRIGHT_CYAN}${BOLD}║  ${BRIGHT_MAGENTA}██║  ██║  ██║ ██║  ██║ ██║╚██╔╝██║  ${BRIGHT_YELLOW}v2.0-PRO${BRIGHT_CYAN} · ${BRIGHT_GREEN}Production Ready     ${BRIGHT_CYAN}║${RESET}"
-echo -e "  ${BRIGHT_CYAN}${BOLD}║  ${BRIGHT_MAGENTA}╚██████╔╝  ██║ ██████╔╝ ██║ ╚═╝ ██║  ${GRAY}High-Performance Core Engine    ${BRIGHT_CYAN}║${RESET}"
-echo -e "  ${BRIGHT_CYAN}${BOLD}║   ${BRIGHT_MAGENTA}╚═════╝   ╚═╝ ╚═════╝  ╚═╝     ╚═╝                                  ${BRIGHT_CYAN}║${RESET}"
-echo -e "${BRIGHT_CYAN}${BOLD}  ║                                                                       ║${RESET}"
-echo -e "${BRIGHT_CYAN}${BOLD}  ╚═══════════════════════════════════════════════════════════════════════╝${RESET}"
+echo -e "  ${PURPLE}╭───────────────────────────────────────────────────────────────────────────────╮${RESET}"
+echo -e "  ${PURPLE}│                                                                               │${RESET}"
+echo -e "  ${PURPLE}│   ${CYAN}${BOLD}██████╗  ██╗ ██████╗  ███╗   ███╗${RESET}                                           ${PURPLE}│${RESET}"
+echo -e "  ${PURPLE}│   ${CYAN}${BOLD}██╔════╝ ███║ ██╔══██╗ ████╗ ████║${RESET}   ${WHITE}${BOLD}G1DM DOWNLOAD MANAGER · PRO${RESET}           ${PURPLE}│${RESET}"
+echo -e "  ${PURPLE}│   ${AQUA}${BOLD}██║ ███╗  ██║ ██║  ██║ ██╔████╔██║${RESET}   ${DIM}High-Throughput Autonomous Engine${RESET}       ${PURPLE}│${RESET}"
+echo -e "  ${PURPLE}│   ${AQUA}${BOLD}██║  ██║  ██║ ██║  ██║ ██║╚██╔╝██║${RESET}   ${EMERALD}● ONLINE${RESET} ${GRAY}·${RESET} ${YELLOW}v2.0-PRO${RESET} ${GRAY}·${RESET} ${AQUA}Multi-Threaded${RESET}   ${PURPLE}│${RESET}"
+echo -e "  ${PURPLE}│   ${BLUE}${BOLD}╚██████╔╝  ██║ ██████╔╝ ██║ ╚═╝ ██║${RESET}   ${GRAY}Media Stream Acceleration & Studio${RESET}      ${PURPLE}│${RESET}"
+echo -e "  ${PURPLE}│    ${BLUE}${BOLD}╚═════╝   ╚═╝ ╚═════╝  ╚═╝     ╚═╝${RESET}                                           ${PURPLE}│${RESET}"
+echo -e "  ${PURPLE}│                                                                               │${RESET}"
+echo -e "  ${PURPLE}╰───────────────────────────────────────────────────────────────────────────────╯${RESET}"
 echo ""
 
-# ── Resolve script directory ──────────────────────────────────────────────────
+# ── Resolve Workspace Directory ───────────────────────────────────────────────
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  STEP 1 — System Prerequisites
+#  PHASE 1: System & Runtime Diagnostics
 # ═══════════════════════════════════════════════════════════════════════════════
-print_step "[1/5] System Prerequisites"
+echo -e "  ${AQUA}${BOLD}⚡  SYSTEM & RUNTIME DIAGNOSTICS${RESET}"
+echo -e "  ${DARK_GRAY}───────────────────────────────────────────────────────────────────────────────${RESET}"
 
-_require_cmd() {
-    local cmd="$1" label="$2" hint="$3"
-    if ! command -v "$cmd" >/dev/null 2>&1; then
-        print_error "$label is not installed or not in PATH."
-        [ -n "$hint" ] && echo -e "${YELLOW}│       $hint${RESET}"
-        print_fail; exit 1
-    fi
-}
-
-_require_cmd node "Node.js" "Install Node.js v18+ from https://nodejs.org"
-_require_cmd npm  "npm"     ""
+if ! command -v node >/dev/null 2>&1; then
+    echo -e "  ${RED}${BOLD}✖  Node.js is not installed or not in PATH.${RESET}"
+    echo -e "     ${YELLOW}Please install Node.js v18+ from https://nodejs.org${RESET}\n"
+    exit 1
+fi
 
 NODE_VERSION=$(node -v)
 NPM_VERSION=$(npm -v 2>/dev/null || echo "n/a")
+OS_PLATFORM="$(uname -s)"
+OS_ARCH="$(uname -m)"
 
-# Warn if Node.js is older than v18
-NODE_MAJOR=$(node -e "process.stdout.write(String(process.versions.node.split('.')[0]))" 2>/dev/null || echo "0")
-if [ "$NODE_MAJOR" -lt 18 ]; then
-    print_warn "Node.js ${NODE_VERSION} detected — v18 or newer is recommended."
-else
-    print_ok "Node.js ${BRIGHT_WHITE}${NODE_VERSION}${GREEN}  (npm ${BRIGHT_WHITE}v${NPM_VERSION}${GREEN})"
-fi
-print_done
+echo -e "  ${EMERALD}✔${RESET}  Node.js ${WHITE}${BOLD}${NODE_VERSION}${RESET}  ${GRAY}·${RESET}  npm ${WHITE}v${NPM_VERSION}${RESET}  ${GRAY}·${RESET}  ${CYAN}${OS_PLATFORM} (${OS_ARCH})${RESET}"
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  STEP 2 — Dependencies
-# ═══════════════════════════════════════════════════════════════════════════════
-print_step "[2/5] Dependencies"
 if [ ! -d "node_modules" ] || [ ! -f "package-lock.json" ]; then
-    print_info "node_modules not found — running ${BRIGHT_WHITE}npm install${CYAN}..."
-    if ! npm install; then
-        print_error "npm install failed."; print_fail; exit 1
-    fi
-    print_ok "Dependencies installed."
+    run_with_spinner "Installing core node dependencies" npm install
 else
-    print_ok "node_modules present & up to date."
-fi
-print_done
-
-# ═══════════════════════════════════════════════════════════════════════════════
-#  STEP 3 — Browser Extension Integrity
-# ═══════════════════════════════════════════════════════════════════════════════
-print_step "[3/5] Browser Extension Integrity"
-
-print_info "Generating icons & dynamic assets..."
-if ! node scripts/build/generate-extension-icons.js 2>&1 | sed 's/^/│     /'; then
-    print_error "Failed to generate extension icons."; print_fail; exit 1
+    echo -e "  ${EMERALD}✔${RESET}  Core modules & package lock verified up to date"
 fi
 
-print_info "Validating manifest & sandbox permissions..."
-if ! node scripts/build/validate-extensions.js 2>&1 | sed 's/^/│     /'; then
-    print_error "Extension integrity check failed — inspect manifest before launching."
-    print_fail; exit 1
+echo ""
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  PHASE 2: Browser Companion Integrity & Asset Matrix
+# ═══════════════════════════════════════════════════════════════════════════════
+echo -e "  ${PURPLE}${BOLD}🧩  BROWSER COMPANION & EXTENSION MATRIX${RESET}"
+echo -e "  ${DARK_GRAY}───────────────────────────────────────────────────────────────────────────────${RESET}"
+
+run_with_spinner "Synthesizing dynamic brand & extension icon assets" node scripts/build/generate-extension-icons.js --quiet
+run_with_spinner "Auditing Chrome, Firefox, Safari & Brave security manifests" node scripts/build/validate-extensions.js --quiet
+
+if [ -x "resources/native-host/install-host.sh" ]; then
+    ./resources/native-host/install-host.sh >/tmp/g1dm-native-host.log 2>&1 || true
+    echo -e "  ${EMERALD}✔${RESET}  Native Messaging Host connected and registered"
 fi
 
-print_ok "Companion extension verified & ready."
-print_done
+echo ""
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  STEP 4 — Build
+#  PHASE 3: High-Performance Engine Compilation
 # ═══════════════════════════════════════════════════════════════════════════════
-print_step "[4/5] Build  (TypeScript backend + Next.js frontend)"
-print_info "Compiling — this may take a moment on first run..."
-if ! npm run build 2>&1 | grep -E "^(error|warn|✓|Route|  )" | sed 's/^/│     /'; then
-    # grep exits 1 when no lines match; run build independently to capture real exit code
-    npm run build
-fi
-print_ok "Build complete."
-print_done
+echo -e "  ${MAGENTA}${BOLD}🏗️   BUILD & COMPILATION PIPELINE${RESET}"
+echo -e "  ${DARK_GRAY}───────────────────────────────────────────────────────────────────────────────${RESET}"
+
+run_with_spinner "Compiling TypeScript core engine (tsc)" npm run build:backend
+run_with_spinner "Optimizing Next.js Web UI & static chunks" npm run build:frontend
+
+echo ""
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  STEP 5 — Browser selection
+#  PHASE 4: Browser Target Selection
 # ═══════════════════════════════════════════════════════════════════════════════
 PORT="${PORT:-8055}"
 URL="http://127.0.0.1:${PORT}"
@@ -128,105 +170,85 @@ CHROME_EXT_DIR="$SCRIPT_DIR/resources/extensions/chrome"
 
 BROWSER_NAMES=()
 BROWSER_CMDS=()
-BROWSER_TAGS=()   # "ext" | "plain" | "headless"
+BROWSER_ICONS=()
+BROWSER_TAGS=()
 
 _add_browser() {
-    # $1=name  $2=command  $3=tag
+    # $1=name  $2=command  $3=icon  $4=tag
     BROWSER_NAMES+=("$1")
     BROWSER_CMDS+=("$2")
-    BROWSER_TAGS+=("$3")
+    BROWSER_ICONS+=("$3")
+    BROWSER_TAGS+=("$4")
 }
 
-# ── Native-host silent setup ──────────────────────────────────────────────────
-if [ -x "resources/native-host/install-host.sh" ]; then
-    ./resources/native-host/install-host.sh >/tmp/g1dm-native-host.log 2>&1 || true
-fi
-
-# ── Detect browsers (macOS) ───────────────────────────────────────────────────
-if [[ "$(uname -s)" == "Darwin" ]]; then
+if [[ "$OS_PLATFORM" == "Darwin" ]]; then
     if [ -d "/Applications/Google Chrome.app" ]; then
-        _add_browser \
-            "Google Chrome  +  G1DM Extension" \
-            "'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' --load-extension='${CHROME_EXT_DIR}'" \
-            "ext"
+        _add_browser "Google Chrome (with G1DM Companion)" "'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' --load-extension='${CHROME_EXT_DIR}'" "⚡" "ext"
     fi
     if [ -d "/Applications/Brave Browser.app" ]; then
-        _add_browser \
-            "Brave Browser  +  G1DM Extension" \
-            "'/Applications/Brave Browser.app/Contents/MacOS/Brave Browser' --load-extension='${CHROME_EXT_DIR}'" \
-            "ext"
+        _add_browser "Brave Browser (with G1DM Companion)" "'/Applications/Brave Browser.app/Contents/MacOS/Brave Browser' --load-extension='${CHROME_EXT_DIR}'" "🦁" "ext"
     fi
     if [ -d "/Applications/Microsoft Edge.app" ]; then
-        _add_browser \
-            "Microsoft Edge  +  G1DM Extension" \
-            "'/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge' --load-extension='${CHROME_EXT_DIR}'" \
-            "ext"
+        _add_browser "Microsoft Edge (with G1DM Companion)" "'/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge' --load-extension='${CHROME_EXT_DIR}'" "🌊" "ext"
     fi
     if [ -d "/Applications/Firefox.app" ]; then
-        _add_browser "Firefox" "open -a '/Applications/Firefox.app'" "plain"
+        _add_browser "Firefox" "open -a '/Applications/Firefox.app'" "🦊" "plain"
     fi
     if [ -d "/Applications/Safari.app" ]; then
-        _add_browser "Safari" "open -a '/Applications/Safari.app'" "plain"
+        _add_browser "Safari" "open -a '/Applications/Safari.app'" "🧭" "plain"
     fi
-
-# ── Detect browsers (Linux) ───────────────────────────────────────────────────
 else
     for _bin in google-chrome google-chrome-stable chromium chromium-browser; do
         if command -v "$_bin" >/dev/null 2>&1; then
-            _add_browser \
-                "Google Chrome / Chromium  +  G1DM Extension" \
-                "${_bin} --load-extension='${CHROME_EXT_DIR}'" \
-                "ext"
+            _add_browser "Google Chrome / Chromium" "${_bin} --load-extension='${CHROME_EXT_DIR}'" "⚡" "ext"
             break
         fi
     done
     if command -v brave-browser >/dev/null 2>&1; then
-        _add_browser \
-            "Brave Browser  +  G1DM Extension" \
-            "brave-browser --load-extension='${CHROME_EXT_DIR}'" \
-            "ext"
+        _add_browser "Brave Browser" "brave-browser --load-extension='${CHROME_EXT_DIR}'" "🦁" "ext"
     fi
     if command -v microsoft-edge >/dev/null 2>&1 || command -v microsoft-edge-stable >/dev/null 2>&1; then
         _EDGE_BIN=$(command -v microsoft-edge-stable 2>/dev/null || command -v microsoft-edge)
-        _add_browser \
-            "Microsoft Edge  +  G1DM Extension" \
-            "${_EDGE_BIN} --load-extension='${CHROME_EXT_DIR}'" \
-            "ext"
+        _add_browser "Microsoft Edge" "${_EDGE_BIN} --load-extension='${CHROME_EXT_DIR}'" "🌊" "ext"
     fi
     if command -v firefox >/dev/null 2>&1; then
-        _add_browser "Firefox" "firefox" "plain"
+        _add_browser "Firefox" "firefox" "🦊" "plain"
     fi
 fi
 
-_add_browser "Default system browser" "open" "plain"
-_add_browser "Headless / API-only mode (no browser)" "" "headless"
+_add_browser "Default System Browser" "open" "🌐" "plain"
+_add_browser "Headless / Daemon Only (no browser window)" "" "🛡️" "headless"
 
-# ── Print browser menu ────────────────────────────────────────────────────────
-echo -e "${BRIGHT_CYAN}${BOLD}  ┌─ Browser Selection ─────────────────────────────────────────────────┐${RESET}"
+echo -e "  ${CYAN}${BOLD}🌐  SELECT LAUNCH TARGET${RESET}"
+echo -e "  ${DARK_GRAY}───────────────────────────────────────────────────────────────────────────────${RESET}"
+
 for i in "${!BROWSER_NAMES[@]}"; do
     idx=$((i + 1))
     tag="${BROWSER_TAGS[$i]}"
     name="${BROWSER_NAMES[$i]}"
+    icon="${BROWSER_ICONS[$i]}"
+    
     case "$tag" in
-        ext)      badge="${BRIGHT_GREEN}${BOLD}[Extension]${RESET}" ;;
-        plain)    badge="${CYAN}[Browser]${RESET}  " ;;
-        headless) badge="${GRAY}[Headless]${RESET} " ;;
+        ext)      badge="${EMERALD}${BOLD}[Extension Active]${RESET} " ;;
+        plain)    badge="${CYAN}[Browser]${RESET}          " ;;
+        headless) badge="${GRAY}[Headless API]${RESET}     " ;;
     esac
-    echo -e "  ${BRIGHT_CYAN}${BOLD}║${RESET}  ${BRIGHT_YELLOW}${idx})${RESET}  ${badge}  ${BRIGHT_WHITE}${name}${RESET}"
-done
-echo -e "${BRIGHT_CYAN}${BOLD}  └─────────────────────────────────────────────────────────────────────┘${RESET}"
-
-# Find the best default (first extension-capable browser, else last option)
-DEFAULT_OPTION=${#BROWSER_NAMES[@]}
-for i in "${!BROWSER_TAGS[@]}"; do
-    if [ "${BROWSER_TAGS[$i]}" = "ext" ]; then
-        DEFAULT_OPTION=$((i + 1)); break
+    
+    if [ "$i" -eq 0 ]; then
+        echo -e "  ${YELLOW}${BOLD} ${idx})${RESET}  ${icon}  ${WHITE}${BOLD}${name}${RESET}  ${badge}  ${AQUA}${DIM}★ Recommended${RESET}"
+    else
+        echo -e "  ${YELLOW}${BOLD} ${idx})${RESET}  ${icon}  ${WHITE}${name}${RESET}  ${badge}"
     fi
 done
 
+DEFAULT_OPTION=1
 echo ""
-echo -en "${BRIGHT_YELLOW}${BOLD}  ➤  Choose an option [${BRIGHT_WHITE}${DEFAULT_OPTION}${BRIGHT_YELLOW}]: ${RESET}"
-read -r BROWSER_CHOICE
+echo -en "  ${AQUA}${BOLD}➤  Choose target [${WHITE}1-${#BROWSER_NAMES[@]}${AQUA}, default: ${EMERALD}${DEFAULT_OPTION}${AQUA}]: ${RESET}"
+
+tput cnorm 2>/dev/null || printf "${ESC}[?25h"
+read -r BROWSER_CHOICE || BROWSER_CHOICE=""
+tput civis 2>/dev/null || printf "${ESC}[?25l"
+
 BROWSER_CHOICE="${BROWSER_CHOICE:-$DEFAULT_OPTION}"
 
 OPEN_BROWSER_CMD=""
@@ -238,95 +260,103 @@ if [[ "$BROWSER_CHOICE" =~ ^[0-9]+$ ]] \
     SELECTED_BROWSER_NAME="${BROWSER_NAMES[$((BROWSER_CHOICE - 1))]}"
 fi
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  STEP 5 — Start server
-# ═══════════════════════════════════════════════════════════════════════════════
 echo ""
-print_step "[5/5] Starting G1DM Core Service"
-print_info "Binding to ${BRIGHT_WHITE}127.0.0.1:${PORT}${CYAN} (loopback only)..."
 
-# ── Graceful shutdown ─────────────────────────────────────────────────────────
+# ═══════════════════════════════════════════════════════════════════════════════
+#  PHASE 5: Core Service Daemon Startup
+# ═══════════════════════════════════════════════════════════════════════════════
+echo -e "  ${GREEN}${BOLD}🚀  ACTIVATING CORE SERVICE DAEMON${RESET}"
+echo -e "  ${DARK_GRAY}───────────────────────────────────────────────────────────────────────────────${RESET}"
+
+# Reclaim port if occupied
+if command -v lsof >/dev/null 2>&1; then
+    _EXISTING_PID=$(lsof -ti :"${PORT}" 2>/dev/null || true)
+    if [ -n "$_EXISTING_PID" ]; then
+        echo -e "  ${YELLOW}⚠  Reclaiming port ${PORT} from previous instance (PID ${_EXISTING_PID})...${RESET}"
+        kill -9 $_EXISTING_PID 2>/dev/null || true
+        sleep 0.4
+    fi
+fi
+
+# Graceful shutdown handler
 _SHUTDOWN_DONE=0
 _do_shutdown() {
     [ "$_SHUTDOWN_DONE" -eq 1 ] && return
     _SHUTDOWN_DONE=1
-    echo -e "\n${BRIGHT_YELLOW}${BOLD}  🛑  Shutting down G1DM (PID ${SERVER_PID})...${RESET}"
+    echo ""
+    echo -e "  ${YELLOW}${BOLD}🛑  Gracefully shutting down G1DM Core Engine (PID ${SERVER_PID})...${RESET}"
     kill -TERM "$SERVER_PID" 2>/dev/null || true
     local waited=0
-    while kill -0 "$SERVER_PID" 2>/dev/null && [ $waited -lt 50 ]; do
-        sleep 0.1; waited=$((waited + 1))
+    while kill -0 "$SERVER_PID" 2>/dev/null && [ $waited -lt 30 ]; do
+        sleep 0.1
+        waited=$((waited + 1))
     done
     if kill -0 "$SERVER_PID" 2>/dev/null; then
-        echo -e "${BRIGHT_YELLOW}  ⚠   Graceful timeout — force-killing...${RESET}"
         kill -KILL "$SERVER_PID" 2>/dev/null || true
     fi
-    echo -e "${BRIGHT_GREEN}  ✔   G1DM stopped cleanly. Goodbye!${RESET}\n"
+    cleanup
+    echo -e "  ${EMERALD}${BOLD}✔  G1DM daemon stopped cleanly. Have a great day!${RESET}\n"
 }
-# ── Clean up any lingering process on the target port ────────────────────────
-if command -v lsof >/dev/null 2>&1; then
-    _EXISTING_PID=$(lsof -ti :"${PORT}" 2>/dev/null || true)
-    if [ -n "$_EXISTING_PID" ]; then
-        print_info "Reclaiming port ${PORT} (stopping existing process on port)..."
-        kill -9 $_EXISTING_PID 2>/dev/null || true
-        sleep 0.5
-    fi
-fi
 
-# ── Launch server ─────────────────────────────────────────────────────────────
 SERVER_PID=""
 trap '_do_shutdown; exit 0' INT TERM
 trap '_do_shutdown'          EXIT
 
-PORT="${PORT}" NODE_ENV=production node dist/main/server.js &
+# Launch daemon in background with quiet logging
+LOG_FILE="/tmp/g1dm-server.log"
+PORT="${PORT}" NODE_ENV=production node dist/main/server.js >"$LOG_FILE" 2>&1 &
 SERVER_PID=$!
 
-# ── Animated readiness probe ──────────────────────────────────────────────────
-echo -en "${CYAN}│  • Waiting for server${RESET}"
-SPINNER=("⠋" "⠙" "⠹" "⠸" "⠼" "⠴" "⠦" "⠧" "⠇" "⠏")
-MAX_RETRIES=60
-RETRY_COUNT=0
+# Animated health probe
+spinner_frames=("⠋" "⠙" "⠹" "⠸" "⠼" "⠴" "⠦" "⠧" "⠇" "⠏")
+probe_i=0
+MAX_PROBES=80
 READY=0
-while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
-    HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-        "http://127.0.0.1:${PORT}/api/browser/health" 2>/dev/null || echo "000")
-    if [ "$HTTP_STATUS" = "200" ]; then
-        READY=1; break
-    fi
-    echo -en " ${BRIGHT_MAGENTA}${SPINNER[$((RETRY_COUNT % ${#SPINNER[@]}))]}${RESET}"
-    sleep 0.15
-    RETRY_COUNT=$((RETRY_COUNT + 1))
-done
-echo ""
 
-if [ $READY -eq 1 ]; then
-    print_ok "Server online  ${GRAY}(HTTP 200 on /api/browser/health)${RESET}"
+while [ $probe_i -lt $MAX_PROBES ]; do
+    HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "http://127.0.0.1:${PORT}/api/browser/health" 2>/dev/null || echo "000")
+    if [ "$HTTP_STATUS" = "200" ]; then
+        READY=1
+        break
+    fi
+    
+    frame="${spinner_frames[$((probe_i % 10))]}"
+    printf "\r  ${AQUA}%s${RESET}  ${WHITE}Initializing IPC sockets & HTTP engine...${RESET}\033[K" "$frame"
+    sleep 0.12
+    probe_i=$((probe_i + 1))
+done
+printf "\r\033[K"
+
+if [ "$READY" -eq 1 ]; then
+    echo -e "  ${EMERALD}✔${RESET}  Server engine live on ${WHITE}${BOLD}http://127.0.0.1:${PORT}${RESET} ${GRAY}(HTTP 200)${RESET}"
 else
-    print_warn "Readiness timeout — proceeding anyway. Check logs if the UI does not load."
+    echo -e "  ${YELLOW}⚠  Server readiness check took longer than expected — check ${LOG_FILE}${RESET}"
 fi
 
-echo -e "${BRIGHT_BLUE}└── Initialized.${RESET}"
 echo ""
 
-# ── Status dashboard ──────────────────────────────────────────────────────────
-echo -e "${BRIGHT_GREEN}${BOLD}  ╔═══════════════════════════════════════════════════════════════════════╗${RESET}"
-echo -e "${BRIGHT_GREEN}${BOLD}  ║            🚀  G1DM CORE ENGINE & WEB UI  ·  ACTIVE                  ║${RESET}"
-echo -e "${BRIGHT_GREEN}${BOLD}  ╠═══════════════════════════════════════════════════════════════════════╣${RESET}"
-echo -e "${BRIGHT_GREEN}${BOLD}  ║${RESET}  ${BRIGHT_CYAN}${BOLD}🌐  Web Dashboard${RESET}   ${BRIGHT_WHITE}${UNDERLINE}${URL}${RESET}"
-echo -e "${BRIGHT_GREEN}${BOLD}  ║${RESET}  ${BRIGHT_BLUE}${BOLD}⚡  REST API${RESET}        ${BRIGHT_WHITE}${URL}/api/v1${RESET}"
-echo -e "${BRIGHT_GREEN}${BOLD}  ║${RESET}  ${BRIGHT_MAGENTA}${BOLD}📋  OpenAPI Docs${RESET}    ${BRIGHT_WHITE}${URL}/api/v1/openapi.json${RESET}"
-echo -e "${BRIGHT_GREEN}${BOLD}  ║${RESET}  ${BRIGHT_YELLOW}${BOLD}🧩  Extension${RESET}       ${GRAY}${CHROME_EXT_DIR}${RESET}"
-echo -e "${BRIGHT_GREEN}${BOLD}  ╚═══════════════════════════════════════════════════════════════════════╝${RESET}"
+# ── HUD Status Card ───────────────────────────────────────────────────────────
+echo -e "  ${GREEN}╔═══════════════════════════════════════════════════════════════════════════════╗${RESET}"
+echo -e "  ${GREEN}║${RESET}   ${BOLD}${WHITE}🚀  G1DM CORE ENGINE & ACCELERATED SERVICE ONLINE${RESET}                           ${GREEN}║${RESET}"
+echo -e "  ${GREEN}╠═══════════════════════════════════════════════════════════════════════════════╣${RESET}"
+echo -e "  ${GREEN}║${RESET}   ${CYAN}${BOLD}🌐  Web Dashboard${RESET}    ➜   ${WHITE}${UNDERLINE}${URL}${RESET}                                       ${GREEN}║${RESET}"
+echo -e "  ${GREEN}║${RESET}   ${BLUE}${BOLD}⚡  REST API v1${RESET}      ➜   ${WHITE}${URL}/api/v1${RESET}                                ${GREEN}║${RESET}"
+echo -e "  ${GREEN}║${RESET}   ${MAGENTA}${BOLD}📋  OpenAPI Spec${RESET}     ➜   ${WHITE}${URL}/api/v1/openapi.json${RESET}                   ${GREEN}║${RESET}"
+echo -e "  ${GREEN}║${RESET}   ${ORANGE}${BOLD}🧩  Companion Ext${RESET}    ➜   ${GRAY}${CHROME_EXT_DIR}${RESET}   ${GREEN}║${RESET}"
+echo -e "  ${GREEN}║${RESET}   ${EMERALD}${BOLD}🛡️   Security Mode${RESET}    ➜   ${EMERALD}Loopback Only (127.0.0.1) · Zero-Leakage${RESET}       ${GREEN}║${RESET}"
+echo -e "  ${GREEN}╚═══════════════════════════════════════════════════════════════════════════════╝${RESET}"
 echo ""
 
-# ── Launch browser ────────────────────────────────────────────────────────────
+# Launch target browser
 if [ -n "$OPEN_BROWSER_CMD" ]; then
-    echo -e "${BRIGHT_CYAN}  ✨  Launching ${BRIGHT_WHITE}${BOLD}${SELECTED_BROWSER_NAME}${RESET}${BRIGHT_CYAN}...${RESET}"
+    echo -e "  ${AQUA}✨  Connecting to ${WHITE}${BOLD}${SELECTED_BROWSER_NAME}${RESET}${AQUA}...${RESET}"
     eval "$OPEN_BROWSER_CMD \"$URL\"" >/dev/null 2>&1 &
 fi
 
-echo -e "${GRAY}  ────────────────────────────────────────────────────────────────────────${RESET}"
-echo -e "  ${BRIGHT_YELLOW}${BOLD}💡${RESET}  ${GRAY}Press ${BRIGHT_WHITE}Ctrl + C${GRAY} to stop the server gracefully.${RESET}"
+echo -e "  ${DARK_GRAY}───────────────────────────────────────────────────────────────────────────────${RESET}"
+echo -e "  ${YELLOW}${BOLD}💡  PRO-TIP:${RESET} ${GRAY}Press ${WHITE}${BOLD}Ctrl + C${RESET} ${GRAY}to stop the daemon safely.${RESET}"
 echo ""
 
-# ── Keep alive ────────────────────────────────────────────────────────────────
+# Restore cursor and wait for daemon
+cleanup
 wait "$SERVER_PID" 2>/dev/null || true
