@@ -65,8 +65,8 @@ run_with_spinner() {
         i=$((i + 1))
     done
     
-    wait "$pid"
-    local exit_code=$?
+    local exit_code=0
+    wait "$pid" 2>/dev/null || exit_code=$?
     local end_time
     end_time=$(date +%s)
     local total_elapsed=$((end_time - start_time))

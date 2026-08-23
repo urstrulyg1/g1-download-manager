@@ -192,9 +192,9 @@ export default function Home() {
         }
         setIsAddModalOpen(true);
       } else if (hash.startsWith('#batch')) {
-        setActiveView('batch');
+        setActiveView('batchLinks');
       } else if (hash.startsWith('#media')) {
-        setActiveView('media');
+        setActiveView('mediaDetector');
       }
     };
 
