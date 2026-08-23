@@ -1,0 +1,38 @@
+{
+  "mp4": {
+    "path": "test-video.mp4",
+    "size": 1669,
+    "sha256": "61bb96f25e12fcb02791c3482d4c82ea9b39e50a605a07be34b0c2a992487fa3",
+    "container": "MP4 (ISO/IEC 14496-12)",
+    "videoCodec": "H.264/AVC",
+    "audioCodec": "None",
+    "duration": 1,
+    "width": 16,
+    "height": 16,
+    "description": "Actual playable MP4 with H.264 video (1 second, 16x16 green)",
+    "generated": "2026-08-23T09:10:00.371Z",
+    "validatedWithFFprobe": true
+  },
+  "webm": {
+    "path": "test-video.webm",
+    "size": 1076,
+    "sha256": "6dd994b5ef265ed314658567a10db270ea786b38ec3ff25752c24986c7329c98",
+    "container": "WebM (Matroska/EBML)",
+    "videoCodec": "VP8",
+    "audioCodec": "None",
+    "duration": 1,
+    "width": 16,
+    "height": 16,
+    "description": "Actual playable WebM with VP8 video (1 second, 16x16 green)",
+    "generated": "2026-08-23T09:10:00.371Z",
+    "validatedWithFFprobe": true
+  },
+  "invalidMp4": {
+    "path": "invalid-video.mp4",
+    "size": 51,
+    "sha256": "b7675eeced0bd1b4f2120f8d1a8a654b4db9f4d1ba5094febc20a645019466da",
+    "container": "Invalid",
+    "description": "File with .mp4 extension but invalid structure",
+    "generated": "2026-08-23T09:10:00.371Z"
+  }
+}

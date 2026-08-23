@@ -17,6 +17,44 @@ import * as crypto from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
 
+// Load real media fixtures from filesystem
+const MEDIA_FIXTURES_DIR = path.join(__dirname, 'media');
+let mediaFixtures: Record<string, { data: Buffer; hash: string; size: number; contentType: string }> = {};
+
+try {
+  if (fs.existsSync(MEDIA_FIXTURES_DIR)) {
+    const files = fs.readdirSync(MEDIA_FIXTURES_DIR);
+    for (const file of files) {
+      const filePath = path.join(MEDIA_FIXTURES_DIR, file);
+      if (fs.statSync(filePath).isFile() && !file.endsWith('.json')) {
+        const data = fs.readFileSync(filePath);
+        const hash = crypto.createHash('sha256').update(data).digest('hex');
+        mediaFixtures[file] = {
+          data,
+          hash,
+          size: data.length,
+          contentType: getContentType(file)
+        };
+      }
+    }
+  }
+} catch (err) {
+  // Media fixtures not available, will use synthetic data
+}
+
+function getContentType(filename: string): string {
+  const ext = path.extname(filename).toLowerCase();
+  const types: Record<string, string> = {
+    '.mp4': 'video/mp4',
+    '.webm': 'video/webm',
+    '.mkv': 'video/x-matroska',
+    '.png': 'image/png',
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+  };
+  return types[ext] || 'application/octet-stream';
+}
+
 // Deterministic test content - generate once, hash is fixed
 const DETERMINISTIC_1MB = crypto.createHash('sha256')
   .update('G1DM_TEST_FILE_1MB_' + 'x'.repeat(1024 * 1024 - 18))
@@ -288,10 +326,57 @@ export async function createTestServer(options: TestServerOptions = {}): Promise
       return;
     }
 
+    // Real media fixtures
+    if (pathname === '/files/media/test-video.mp4' && mediaFixtures['test-video.mp4']) {
+      const fixture = mediaFixtures['test-video.mp4'];
+      res.writeHead(200, {
+        'Content-Type': fixture.contentType,
+        'Content-Length': fixture.size,
+        'Content-Disposition': 'attachment; filename="Test Video.mp4"',
+      });
+      res.end(fixture.data);
+      return;
+    }
+
+    if (pathname === '/files/media/test-video.webm' && mediaFixtures['test-video.webm']) {
+      const fixture = mediaFixtures['test-video.webm'];
+      res.writeHead(200, {
+        'Content-Type': fixture.contentType,
+        'Content-Length': fixture.size,
+        'Content-Disposition': 'attachment; filename="Test Video.webm"',
+      });
+      res.end(fixture.data);
+      return;
+    }
+
+    if (pathname === '/files/media/invalid-video.mp4' && mediaFixtures['invalid-video.mp4']) {
+      const fixture = mediaFixtures['invalid-video.mp4'];
+      res.writeHead(200, {
+        'Content-Type': fixture.contentType,
+        'Content-Length': fixture.size,
+        'Content-Disposition': 'attachment; filename="Invalid Video.mp4"',
+      });
+      res.end(fixture.data);
+      return;
+    }
+
     // Health check endpoint
     if (pathname === '/health') {
+      const mediaInfo = Object.keys(mediaFixtures).length > 0 ? {
+        available: true,
+        files: Object.keys(mediaFixtures).map(f => ({
+          name: f,
+          size: mediaFixtures[f].size,
+          hash: mediaFixtures[f].hash
+        }))
+      } : { available: false };
+      
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ status: 'ok', hashes: { '1mb': DETERMINISTIC_1MB_HASH, '5mb': DETERMINISTIC_5MB_HASH, '10mb': DETERMINISTIC_10MB_HASH } }));
+      res.end(JSON.stringify({ 
+        status: 'ok', 
+        hashes: { '1mb': DETERMINISTIC_1MB_HASH, '5mb': DETERMINISTIC_5MB_HASH, '10mb': DETERMINISTIC_10MB_HASH },
+        mediaFixtures: mediaInfo
+      }));
       return;
     }
 

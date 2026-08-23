@@ -1,5 +1,7 @@
 const http = require('http');
 const crypto = require('crypto');
+const fs = require('fs');
+const path = require('path');
 
 function buildPattern(size, multiplier, offset) {
   const buffer = Buffer.alloc(size);
@@ -18,6 +20,46 @@ const BUFFERS = {
 const HASHES = Object.fromEntries(
   Object.entries(BUFFERS).map(([key, value]) => [key, crypto.createHash('sha256').update(value).digest('hex')])
 );
+
+// Load real media fixtures from filesystem
+const MEDIA_FIXTURES_DIR = path.join(__dirname, '..', 'fixtures', 'media');
+let mediaFixtures = {};
+
+try {
+  if (fs.existsSync(MEDIA_FIXTURES_DIR)) {
+    const files = fs.readdirSync(MEDIA_FIXTURES_DIR);
+    for (const file of files) {
+      const filePath = path.join(MEDIA_FIXTURES_DIR, file);
+      if (fs.statSync(filePath).isFile() && !file.endsWith('.json')) {
+        const data = fs.readFileSync(filePath);
+        const hash = crypto.createHash('sha256').update(data).digest('hex');
+        mediaFixtures[file] = {
+          data,
+          hash,
+          size: data.length,
+          contentType: getContentType(file)
+        };
+        HASHES[file] = hash;
+      }
+    }
+    console.log(`Loaded ${Object.keys(mediaFixtures).length} media fixtures from ${MEDIA_FIXTURES_DIR}`);
+  }
+} catch (err) {
+  console.warn('Could not load media fixtures:', err.message);
+}
+
+function getContentType(filename) {
+  const ext = path.extname(filename).toLowerCase();
+  const types = {
+    '.mp4': 'video/mp4',
+    '.webm': 'video/webm',
+    '.mkv': 'video/x-matroska',
+    '.png': 'image/png',
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+  };
+  return types[ext] || 'application/octet-stream';
+}
 
 function parseRange(rangeHeader, totalSize) {
   if (!rangeHeader) {
@@ -200,6 +242,40 @@ async function startFixtureServer({ port = 18055 } = {}) {
       return;
     }
 
+    // Real media fixtures
+    if (pathname === '/files/media/test-video.mp4') {
+      if (mediaFixtures['test-video.mp4']) {
+        sendBuffer(req, res, mediaFixtures['test-video.mp4'].data, {
+          contentType: mediaFixtures['test-video.mp4'].contentType,
+          filename: 'Test Video.mp4',
+          slowMs: isProbeRequest ? 0 : 0,
+        });
+        return;
+      }
+    }
+
+    if (pathname === '/files/media/test-video.webm') {
+      if (mediaFixtures['test-video.webm']) {
+        sendBuffer(req, res, mediaFixtures['test-video.webm'].data, {
+          contentType: mediaFixtures['test-video.webm'].contentType,
+          filename: 'Test Video.webm',
+          slowMs: isProbeRequest ? 0 : 0,
+        });
+        return;
+      }
+    }
+
+    if (pathname === '/files/media/invalid-video.mp4') {
+      if (mediaFixtures['invalid-video.mp4']) {
+        sendBuffer(req, res, mediaFixtures['invalid-video.mp4'].data, {
+          contentType: mediaFixtures['invalid-video.mp4'].contentType,
+          filename: 'Invalid Video.mp4',
+          slowMs: isProbeRequest ? 0 : 0,
+        });
+        return;
+      }
+    }
+
     if (pathname === '/files/flaky-retry.mp4') {
       if (isProbeRequest) {
         sendBuffer(req, res, BUFFERS['1mb'], {
@@ -328,6 +404,14 @@ async function startFixtureServer({ port = 18055 } = {}) {
         status: 'ok',
         baseUrl: `http://127.0.0.1:${port}`,
         hashes: HASHES,
+        mediaFixtures: Object.keys(mediaFixtures).length > 0 ? {
+          available: true,
+          files: Object.keys(mediaFixtures).map(f => ({
+            name: f,
+            size: mediaFixtures[f].size,
+            hash: mediaFixtures[f].hash
+          }))
+        } : { available: false },
       });
       res.writeHead(200, {
         'Content-Type': 'application/json; charset=utf-8',
