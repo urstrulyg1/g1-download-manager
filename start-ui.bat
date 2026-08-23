@@ -33,16 +33,19 @@ set "BWHITE=%ESC%[97m"
 
 REM ── Banner ────────────────────────────────────────────────────────────────────
 echo.
-echo   %BCYAN%%BOLD% ██████╗   ██╗  ██████╗  ███╗   ███╗%R%
-echo   %BCYAN%%BOLD%██╔════╝  ███║  ██╔══██╗ ████╗ ████║%R%
-echo   %BCYAN%%BOLD%██║  ███╗  ██║  ██║  ██║ ██╔████╔██║%R%
-echo   %BCYAN%%BOLD%██║   ██║  ██║  ██║  ██║ ██║╚██╔╝██║%R%
-echo   %BBLUE%%BOLD%╚██████╔╝  ██║  ██████╔╝ ██║ ╚═╝ ██║%R%
-echo   %BBLUE%%BOLD% ╚═════╝   ╚═╝  ╚═════╝  ╚═╝     ╚═╝%R%
-echo.
-echo   %BWHITE%%BOLD%⚡  G1DM DOWNLOAD MANAGER%R%  %GRAY%·%R%  %BYELLOW%%BOLD%v2.0-PRO%R%  %GRAY%·%R%  %BGREEN%%BOLD%● ACTIVE%R%
-echo   %GRAY%High-Performance Universal Core Engine  ·  Multi-Threaded Turbo Pipeline%R%
-echo   %GRAY%───────────────────────────────────────────────────────────────────────────────%R%
+echo   %BMAGENTA%╭────────────────────────────────────────────────────────────────────────────╮%R%
+echo   %BMAGENTA%│                                                                            │%R%
+echo   %BMAGENTA%│%R%                    %BCYAN%%BOLD% ██████╗   ██╗  ██████╗  ███╗   ███╗%R%                    %BMAGENTA%│%R%
+echo   %BMAGENTA%│%R%                    %BCYAN%%BOLD%██╔════╝  ███║  ██╔══██╗ ████╗ ████║%R%                    %BMAGENTA%│%R%
+echo   %BMAGENTA%│%R%                    %BCYAN%%BOLD%██║  ███╗  ██║  ██║  ██║ ██╔████╔██║%R%                    %BMAGENTA%│%R%
+echo   %BMAGENTA%│%R%                    %BCYAN%%BOLD%██║   ██║  ██║  ██║  ██║ ██║╚██╔╝██║%R%                    %BMAGENTA%│%R%
+echo   %BMAGENTA%│%R%                    %BBLUE%%BOLD%╚██████╔╝  ██║  ██████╔╝ ██║ ╚═╝ ██║%R%                    %BMAGENTA%│%R%
+echo   %BMAGENTA%│%R%                    %BBLUE%%BOLD% ╚═════╝   ╚═╝  ╚═════╝  ╚═╝     ╚═╝%R%                    %BMAGENTA%│%R%
+echo   %BMAGENTA%│                                                                            │%R%
+echo   %BMAGENTA%├────────────────────────────────────────────────────────────────────────────┤%R%
+echo   %BMAGENTA%│%R%            %BWHITE%%BOLD%⚡  G1DM DOWNLOAD MANAGER%R%  %GRAY%·%R%  %BYELLOW%%BOLD%v2.0-PRO%R%  %GRAY%·%R%  %BGREEN%%BOLD%● ACTIVE%R%             %BMAGENTA%│%R%
+echo   %BMAGENTA%│%R%   %GRAY%High-Performance Universal Core Engine  ·  Multi-Threaded Turbo Pipeline%R%   %BMAGENTA%│%R%
+echo   %BMAGENTA%╰────────────────────────────────────────────────────────────────────────────╯%R%
 echo.
 
 REM ── Move to script directory ──────────────────────────────────────────────────

@@ -88,16 +88,29 @@ run_with_spinner() {
 # ── Hero Banner ───────────────────────────────────────────────────────────────
 clear 2>/dev/null || true
 echo ""
-echo -e "  ${CYAN}${BOLD} ██████╗   ██╗  ██████╗  ███╗   ███╗${RESET}"
-echo -e "  ${CYAN}${BOLD}██╔════╝  ███║  ██╔══██╗ ████╗ ████║${RESET}"
-echo -e "  ${AQUA}${BOLD}██║  ███╗  ██║  ██║  ██║ ██╔████╔██║${RESET}"
-echo -e "  ${AQUA}${BOLD}██║   ██║  ██║  ██║  ██║ ██║╚██╔╝██║${RESET}"
-echo -e "  ${BLUE}${BOLD}╚██████╔╝  ██║  ██████╔╝ ██║ ╚═╝ ██║${RESET}"
-echo -e "  ${BLUE}${BOLD} ╚═════╝   ╚═╝  ╚═════╝  ╚═╝     ╚═╝${RESET}"
-echo ""
-echo -e "  ${WHITE}${BOLD}⚡  G1DM DOWNLOAD MANAGER${RESET}  ${GRAY}·${RESET}  ${YELLOW}${BOLD}v2.0-PRO${RESET}  ${GRAY}·${RESET}  ${EMERALD}${BOLD}● ACTIVE${RESET}"
-echo -e "  ${GRAY}High-Performance Universal Core Engine  ·  Multi-Threaded Turbo Pipeline${RESET}"
-echo -e "  ${DARK_GRAY}───────────────────────────────────────────────────────────────────────────────${RESET}"
+
+TERM_WIDTH=$(tput cols 2>/dev/null || echo "80")
+BOX_WIDTH=78
+if [ "$TERM_WIDTH" -gt "$BOX_WIDTH" ]; then
+    PAD_LEN=$(( (TERM_WIDTH - BOX_WIDTH) / 2 ))
+    PAD=$(printf '%*s' "$PAD_LEN" '')
+else
+    PAD=" "
+fi
+
+echo -e "${PAD}${PURPLE}╭────────────────────────────────────────────────────────────────────────────╮${RESET}"
+echo -e "${PAD}${PURPLE}│                                                                            │${RESET}"
+echo -e "${PAD}${PURPLE}│${RESET}                    ${CYAN}${BOLD} ██████╗   ██╗  ██████╗  ███╗   ███╗${RESET}                    ${PURPLE}│${RESET}"
+echo -e "${PAD}${PURPLE}│${RESET}                    ${CYAN}${BOLD}██╔════╝  ███║  ██╔══██╗ ████╗ ████║${RESET}                    ${PURPLE}│${RESET}"
+echo -e "${PAD}${PURPLE}│${RESET}                    ${AQUA}${BOLD}██║  ███╗  ██║  ██║  ██║ ██╔████╔██║${RESET}                    ${PURPLE}│${RESET}"
+echo -e "${PAD}${PURPLE}│${RESET}                    ${AQUA}${BOLD}██║   ██║  ██║  ██║  ██║ ██║╚██╔╝██║${RESET}                    ${PURPLE}│${RESET}"
+echo -e "${PAD}${PURPLE}│${RESET}                    ${BLUE}${BOLD}╚██████╔╝  ██║  ██████╔╝ ██║ ╚═╝ ██║${RESET}                    ${PURPLE}│${RESET}"
+echo -e "${PAD}${PURPLE}│${RESET}                    ${BLUE}${BOLD} ╚═════╝   ╚═╝  ╚═════╝  ╚═╝     ╚═╝${RESET}                    ${PURPLE}│${RESET}"
+echo -e "${PAD}${PURPLE}│                                                                            │${RESET}"
+echo -e "${PAD}${PURPLE}├────────────────────────────────────────────────────────────────────────────┤${RESET}"
+echo -e "${PAD}${PURPLE}│${RESET}            ${WHITE}${BOLD}⚡  G1DM DOWNLOAD MANAGER${RESET}  ${GRAY}·${RESET}  ${YELLOW}${BOLD}v2.0-PRO${RESET}  ${GRAY}·${RESET}  ${EMERALD}${BOLD}● ACTIVE${RESET}             ${PURPLE}│${RESET}"
+echo -e "${PAD}${PURPLE}│${RESET}   ${GRAY}High-Performance Universal Core Engine  ·  Multi-Threaded Turbo Pipeline${RESET}   ${PURPLE}│${RESET}"
+echo -e "${PAD}${PURPLE}╰────────────────────────────────────────────────────────────────────────────╯${RESET}"
 echo ""
 
 # ── Resolve Workspace Directory ───────────────────────────────────────────────
