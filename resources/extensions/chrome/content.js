@@ -267,29 +267,53 @@
     } catch (e) {}
   }
 
+  let probedMaxResolution = 0;
+  let lastProbedUrl = '';
+
+  function fetchBackendMediaAnalysis(pageUrl) {
+    if (!pageUrl || !pageUrl.startsWith('http') || pageUrl === lastProbedUrl) return;
+    lastProbedUrl = pageUrl;
+
+    fetch('http://127.0.0.1:8055/api/media/secure-detect', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: pageUrl })
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data && !data.error) {
+          const recH = data.recommendedQuality?.height;
+          const availH = Array.isArray(data.availableVideoQualities) && data.availableVideoQualities.length > 0
+            ? Math.max(...data.availableVideoQualities.map(q => q.height || 0))
+            : 0;
+          const maxH = recH || availH;
+          if (maxH > 0) {
+            probedMaxResolution = maxH;
+            document.documentElement.setAttribute('data-g1dm-max-height', String(maxH));
+            updateAllOverlays();
+          }
+        }
+      })
+      .catch(() => {});
+  }
+
   function detectMaxAvailableResolution(video) {
-    // 1. Read from main-world DOM bridge (populated from YouTube player API)
+    // 1. Probed analysis from backend media engine
+    if (probedMaxResolution > 0) {
+      return probedMaxResolution;
+    }
+
+    // 2. Read from main-world DOM bridge (populated from YouTube player API)
     const domMax = document.documentElement.getAttribute('data-g1dm-max-height');
     if (domMax) {
       const parsed = parseInt(domMax, 10);
       if (parsed > 0) return parsed;
     }
 
-    // 2. Read HTML5 video element decoded height
+    // 3. Read HTML5 video element decoded height
     if (video && video.videoHeight && video.videoHeight > 0) {
       return video.videoHeight;
     }
-
-    // 3. Sniffed manifest / stream URLs with explicit resolution pattern
-    let sniffedMax = 0;
-    for (const u of detectedMediaUrls) {
-      const m = u.match(/[/_-](\d{3,4})p[._/-]/i);
-      if (m && m[1]) {
-        const val = parseInt(m[1], 10);
-        if (val >= 144 && val <= 4320 && val > sniffedMax) sniffedMax = val;
-      }
-    }
-    if (sniffedMax > 0) return sniffedMax;
 
     // 4. Default fallback: 1080p
     return 1080;
@@ -1134,12 +1158,14 @@
 
   // Initialize
   injectMainWorldBridge();
+  fetchBackendMediaAnalysis(window.location.href);
   scanForVideos();
   snifferMediaRequests();
 
   // Polling sniffer and mutation observer
   const observer = new MutationObserver(() => {
     injectMainWorldBridge();
+    fetchBackendMediaAnalysis(window.location.href);
     scanForVideos();
   });
   observer.observe(document.documentElement || document.body, { childList: true, subtree: true });
