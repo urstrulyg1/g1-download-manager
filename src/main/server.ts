@@ -47,6 +47,8 @@ import { PathGuard } from './security/PathGuard';
 import { redactSettings } from './security/Redact';
 import { BackupService } from './backup/BackupService';
 import { NetworkIntelligence } from './network/NetworkIntelligence';
+import { CrashReporter } from './diagnostics/CrashReporter';
+import { PrivacyCenter } from './security/PrivacyCenter';
 
 export async function createUnifiedServer(port: number = 8055) {
   const rendererDir = path.join(process.cwd(), 'src', 'renderer');
@@ -63,6 +65,8 @@ export async function createUnifiedServer(port: number = 8055) {
 
   const engine = new DownloadEngine(db);
   await engine.init();
+
+  CrashReporter.initialize(db, engine);
 
   const scheduler = new SchedulerService(db, engine);
   scheduler.start();
@@ -670,6 +674,62 @@ export async function createUnifiedServer(port: number = 8055) {
       res.setHeader('Content-Type', 'application/json');
       res.setHeader('Content-Disposition', `attachment; filename="g1dm_diag_${Date.now()}.json"`);
       res.send(report);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Export Sanitized Crash Report
+  app.get('/api/diagnostics/crash-report', (req, res) => {
+    try {
+      const report = CrashReporter.generateExportableCrashReport(db, engine);
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Content-Disposition', `attachment; filename="g1dm_crash_report_${Date.now()}.json"`);
+      res.send(JSON.stringify(report, null, 2));
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // List Local Crash Logs
+  app.get('/api/diagnostics/crash-logs', (req, res) => {
+    try {
+      const logs = db.getCrashLogs(50);
+      res.json(logs);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Privacy Center Summary
+  app.get('/api/privacy/summary', (req, res) => {
+    try {
+      const summary = PrivacyCenter.getPrivacySummary(db);
+      res.json(summary);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Privacy Center Permanent Wipe
+  app.post('/api/privacy/wipe', (req, res) => {
+    try {
+      const result = PrivacyCenter.wipeAllData(db, req.body?.confirmationPhrase);
+      if (!result.success) {
+        return res.status(400).json(result);
+      }
+      res.json(result);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Scheduler Custom Timezone Configuration
+  app.post('/api/scheduler/timezone', (req, res) => {
+    try {
+      const offset = typeof req.body?.offsetMinutes === 'number' ? req.body.offsetMinutes : null;
+      scheduler.setCustomTimezoneOffset(offset);
+      res.json({ success: true, status: scheduler.getStatus() });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }

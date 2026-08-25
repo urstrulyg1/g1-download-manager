@@ -10,6 +10,7 @@ export interface SchedulerPolicyStatus {
   activeQueues: string[];
   powerSource: 'AC' | 'Battery';
   networkType: 'WiFi' | 'Ethernet' | 'Metered';
+  timezoneOffsetMinutes: number;
 }
 
 export class SchedulerService {
@@ -18,6 +19,7 @@ export class SchedulerService {
   private interval: NodeJS.Timeout | null = null;
   private powerSource: 'AC' | 'Battery' = 'AC';
   private networkType: 'WiFi' | 'Ethernet' | 'Metered' = 'WiFi';
+  private customTimezoneOffsetMinutes: number | null = null;
 
   constructor(db: AppDatabase, engine: DownloadEngine) {
     this.db = db;
@@ -52,19 +54,33 @@ export class SchedulerService {
     this.tick();
   }
 
+  public setCustomTimezoneOffset(offsetMinutes: number | null): void {
+    this.customTimezoneOffsetMinutes = offsetMinutes;
+    this.tick();
+  }
+
+  private getCurrentDate(): Date {
+    const now = new Date();
+    if (this.customTimezoneOffsetMinutes !== null) {
+      const utc = now.getTime() + now.getTimezoneOffset() * 60000;
+      return new Date(utc + this.customTimezoneOffsetMinutes * 60000);
+    }
+    return now;
+  }
+
   public getStatus(): SchedulerPolicyStatus {
     const settings = this.db.getSettings();
-    const now = new Date();
+    const now = this.getCurrentDate();
     const currentHour = now.getHours();
     const currentMinute = now.getMinutes();
     const currentDay = now.getDay();
     const currentTimeStr = `${String(currentHour).padStart(2, '0')}:${String(currentMinute).padStart(2, '0')}`;
 
-    const isWorkingHour = settings.scheduler.workingHoursEnabled
+    const isWorkingHour = settings.scheduler?.workingHoursEnabled
       ? this.isTimeInRange(
           currentTimeStr,
-          settings.scheduler.workingHoursStart,
-          settings.scheduler.workingHoursEnd
+          settings.scheduler.workingHoursStart || '09:00',
+          settings.scheduler.workingHoursEnd || '18:00'
         )
       : false;
 
@@ -81,12 +97,13 @@ export class SchedulerService {
       activeQueues,
       powerSource: this.powerSource,
       networkType: this.networkType,
+      timezoneOffsetMinutes: this.customTimezoneOffsetMinutes ?? -now.getTimezoneOffset(),
     };
   }
 
-  private tick(): void {
+  public tick(): void {
     const settings = this.db.getSettings();
-    const now = new Date();
+    const now = this.getCurrentDate();
     const currentHour = now.getHours();
     const currentMinute = now.getMinutes();
     const currentDay = now.getDay(); // 0 = Sun, 1 = Mon, ..., 6 = Sat
@@ -94,11 +111,11 @@ export class SchedulerService {
     const currentTimeStr = `${String(currentHour).padStart(2, '0')}:${String(currentMinute).padStart(2, '0')}`;
 
     // 1. Working Hours & Weekend Bandwidth Limits
-    if (settings.scheduler.workingHoursEnabled) {
+    if (settings.scheduler?.workingHoursEnabled) {
       const isWorkingHour = this.isTimeInRange(
         currentTimeStr,
-        settings.scheduler.workingHoursStart,
-        settings.scheduler.workingHoursEnd
+        settings.scheduler.workingHoursStart || '09:00',
+        settings.scheduler.workingHoursEnd || '18:00'
       );
 
       if (isWorkingHour && !isWeekend) {
@@ -112,19 +129,16 @@ export class SchedulerService {
       }
     }
 
-    // 2. Queue Specific Schedules
+    // 2. Queue Specific Schedules with Midnight Crossover & Day Rollover
     const queues = this.db.getQueues();
     for (const queue of queues) {
       if (!queue.schedule || !queue.schedule.enabled) continue;
 
-      const matchesDay = !queue.schedule.daysOfWeek || queue.schedule.daysOfWeek.includes(currentDay);
-      if (!matchesDay) continue;
+      const startTime = queue.schedule.startTime || '00:00';
+      const stopTime = queue.schedule.stopTime || '23:59';
+      const daysOfWeek = queue.schedule.daysOfWeek || [0, 1, 2, 3, 4, 5, 6];
 
-      const inScheduleWindow = this.isTimeInRange(
-        currentTimeStr,
-        queue.schedule.startTime,
-        queue.schedule.stopTime
-      );
+      const inScheduleWindow = this.isQueueInWindow(currentTimeStr, currentDay, startTime, stopTime, daysOfWeek);
 
       if (inScheduleWindow && queue.status === 'stopped') {
         queue.status = 'active';
@@ -138,7 +152,42 @@ export class SchedulerService {
     }
   }
 
-  private isTimeInRange(current: string, start: string, end: string): boolean {
+  /**
+   * Determines whether the current time and day falls into the queue schedule window,
+   * properly accounting for midnight crossover (e.g. Monday 23:00 to Tuesday 07:00).
+   */
+  public isQueueInWindow(
+    current: string,
+    currentDay: number,
+    start: string,
+    end: string,
+    daysOfWeek: number[]
+  ): boolean {
+    if (daysOfWeek.length === 0) return false;
+
+    if (start <= end) {
+      // Same-day window (e.g. 09:00 to 17:00)
+      const dayMatches = daysOfWeek.includes(currentDay);
+      return dayMatches && current >= start && current <= end;
+    }
+
+    // Midnight crossover window (e.g. 23:00 to 07:00)
+    // Part 1: Evening portion (from start up to 23:59) - belongs to current day
+    if (current >= start) {
+      return daysOfWeek.includes(currentDay);
+    }
+
+    // Part 2: Morning portion (from 00:00 up to end) - started on previous day
+    if (current <= end) {
+      const prevDay = (currentDay + 6) % 7;
+      return daysOfWeek.includes(prevDay);
+    }
+
+    return false;
+  }
+
+  public isTimeInRange(current: string, start: string, end: string): boolean {
+    if (!current || !start || !end) return false;
     if (start <= end) {
       return current >= start && current <= end;
     }

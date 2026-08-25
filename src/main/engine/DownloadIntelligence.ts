@@ -103,7 +103,7 @@ export class DownloadIntelligence {
       const existingNormUrl = normalizeUrl(existing.url);
 
       // 1. Same SHA256 or (Same ETag + Same Size + Same URL)
-      if (candidate.sha256 && existing.checksum.actual && candidate.sha256.toLowerCase() === existing.checksum.actual.toLowerCase()) {
+      if (candidate.sha256 && existing.checksum?.actual && candidate.sha256.toLowerCase() === existing.checksum.actual.toLowerCase()) {
         return {
           classification: 'DEFINITELY_DUPLICATE',
           matchedDownloadId: existing.id,

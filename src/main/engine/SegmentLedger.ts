@@ -14,7 +14,7 @@ export interface LedgerSegment {
   segmentId: number;
   downloadId: string;
   startOffset: number;
-  endOffset: number; // inclusive
+  endOffset: number; // inclusive, -1 for unknown size single-stream
   currentOffset: number;
   claimedBy?: string; // workerId
   status: LedgerSegmentStatus;
@@ -25,6 +25,11 @@ export interface LedgerSegment {
   createdAt: number;
   updatedAt: number;
   stolenFromSegmentId?: number;
+}
+
+export interface LedgerValidationResult {
+  valid: boolean;
+  errors: string[];
 }
 
 export class SegmentLedger extends EventEmitter {
@@ -167,10 +172,13 @@ export class SegmentLedger extends EventEmitter {
 
   public updateProgress(segmentId: number, bytesDelta: number): void {
     const seg = this.segments.get(segmentId);
-    if (!seg) return;
+    if (!seg || bytesDelta <= 0) return;
 
-    seg.currentOffset += bytesDelta;
-    seg.bytesCompleted += bytesDelta;
+    const maxAllowed = seg.endOffset !== -1 ? seg.endOffset - seg.currentOffset + 1 : bytesDelta;
+    const actualDelta = Math.min(bytesDelta, Math.max(0, maxAllowed));
+
+    seg.currentOffset += actualDelta;
+    seg.bytesCompleted += actualDelta;
     seg.status = 'DOWNLOADING';
     seg.updatedAt = Date.now();
 
@@ -182,6 +190,10 @@ export class SegmentLedger extends EventEmitter {
   public markCompleted(segmentId: number): void {
     const seg = this.segments.get(segmentId);
     if (seg) {
+      if (seg.endOffset !== -1) {
+        seg.currentOffset = seg.endOffset + 1;
+        seg.bytesCompleted = seg.endOffset - seg.startOffset + 1;
+      }
       seg.status = 'COMPLETED';
       seg.version++;
       seg.updatedAt = Date.now();
@@ -209,6 +221,64 @@ export class SegmentLedger extends EventEmitter {
       seg.version++;
       seg.updatedAt = Date.now();
     }
+  }
+
+  public getTotalCompletedBytes(): number {
+    let sum = 0;
+    for (const seg of this.segments.values()) {
+      if (seg.status !== 'ABANDONED') {
+        sum += seg.bytesCompleted;
+      }
+    }
+    return sum;
+  }
+
+  public validateInvariants(): LedgerValidationResult {
+    const errors: string[] = [];
+    const list = Array.from(this.segments.values())
+      .filter((s) => s.status !== 'ABANDONED')
+      .sort((a, b) => a.startOffset - b.startOffset);
+
+    for (let i = 0; i < list.length; i++) {
+      const s = list[i];
+
+      // 1. Negative range checks
+      if (s.startOffset < 0) {
+        errors.push(`Segment ${s.segmentId} has negative startOffset: ${s.startOffset}`);
+      }
+      if (s.endOffset !== -1 && s.endOffset < s.startOffset) {
+        errors.push(`Segment ${s.segmentId} has endOffset (${s.endOffset}) < startOffset (${s.startOffset})`);
+      }
+
+      // 2. Out-of-bounds checks
+      if (this.totalBytes > 0 && s.endOffset >= this.totalBytes) {
+        errors.push(`Segment ${s.segmentId} endOffset (${s.endOffset}) exceeds totalBytes (${this.totalBytes})`);
+      }
+
+      // 3. Impossible progress
+      if (s.bytesCompleted < 0) {
+        errors.push(`Segment ${s.segmentId} has negative bytesCompleted: ${s.bytesCompleted}`);
+      }
+      if (s.endOffset !== -1) {
+        const span = s.endOffset - s.startOffset + 1;
+        if (s.bytesCompleted > span) {
+          errors.push(`Segment ${s.segmentId} bytesCompleted (${s.bytesCompleted}) exceeds span (${span})`);
+        }
+      }
+
+      // 4. Overlap check with next segment
+      if (i < list.length - 1) {
+        const next = list[i + 1];
+        if (s.endOffset >= next.startOffset) {
+          errors.push(`Overlap between Segment ${s.segmentId} [${s.startOffset}-${s.endOffset}] and Segment ${next.segmentId} [${next.startOffset}-${next.endOffset}]`);
+        }
+      }
+    }
+
+    return {
+      valid: errors.length === 0,
+      errors,
+    };
   }
 
   public validateZeroOverlap(): boolean {
@@ -255,6 +325,34 @@ export class SegmentLedger extends EventEmitter {
     }
 
     return { valid: true };
+  }
+
+  public isCompleteAndConsistent(): { consistent: boolean; reason?: string } {
+    if (!this.isAllCompleted()) {
+      return { consistent: false, reason: 'Not all segments are in COMPLETED status' };
+    }
+
+    const inv = this.validateInvariants();
+    if (!inv.valid) {
+      return { consistent: false, reason: `Invariant violations: ${inv.errors.join('; ')}` };
+    }
+
+    const gap = this.validateZeroGap();
+    if (!gap.valid) {
+      return { consistent: false, reason: gap.error };
+    }
+
+    if (this.totalBytes > 0) {
+      const totalCompleted = this.getTotalCompletedBytes();
+      if (totalCompleted !== this.totalBytes) {
+        return {
+          consistent: false,
+          reason: `Total completed bytes mismatch: sum is ${totalCompleted}, expected ${this.totalBytes}`,
+        };
+      }
+    }
+
+    return { consistent: true };
   }
 
   public getSegments(): LedgerSegment[] {

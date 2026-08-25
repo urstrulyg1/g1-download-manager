@@ -21,7 +21,7 @@ export const ClipboardToast: React.FC<ClipboardToastProps> = ({
       role="status"
       aria-live="polite"
       aria-label="Clipboard URL detected"
-      className="fixed bottom-6 right-6 z-50 bg-slate-900 border border-blue-500/50 rounded-2xl shadow-2xl p-4 max-w-sm w-full animate-in slide-in-from-bottom-5 duration-200"
+      className="fixed bottom-6 right-6 z-50 bg-slate-900 border border-blue-500/50 rounded-2xl shadow-2xl p-4 max-w-sm w-full animate-toast-in"
     >
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-2.5">

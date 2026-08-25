@@ -39,7 +39,7 @@ export class ResourceGovernor {
     if (cpuPct > this.limits.cpuThrottleThresholdPct) {
       isThrottling = true;
       throttleReason = `High system CPU load (${cpuPct}%). Reducing background concurrency.`;
-    } else if (mem.heapUsed > this.limits.maxMemoryBufferBytes * 2) {
+    } else if (mem.heapUsed > 640 * 1024 * 1024) {
       isThrottling = true;
       throttleReason = `Memory pressure (${(mem.heapUsed / 1024 / 1024).toFixed(0)} MB). Applying buffer flush.`;
     } else if (activeSockets >= this.limits.maxGlobalSockets) {

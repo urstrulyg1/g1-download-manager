@@ -53,6 +53,10 @@ export const DiagnosticsView: React.FC<DiagnosticsViewProps> = ({ lang }) => {
     window.open('/api/diagnostics/export', '_blank');
   };
 
+  const handleExportCrashReport = () => {
+    window.open('/api/diagnostics/crash-report', '_blank');
+  };
+
   const formatBytes = (bytes?: number) => {
     if (!bytes || bytes <= 0) return '0 B';
     const k = 1024;
@@ -90,7 +94,15 @@ export const DiagnosticsView: React.FC<DiagnosticsViewProps> = ({ lang }) => {
             className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold flex items-center gap-1.5 shadow-lg shadow-blue-600/30"
           >
             <Download className="w-4 h-4" />
-            <span>Export Redacted Report</span>
+            <span>Export Diagnostics</span>
+          </button>
+
+          <button
+            onClick={handleExportCrashReport}
+            className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-300 text-xs font-bold flex items-center gap-1.5 border border-slate-700 transition-colors"
+          >
+            <Download className="w-4 h-4" />
+            <span>Export Crash Report</span>
           </button>
         </div>
       </div>
