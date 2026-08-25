@@ -192,7 +192,7 @@ export const IdmProgressModal: React.FC<IdmProgressModalProps> = ({
                 ? 'Download Paused'
                 : isFailed
                 ? 'Download Failed'
-                : 'Downloading Video'}
+                : 'Downloading'}
             </span>
           </div>
 
@@ -236,7 +236,7 @@ export const IdmProgressModal: React.FC<IdmProgressModalProps> = ({
               </div>
             ) : (
               <div className="w-14 h-14 rounded-xl bg-gradient-to-tr from-blue-500/20 to-cyan-500/20 border border-blue-500/30 text-blue-400 flex items-center justify-center shrink-0">
-                {item.category === 'audio' ? <FileAudio className="w-7 h-7" /> : <FileVideo className="w-7 h-7" />}
+                {item.category === 'audio' ? <FileAudio className="w-7 h-7" /> : item.category === 'video' ? <FileVideo className="w-7 h-7" /> : <HardDrive className="w-7 h-7" />}
               </div>
             )}
 
@@ -374,6 +374,11 @@ export const IdmProgressModal: React.FC<IdmProgressModalProps> = ({
                 {item.avgSpeed > 0 ? `${formatBytes(item.avgSpeed)}/s` : '—'}
               </span>
             </div>
+          </div>
+
+          <div className="p-2.5 rounded-xl bg-slate-950/40 border border-slate-800/60 flex items-center gap-2 text-xs font-mono text-slate-400 truncate" data-testid="idm-source">
+            <ExternalLink className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+            <span className="truncate" title={item.url}>Source: {item.url}</span>
           </div>
 
           {/* Destination Path */}

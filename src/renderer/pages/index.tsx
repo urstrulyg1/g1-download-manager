@@ -40,6 +40,7 @@ import {
 import { Language } from '../lib/i18n';
 import { DownloadItem } from '../../shared/types';
 import { api } from '../lib/api';
+import { chooseDownloadPopup } from '../lib/downloadPopupLifecycle';
 
 export default function Home() {
   const {
@@ -72,6 +73,10 @@ export default function Home() {
   const [isActionCenterOpen, setIsActionCenterOpen] = useState(false);
   const [selectedDownload, setSelectedDownload] = useState<DownloadItem | null>(null);
   const [activeIdmDownloadId, setActiveIdmDownloadId] = useState<string | null>(null);
+  // Presentation-only lifecycle. Download state itself remains exclusively in
+  // useDownloadEngine / the server WebSocket stream.
+  const [minimizedDownloadIds, setMinimizedDownloadIds] = useState<Set<string>>(() => new Set());
+  const [dismissedDownloadIds, setDismissedDownloadIds] = useState<Set<string>>(() => new Set());
   const [isRetryingFailed, setIsRetryingFailed] = useState(false);
   const [retryFailedError, setRetryFailedError] = useState<string | null>(null);
 
@@ -90,6 +95,22 @@ export default function Home() {
       setIsRetryingFailed(false);
     }
   };
+
+  // Deterministic popup lifecycle: newly active engine items open a popup;
+  // minimizing never mutates the engine; completion restores a minimized item.
+  useEffect(() => {
+    const popupDecision = chooseDownloadPopup(downloads, activeIdmDownloadId, minimizedDownloadIds, dismissedDownloadIds);
+    const completedWhileMinimized = popupDecision.restoreCompletedId ? downloads.find((item) => item.id === popupDecision.restoreCompletedId) : undefined;
+    if (completedWhileMinimized) {
+      setMinimizedDownloadIds((previous) => {
+        const next = new Set(previous); next.delete(completedWhileMinimized.id); return next;
+      });
+      setDismissedDownloadIds((previous) => { const next = new Set(previous); next.delete(completedWhileMinimized.id); return next; });
+      setActiveIdmDownloadId(completedWhileMinimized.id);
+      return;
+    }
+    if (!activeIdmDownloadId && popupDecision.openId) setActiveIdmDownloadId(popupDecision.openId);
+  }, [downloads, activeIdmDownloadId, minimizedDownloadIds, dismissedDownloadIds]);
 
   const [clipboardUrl, setClipboardUrl] = useState<string | null>(null);
   const [inboxItems, setInboxItems] = useState<InboxItem[]>([]);
@@ -543,9 +564,28 @@ export default function Home() {
 
       <IdmProgressModal
         item={downloads.find((d) => d.id === activeIdmDownloadId) || null}
-        onClose={() => setActiveIdmDownloadId(null)}
-        onMinimize={() => setActiveIdmDownloadId(null)}
+        onClose={() => {
+          if (activeIdmDownloadId) setDismissedDownloadIds((previous) => new Set(previous).add(activeIdmDownloadId));
+          setActiveIdmDownloadId(null);
+        }}
+        onMinimize={() => {
+          if (activeIdmDownloadId) setMinimizedDownloadIds((previous) => new Set(previous).add(activeIdmDownloadId));
+          setActiveIdmDownloadId(null);
+        }}
       />
+
+      {minimizedDownloadIds.size > 0 && (
+        <div className="fixed bottom-4 right-4 z-40 w-72 rounded-xl border border-blue-400/30 bg-slate-950/95 shadow-2xl shadow-blue-950/50 backdrop-blur p-2 animate-in fade-in slide-in-from-bottom-2 duration-150" data-testid="idm-minimized-center" aria-label="Minimized download progress">
+          <div className="px-2 pb-1.5 text-[10px] font-bold uppercase tracking-wider text-blue-300">G1DM Downloads · {minimizedDownloadIds.size}</div>
+          {downloads.filter((item) => minimizedDownloadIds.has(item.id)).map((item) => (
+            <button key={item.id} onClick={() => { setMinimizedDownloadIds((previous) => { const next = new Set(previous); next.delete(item.id); return next; }); setActiveIdmDownloadId(item.id); }} className="w-full rounded-lg px-2 py-2 text-left hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-cyan-400" aria-label={`Restore ${item.filename} progress popup`}>
+              <div className="flex justify-between gap-2 text-xs"><span className="truncate font-semibold text-slate-100">{item.filename}</span><span className="shrink-0 text-cyan-300">{item.progress.toFixed(0)}%</span></div>
+              <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-slate-800"><div className="h-full rounded-full bg-gradient-to-r from-blue-500 to-cyan-400 transition-[width] duration-200 motion-reduce:transition-none" style={{ width: `${Math.max(0, Math.min(100, item.progress))}%` }} /></div>
+              <div className="mt-1 text-[10px] text-slate-400">↓ {item.speed > 0 ? `${(item.speed / 1024 / 1024).toFixed(1)} MB/s` : 'Waiting'} · {item.status}</div>
+            </button>
+          ))}
+        </div>
+      )}
 
       <CommandPalette
         isOpen={isCommandPaletteOpen}
