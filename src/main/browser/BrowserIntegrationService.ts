@@ -105,7 +105,7 @@ export class BrowserIntegrationService {
       name: 'G1DM — Internet Download Manager Integration',
       version: '1.0.0',
       description: 'Official companion extension for G1DM Next-Generation Download Manager',
-      permissions: ['downloads', 'contextMenus', 'storage', 'activeTab'],
+      permissions: ['contextMenus', 'storage', 'activeTab'],
       host_permissions: ['<all_urls>'],
       background: {
         service_worker: 'background.js',
@@ -170,37 +170,8 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
   }
 });
 
-// Download Interception
-chrome.downloads.onCreated.addListener((downloadItem) => {
-  chrome.storage.local.get(["interceptionEnabled"], (data) => {
-    if (data.interceptionEnabled !== false) {
-      // The browser reports a full native path (or sometimes just a basename).
-      // Extract a safe basename here; the G1DM engine then re-runs its full
-      // filename resolution pipeline (user name -> media title ->
-      // Content-Disposition -> page title -> URL filename -> safe fallback),
-      // so a generic or empty name here does NOT lock in a bad filename.
-      const suggested = sanitizeBrowserFilename(downloadItem.filename);
-      sendToG1DM(downloadItem.url, suggested);
-      chrome.downloads.cancel(downloadItem.id);
-    }
-  });
-});
-
-// Strip directory components the browser included and remove characters that
-// are illegal on common filesystems. Multi-byte (Unicode) characters are kept.
-function sanitizeBrowserFilename(rawName) {
-  if (!rawName) return undefined;
-  let name = String(rawName);
-  // Both Windows and POSIX separators may appear across platforms.
-  const parts = name.split(/[\\/]/);
-  name = parts[parts.length - 1] || name;
-  name = name.replace(/[\\/:*?"<>|\u0000-\u001f]/g, '_').trim();
-  name = name.replace(/\.{2,}/g, '_');
-  if (!name || name === '.' || name === '..' || /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(\.|$)/i.test(name)) {
-    return undefined;
-  }
-  return name;
-}
+// This companion never invokes browser download APIs. It only submits URLs
+// to G1DM; the core DownloadEngine performs the transfer.
 
 async function sendToG1DM(url, filename) {
   try {

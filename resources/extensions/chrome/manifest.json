@@ -4,7 +4,6 @@
   "version": "4.0.0",
   "description": "Official companion extension for G1DM Next-Generation Download Manager. Intercepts downloads, captures video streams, and provides right-click download menus.",
   "permissions": [
-    "downloads",
     "contextMenus",
     "storage",
     "activeTab",

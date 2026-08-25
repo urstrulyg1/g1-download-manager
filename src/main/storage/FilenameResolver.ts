@@ -112,7 +112,8 @@ export class FilenameResolver {
         const userExt = userRawExt.replace(/^\./, '');
         const userStem = this.sanitizeStem(path.basename(user, userRawExt));
         if (userStem) {
-          const useExt = userExt && !PAGE_EXTS.has(userExt.toLowerCase()) ? userExt : ext;
+          if (!userExt) return this.buildExtensionless(userStem, 'user');
+          const useExt = !PAGE_EXTS.has(userExt.toLowerCase()) ? userExt : ext;
           return this.build(userStem, useExt, 'user');
         }
       }
@@ -130,8 +131,9 @@ export class FilenameResolver {
         const cdRawExt = path.extname(cd);
         const cdExt = cdRawExt.replace(/^\./, '');
         const cdStem = this.sanitizeStem(path.basename(cd, cdRawExt));
-        if (cdStem && !this.isGenericStem(cdStem)) {
-          const useExt = cdExt && !PAGE_EXTS.has(cdExt.toLowerCase()) ? cdExt : ext;
+        if (cdStem) {
+          if (!cdExt) return this.buildExtensionless(cdStem, 'content_disposition');
+          const useExt = !PAGE_EXTS.has(cdExt.toLowerCase()) ? cdExt : ext;
           return this.build(cdStem, useExt, 'content_disposition');
         }
       }
@@ -150,12 +152,18 @@ export class FilenameResolver {
         const pfRawExt = path.extname(pf);
         const pfExt = pfRawExt.replace(/^\./, '');
         const pfStem = this.sanitizeStem(path.basename(pf, pfRawExt));
-        if (pfStem && !this.isGenericStem(pfStem)) {
+        // A URL basename with a real extension is a meaningful direct-file
+        // signal even when its stem happens to be `video` or `download`.
+        // Generic extensionless page tokens are still ignored below.
+        if (pfStem && (Boolean(pfExt) || !this.isGenericStem(pfStem))) {
           // If the probe filename carries a real extension, honor it
           // (case preserved); otherwise attach the resolved extension.
           if (pfExt && !PAGE_EXTS.has(pfExt.toLowerCase())) {
             return this.build(pfStem, pfExt, 'url');
           }
+          // A meaningful extensionless URL is a valid server filename. Do not
+          // invent `.bin`, `.mp4`, or another suffix merely for display.
+          if (!pfExt) return this.buildExtensionless(pfStem, 'url');
           return this.build(pfStem, ext, 'url');
         }
       }
@@ -241,6 +249,14 @@ export class FilenameResolver {
   }
 
   // --- internal helpers ----------------------------------------------------
+
+  private static buildExtensionless(
+    stem: string,
+    source: ResolvedFilename['source']
+  ): ResolvedFilename {
+    const safeStem = this.sanitizeStem(stem) || 'download';
+    return { filename: safeStem, stem: safeStem, ext: '', source };
+  }
 
   private static build(
     stem: string,

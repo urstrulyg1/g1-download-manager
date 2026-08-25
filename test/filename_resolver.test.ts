@@ -117,9 +117,9 @@ describe('FilenameResolver — priority chain & safety', () => {
 
     it('uses a neutral fallback rather than assuming every unknown resource is media', () => {
       const audio = FilenameResolver.resolve({ url: 'https://x/y', isAudio: true, probeFilename: 'y' });
-      expect(audio.ext).toBe('bin');
+      expect(audio.ext).toBe('');
       const unknown = FilenameResolver.resolve({ url: 'https://x/y', probeFilename: 'y' });
-      expect(unknown.ext).toBe('bin');
+      expect(unknown.ext).toBe('');
     });
 
     it('keeps a real extension from the URL filename', () => {
@@ -153,7 +153,7 @@ describe('FilenameResolver — priority chain & safety', () => {
         mediaTitle: 'Real Title',
         mediaContainer: 'mp4',
       });
-      expect(r.filename).toBe('watch.mp4');
+      expect(r.filename).toBe('watch');
       expect(r.source).toBe('user');
     });
   });

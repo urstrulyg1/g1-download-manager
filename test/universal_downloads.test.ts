@@ -24,7 +24,7 @@ describe('universal downloads', () => {
   });
 
   it('handles no extension, Unicode, long names, Content-Disposition, and malicious input safely', () => {
-    expect(FilenameResolver.resolve({ url: 'https://x/download', probeFilename: 'download' }).filename).toBe('download.bin');
+    expect(FilenameResolver.resolve({ url: 'https://x/file-without-extension', probeFilename: 'file-without-extension' }).filename).toBe('file-without-extension');
     expect(FilenameResolver.resolve({ url: 'https://x', contentDispositionFilename: '日本語の資料.pdf' }).filename).toBe('日本語の資料.pdf');
     const long = FilenameResolver.resolve({ url: 'https://x', userFilename: `${'x'.repeat(500)}.iso` });
     expect(long.filename.length).toBeLessThanOrEqual(255);
@@ -67,6 +67,88 @@ describe('universal downloads', () => {
     } finally {
       await engine.shutdown();
       db.close();
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
+  }, 30000);
+});
+
+describe('canonical DownloadEngine HTTP path', () => {
+  const dir = path.join(__dirname, 'tmp_canonical_engine');
+  const fixtures = [
+    'song.mp3', 'video.mp4', 'archive.zip', 'document.pdf', 'program.exe',
+    'disk.iso', 'package.apk', 'image.png', 'unknown.bin',
+    'file-without-extension', 'unicode-name文件.mp4',
+  ];
+
+  beforeAll(() => fs.mkdirSync(dir, { recursive: true }));
+  afterAll(() => fs.rmSync(dir, { recursive: true, force: true }));
+
+  it('transfers every direct fixture through HttpDownloader, including redirects and missing headers', async () => {
+    const payload = Buffer.alloc(1024 * 1024, 0x47);
+    const server = http.createServer((req, res) => {
+      const requested = decodeURIComponent((req.url || '/').slice(1));
+      if (requested === 'redirect') {
+        res.writeHead(302, { Location: '/document.pdf' }); res.end(); return;
+      }
+      if (!fixtures.includes(requested)) { res.writeHead(404); res.end(); return; }
+      const headers: Record<string, string | number> = { 'Content-Length': payload.length };
+      // Simulate realistic server combinations: Content-Disposition, octet
+      // stream, no Content-Type, and range capability. None are rejected.
+      if (requested !== 'unknown.bin') headers['Content-Type'] = requested === 'file-without-extension' ? 'application/octet-stream' : 'application/x-test';
+      if (requested !== 'file-without-extension') headers['Content-Disposition'] = `attachment; filename*=UTF-8''${encodeURIComponent(requested)}`;
+      if (requested !== 'unknown.bin') headers['Accept-Ranges'] = 'bytes';
+      const range = req.headers.range;
+      if (range && requested !== 'unknown.bin') {
+        const match = /bytes=(\d+)-(\d*)/.exec(range);
+        const start = match ? Number(match[1]) : 0;
+        const end = match && match[2] ? Math.min(Number(match[2]), payload.length - 1) : payload.length - 1;
+        res.writeHead(206, { ...headers, 'Content-Range': `bytes ${start}-${end}/${payload.length}`, 'Content-Length': end - start + 1 });
+        res.end(payload.subarray(start, end + 1));
+      } else {
+        res.writeHead(200, headers); res.end(payload);
+      }
+    });
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    const port = (server.address() as any).port;
+    const db = new AppDatabase(path.join(dir, `canonical-${Date.now()}.db`));
+    await db.init();
+    const engine = new DownloadEngine(db);
+    await engine.init();
+    // Instrument the actual worker class—not merely file existence—to prove
+    // each direct fixture enters G1DM's canonical transfer worker.
+    const { HttpDownloader } = await import('../src/main/engine/HttpDownloader');
+    const originalStart = HttpDownloader.prototype.start;
+    const workerStarts: string[] = [];
+    HttpDownloader.prototype.start = async function(this: any) {
+      workerStarts.push(this.item.filename);
+      return originalStart.call(this);
+    };
+    try {
+      for (const name of [...fixtures, 'redirect']) {
+        const item = await engine.addDownload({ url: `http://127.0.0.1:${port}/${encodeURIComponent(name)}`, destinationDir: dir, startImmediately: false });
+        await new Promise<void>((resolve, reject) => {
+          const completed = (done: any) => {
+            if (done.id !== item.id) return;
+            engine.off('item_completed', completed);
+            engine.off('item_error', failed);
+            resolve();
+          };
+          const failed = (error: Error, failedItem: any) => {
+            if (failedItem?.id !== item.id) return;
+            engine.off('item_completed', completed);
+            reject(error);
+          };
+          engine.on('item_completed', completed);
+          engine.on('item_error', failed);
+          engine.startDownload(item.id).catch((error) => failed(error, item));
+        });
+        expect(fs.existsSync(item.finalPath)).toBe(true);
+      }
+      expect(workerStarts).toHaveLength(fixtures.length + 1);
+      expect(workerStarts).toEqual(expect.arrayContaining(['song.mp3', 'video.mp4', 'archive.zip', 'document.pdf', 'program.exe', 'disk.iso', 'package.apk', 'image.png', 'unknown.bin', 'file-without-extension', 'unicode-name文件.mp4']));
+    } finally {
+      HttpDownloader.prototype.start = originalStart;
+      await engine.shutdown(); db.close();
       await new Promise<void>((resolve) => server.close(() => resolve()));
     }
   }, 30000);
