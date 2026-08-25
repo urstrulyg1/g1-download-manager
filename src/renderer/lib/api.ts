@@ -173,4 +173,36 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ text }),
     }),
+
+  // Verification & Mismatch Resolution
+  resolveChecksum: (id: string, action: 'retry' | 'keep' | 'delete') =>
+    req<{ success: boolean; message: string }>(`/downloads/${id}/resolve-checksum`, {
+      method: 'POST',
+      body: JSON.stringify({ action }),
+    }),
+
+  // QoS Bandwidth Governor
+  getBandwidthAllocations: () => req<any[]>('/qos/allocations'),
+
+  // Network Intelligence
+  getNetworkIntelligence: () => req<any>('/network/intelligence'),
+  checkNetwork: () => req<any>('/network/check', { method: 'POST' }),
+
+  // Automation Rules
+  getRules: () => req<any[]>('/rules'),
+  saveRules: (rules: any[]) =>
+    req<{ success: boolean; rules: any[] }>('/rules', {
+      method: 'POST',
+      body: JSON.stringify({ rules }),
+    }),
+
+  // Scheduler Status
+  getSchedulerStatus: () => req<any>('/scheduler/status'),
+
+  // Backup & Restore
+  importBackup: (payload: any) =>
+    req<any>('/backup/import', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
 };

@@ -514,6 +514,61 @@ export const DownloadDetailModal: React.FC<DownloadDetailModalProps> = ({ item, 
                   <span>Calculate & Verify Checksum</span>
                 </button>
 
+                {item.checksum?.status === 'verified' && (
+                  <div className="p-4 rounded-xl bg-emerald-950/50 border border-emerald-500/40 text-emerald-300 space-y-1">
+                    <div className="flex items-center gap-2 font-bold text-sm">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                      <span>Integrity Verified ✓</span>
+                    </div>
+                    <p className="text-xs text-emerald-200/80">
+                      Calculated {item.checksum.algorithm.toUpperCase()} hash matches the expected value.
+                    </p>
+                  </div>
+                )}
+
+                {item.checksum?.status === 'failed' && (
+                  <div className="p-4 rounded-xl bg-rose-950/60 border border-rose-500/50 text-rose-300 space-y-3">
+                    <div className="flex items-center gap-2 font-bold text-sm text-rose-400">
+                      <XCircle className="w-5 h-5" />
+                      <span>Integrity Verification Failed — Checksum Mismatch</span>
+                    </div>
+                    <p className="text-xs text-rose-200/90 leading-relaxed">
+                      The downloaded file hash does not match expected value. The file may be corrupt or altered.
+                    </p>
+                    <div className="flex items-center gap-2 pt-1 flex-wrap">
+                      <button
+                        onClick={async () => {
+                          await api.resolveChecksum(item.id, 'retry');
+                          onClose();
+                        }}
+                        className="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-semibold text-xs flex items-center gap-1.5 shadow-sm"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5" />
+                        <span>Retry Download</span>
+                      </button>
+                      <button
+                        onClick={async () => {
+                          await api.resolveChecksum(item.id, 'keep');
+                          if (item.checksum) item.checksum.status = 'verified';
+                        }}
+                        className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs border border-slate-700"
+                      >
+                        <span>Keep File Anyway</span>
+                      </button>
+                      <button
+                        onClick={async () => {
+                          await api.resolveChecksum(item.id, 'delete');
+                          onClose();
+                        }}
+                        className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-rose-900/60 text-rose-400 hover:text-rose-200 font-semibold text-xs border border-slate-700"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Delete File</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 {item.checksum?.actual && (
                   <div className="p-3 rounded-lg bg-slate-900 border border-slate-800 space-y-1">
                     <div className="text-slate-400 text-[10px]">Calculated {item.checksum.algorithm.toUpperCase()} Hash:</div>

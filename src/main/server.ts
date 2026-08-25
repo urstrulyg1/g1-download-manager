@@ -45,6 +45,8 @@ import { RequestAuth } from './security/RequestAuth';
 import { UrlGuard } from './security/UrlGuard';
 import { PathGuard } from './security/PathGuard';
 import { redactSettings } from './security/Redact';
+import { BackupService } from './backup/BackupService';
+import { NetworkIntelligence } from './network/NetworkIntelligence';
 
 export async function createUnifiedServer(port: number = 8055) {
   const rendererDir = path.join(process.cwd(), 'src', 'renderer');
@@ -64,6 +66,9 @@ export async function createUnifiedServer(port: number = 8055) {
 
   const scheduler = new SchedulerService(db, engine);
   scheduler.start();
+
+  const networkIntelligence = new NetworkIntelligence();
+  networkIntelligence.start();
 
   const grabber = new SiteGrabber(db, engine);
   const clipboardMonitor = new ClipboardMonitor();
@@ -226,6 +231,16 @@ export async function createUnifiedServer(port: number = 8055) {
 
   grabber.on('project_updated', (proj) => broadcast('grabber_project_updated', proj));
 
+  networkIntelligence.on('network_lost', (status) => {
+    broadcast('network_lost', status);
+  });
+  networkIntelligence.on('network_restored', (status) => {
+    broadcast('network_restored', status);
+  });
+  networkIntelligence.on('status_change', (status) => {
+    broadcast('network_status', status);
+  });
+
   // Periodic metrics broadcast
   const metricsInterval = setInterval(() => {
     if (clients.size === 0) return;
@@ -236,6 +251,7 @@ export async function createUnifiedServer(port: number = 8055) {
   server.on('close', () => {
     clearInterval(metricsInterval);
     scheduler.stop();
+    networkIntelligence.stop();
   });
 
   // Validate a user-supplied URL before the backend fetches it (SSRF guard).
@@ -412,6 +428,46 @@ export async function createUnifiedServer(port: number = 8055) {
       db.saveDownload(item);
       broadcast('item_updated', item);
       res.json(verified);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/downloads/:id/resolve-checksum', async (req, res) => {
+    try {
+      const { action } = req.body; // 'retry' | 'keep' | 'delete'
+      const item = engine.getDownload(req.params.id);
+      if (!item) return res.status(404).json({ error: 'Download not found' });
+
+      if (action === 'retry') {
+        if (fs.existsSync(item.finalPath)) {
+          try { fs.unlinkSync(item.finalPath); } catch {}
+        }
+        if (fs.existsSync(item.tempPath)) {
+          try { fs.unlinkSync(item.tempPath); } catch {}
+        }
+        item.downloadedBytes = 0;
+        item.progress = 0;
+        item.status = 'queued';
+        item.segments = [];
+        item.error = null;
+        db.saveDownload(item);
+        broadcast('item_updated', item);
+        await engine.startDownload(item.id);
+        res.json({ success: true, message: 'Download restarted' });
+      } else if (action === 'keep') {
+        if (item.checksum) {
+          item.checksum.status = 'verified';
+        }
+        db.saveDownload(item);
+        broadcast('item_updated', item);
+        res.json({ success: true, message: 'File kept and checksum verified' });
+      } else if (action === 'delete') {
+        engine.deleteDownload(item.id, true);
+        res.json({ success: true, message: 'File deleted' });
+      } else {
+        res.status(400).json({ error: 'Invalid action. Must be retry, keep, or delete.' });
+      }
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -1301,39 +1357,82 @@ export async function createUnifiedServer(port: number = 8055) {
     });
   }
 
-  // Export / Import State
-  app.get('/api/export', (req, res) => {
-    const exportData = {
-      version: '1.0.0',
-      timestamp: Date.now(),
-      downloads: db.getAllDownloads(),
-      queues: db.getQueues(),
-      categories: db.getCategories(),
-      settings: redactSettings(db.getSettings()),
-      history: db.getHistory(),
-      grabberProjects: db.getGrabberProjects(),
-    };
+  // QoS Bandwidth Governor allocations
+  app.get('/api/qos/allocations', (req, res) => {
+    const allocations = engine.getBandwidthGovernor().calculateAllocations(engine.getAllDownloads());
+    res.json(Array.from(allocations.values()));
+  });
+
+  // Network Intelligence
+  app.get('/api/network/intelligence', (req, res) => {
+    res.json(networkIntelligence.getStatus());
+  });
+
+  app.post('/api/network/check', async (req, res) => {
+    const online = await networkIntelligence.checkConnectivity();
+    res.json({ online, status: networkIntelligence.getStatus() });
+  });
+
+  // Automation Rules
+  app.get('/api/rules', (req, res) => {
+    res.json(engine.getRuleEngine().getRules());
+  });
+
+  app.post('/api/rules', (req, res) => {
+    try {
+      if (Array.isArray(req.body.rules)) {
+        engine.getRuleEngine().setRules(req.body.rules);
+        res.json({ success: true, rules: engine.getRuleEngine().getRules() });
+      } else {
+        res.status(400).json({ error: 'rules array is required' });
+      }
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Scheduler Status
+  app.get('/api/scheduler/status', (req, res) => {
+    res.json(scheduler.getStatus());
+  });
+
+  // Backup & Restore
+  app.get('/api/backup/export', (req, res) => {
+    const data = BackupService.exportData(db, engine.getRuleEngine().getRules());
     res.setHeader('Content-Type', 'application/json');
     res.setHeader('Content-Disposition', `attachment; filename="g1dm_backup_${Date.now()}.json"`);
-    res.send(JSON.stringify(exportData, null, 2));
+    res.send(JSON.stringify(data, null, 2));
+  });
+
+  app.post('/api/backup/import', (req, res) => {
+    try {
+      const result = BackupService.importData(db, req.body, req.query as any);
+      if (Array.isArray(req.body.rules)) {
+        engine.getRuleEngine().setRules(req.body.rules);
+      }
+      res.json(result);
+    } catch (err: any) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  // Backward compatible export / import
+  app.get('/api/export', (req, res) => {
+    const data = BackupService.exportData(db, engine.getRuleEngine().getRules());
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Content-Disposition', `attachment; filename="g1dm_backup_${Date.now()}.json"`);
+    res.send(JSON.stringify(data, null, 2));
   });
 
   app.post('/api/import', (req, res) => {
     try {
-      const data = req.body;
-      if (data.settings) db.saveSettings(data.settings);
-      if (Array.isArray(data.categories)) {
-        data.categories.forEach((c: any) => db.saveCategory(c));
+      const result = BackupService.importData(db, req.body, req.query as any);
+      if (Array.isArray(req.body.rules)) {
+        engine.getRuleEngine().setRules(req.body.rules);
       }
-      if (Array.isArray(data.queues)) {
-        data.queues.forEach((q: any) => db.saveQueue(q));
-      }
-      if (Array.isArray(data.downloads)) {
-        data.downloads.forEach((d: any) => db.saveDownload(d));
-      }
-      res.json({ success: true });
+      res.json(result);
     } catch (err: any) {
-      res.status(500).json({ error: err.message });
+      res.status(400).json({ error: err.message });
     }
   });
 

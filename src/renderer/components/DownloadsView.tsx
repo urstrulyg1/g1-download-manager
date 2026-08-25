@@ -69,6 +69,31 @@ export const DownloadsView: React.FC<DownloadsViewProps> = ({
   const [sortBy, setSortBy] = useState<'createdAt' | 'filename' | 'size' | 'progress' | 'speed'>('createdAt');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [isDraggingOver, setIsDraggingOver] = useState(false);
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDraggingOver(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDraggingOver(false);
+  };
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDraggingOver(false);
+    const text = e.dataTransfer.getData('text/plain') || e.dataTransfer.getData('text/uri-list');
+    if (text && (text.startsWith('http://') || text.startsWith('https://') || text.startsWith('ftp://'))) {
+      try {
+        await api.addDownload({ url: text.trim(), startImmediately: true });
+        if (onRefresh) onRefresh();
+      } catch (err: any) {
+        alert(`Failed to add download: ${err.message}`);
+      }
+    }
+  };
 
   const formatBytes = (bytes: number) => {
     if (bytes <= 0) return '0 B';
@@ -177,7 +202,20 @@ export const DownloadsView: React.FC<DownloadsViewProps> = ({
   const queuedCount = downloads.filter((d) => d.status === 'queued').length;
 
   return (
-    <div className="p-6 space-y-4 max-w-7xl mx-auto w-full flex flex-col">
+    <div
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+      className="relative p-6 space-y-4 max-w-7xl mx-auto w-full flex flex-col"
+    >
+      {isDraggingOver && (
+        <div className="absolute inset-0 z-50 bg-blue-950/90 border-2 border-dashed border-blue-400 rounded-3xl flex flex-col items-center justify-center p-8 backdrop-blur-sm animate-in fade-in duration-150">
+          <Download className="w-16 h-16 text-blue-400 mb-4 animate-bounce" />
+          <h3 className="text-xl font-bold text-white mb-2">Drop Link to Download</h3>
+          <p className="text-sm text-blue-200">Release link or URL anywhere to start downloading immediately</p>
+        </div>
+      )}
+
       {/* Top Controls Bar */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-slate-900/80 border border-slate-800 rounded-2xl p-4 shadow-xl">
         {/* Search */}

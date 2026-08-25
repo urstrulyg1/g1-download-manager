@@ -54,7 +54,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, lang, onSa
   };
 
   const handleExportBackup = () => {
-    window.open('/api/export', '_blank');
+    window.open('/api/backup/export', '_blank');
   };
 
   const handleImportBackup = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -63,12 +63,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, lang, onSa
     try {
       const text = await file.text();
       const json = JSON.parse(text);
-      await fetch('/api/import', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(json),
-      });
-      alert('Application state restored successfully! Refreshing...');
+      const res = await api.importBackup(json);
+      alert(res.message || 'Application state restored successfully! Refreshing...');
       window.location.reload();
     } catch (err: any) {
       alert(`Import error: ${err.message}`);

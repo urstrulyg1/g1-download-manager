@@ -29,6 +29,8 @@ import { PathSanitizer } from '../storage/PathSanitizer';
 import { DownloadIntelligence } from './DownloadIntelligence';
 import { MaliciousLinkScanner } from '../security/MaliciousLinkScanner';
 import { RecoveryOrchestrator } from './RecoveryOrchestrator';
+import { BandwidthGovernor } from '../qos/BandwidthGovernor';
+import { RuleEngine } from '../automation/RuleEngine';
 
 export class DownloadEngine extends EventEmitter {
   private db: AppDatabase;
@@ -41,6 +43,8 @@ export class DownloadEngine extends EventEmitter {
   private policyEngine: ServerPolicyEngine = new ServerPolicyEngine();
   private recoveryOrchestrator: RecoveryOrchestrator;
   private globalRateLimiter: TokenBucketRateLimiter;
+  private bandwidthGovernor: BandwidthGovernor;
+  private ruleEngine: RuleEngine = new RuleEngine();
   private isShuttingDown = false;
   private schedulerInterval: NodeJS.Timeout | null = null;
   private interruptedRecoveredIds: Set<string> = new Set();
@@ -50,7 +54,9 @@ export class DownloadEngine extends EventEmitter {
     this.db = db;
     this.recoveryOrchestrator = new RecoveryOrchestrator(this.policyEngine, this.db);
     const settings = db.getSettings();
-    this.globalRateLimiter = new TokenBucketRateLimiter(settings.downloads.globalSpeedLimitBytesPerSec || 0);
+    const globalLimit = settings.downloads.globalSpeedLimitBytesPerSec || 0;
+    this.globalRateLimiter = new TokenBucketRateLimiter(globalLimit);
+    this.bandwidthGovernor = new BandwidthGovernor(globalLimit);
   }
 
   public async init(): Promise<void> {
@@ -216,9 +222,16 @@ export class DownloadEngine extends EventEmitter {
       };
     });
 
-    const category = params.category || probe.suggestedCategory || 'other';
+    const ruleMatch = this.ruleEngine.evaluatePreDownloadRules({
+      url: params.url,
+      filename: params.filename || probe.filename,
+      size: probe.size > 0 ? probe.size : undefined,
+    });
 
-    let destDir = params.destinationDir;
+    const category = params.category || ruleMatch.category || probe.suggestedCategory || 'other';
+    const priority = params.priority || ruleMatch.priority || 'normal';
+
+    let destDir = params.destinationDir || ruleMatch.destinationDir;
     if (!destDir) {
       const categories = this.db.getCategories();
       const matchedCat = categories.find((c) => c.id === category);
@@ -276,9 +289,10 @@ export class DownloadEngine extends EventEmitter {
           -1;
 
     // Adaptive connection suggestion from ServerPolicyEngine
+    const targetConns = params.maxConnections || ruleMatch.maxConnections || settings.downloads.defaultConnectionsPerDownload || 8;
     const recommendedConns = this.policyEngine.getRecommendedConnections(
       params.url,
-      params.maxConnections || settings.downloads.defaultConnectionsPerDownload || 8
+      targetConns
     );
 
     // Encrypt sensitive auth credentials before storing
@@ -920,6 +934,7 @@ export class DownloadEngine extends EventEmitter {
 
   public setGlobalSpeedLimit(bytesPerSec: number): void {
     this.globalRateLimiter.setLimit(bytesPerSec);
+    this.bandwidthGovernor.setGlobalLimit(bytesPerSec);
     const settings = this.db.getSettings();
     settings.downloads.globalSpeedLimitBytesPerSec = bytesPerSec;
     this.db.saveSettings(settings);
@@ -935,6 +950,14 @@ export class DownloadEngine extends EventEmitter {
 
   public getGlobalRateLimit(): number {
     return this.globalRateLimiter.getLimit();
+  }
+
+  public getBandwidthGovernor(): BandwidthGovernor {
+    return this.bandwidthGovernor;
+  }
+
+  public getRuleEngine(): RuleEngine {
+    return this.ruleEngine;
   }
 
   public getPolicyEngine(): ServerPolicyEngine {
