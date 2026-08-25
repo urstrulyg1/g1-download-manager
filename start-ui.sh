@@ -108,7 +108,7 @@ echo -e "${PAD}${PURPLE}│${RESET}                 ${BLUE}${BOLD}╚███�
 echo -e "${PAD}${PURPLE}│${RESET}                  ${BLUE}${BOLD}╚═════╝   ╚═╝  ╚═════╝  ╚═╝     ╚═╝${RESET}                 ${PURPLE}│${RESET}"
 echo -e "${PAD}${PURPLE}│                                                                      │${RESET}"
 echo -e "${PAD}${PURPLE}├──────────────────────────────────────────────────────────────────────┤${RESET}"
-echo -e "${PAD}${PURPLE}│${RESET}           ${WHITE}${BOLD}G1DM DOWNLOAD MANAGER${RESET}  ${GRAY}·${RESET}  ${YELLOW}${BOLD}v4.0.0-FREE${RESET}  ${GRAY}·${RESET}  ${EMERALD}${BOLD}[ONLINE]${RESET}           ${PURPLE}│${RESET}"
+echo -e "${PAD}${PURPLE}│${RESET}          ${WHITE}${BOLD}G1DM DOWNLOAD MANAGER${RESET}  ${GRAY}·${RESET}  ${YELLOW}${BOLD}v4.0.0-FREE${RESET}  ${GRAY}·${RESET}  ${EMERALD}${BOLD}[ONLINE]${RESET}          ${PURPLE}│${RESET}"
 echo -e "${PAD}${PURPLE}│${RESET}    ${GRAY}High-Performance Core Engine  ·  Multi-Threaded Turbo Pipeline${RESET}    ${PURPLE}│${RESET}"
 echo -e "${PAD}${PURPLE}╰──────────────────────────────────────────────────────────────────────╯${RESET}"
 echo ""

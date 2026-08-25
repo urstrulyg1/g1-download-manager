@@ -43,7 +43,7 @@ echo   %BMAGENTA%│%R%                 %BBLUE%%BOLD%╚██████╔╝
 echo   %BMAGENTA%│%R%                  %BBLUE%%BOLD%╚═════╝   ╚═╝  ╚═════╝  ╚═╝     ╚═╝%R%                 %BMAGENTA%│%R%
 echo   %BMAGENTA%│                                                                      │%R%
 echo   %BMAGENTA%├──────────────────────────────────────────────────────────────────────┤%R%
-echo   %BMAGENTA%│%R%           %BWHITE%%BOLD%G1DM DOWNLOAD MANAGER%R%  %GRAY%·%R%  %BYELLOW%%BOLD%v4.0.0-FREE%R%  %GRAY%·%R%  %BGREEN%%BOLD%[ONLINE]%R%           %BMAGENTA%│%R%
+echo   %BMAGENTA%│%R%          %BWHITE%%BOLD%G1DM DOWNLOAD MANAGER%R%  %GRAY%·%R%  %BYELLOW%%BOLD%v4.0.0-FREE%R%  %GRAY%·%R%  %BGREEN%%BOLD%[ONLINE]%R%          %BMAGENTA%│%R%
 echo   %BMAGENTA%│%R%    %GRAY%High-Performance Core Engine  ·  Multi-Threaded Turbo Pipeline%R%    %BMAGENTA%│%R%
 echo   %BMAGENTA%╰──────────────────────────────────────────────────────────────────────╯%R%
 echo.
