@@ -15,7 +15,7 @@ import {
   Cpu,
   Lock,
 } from 'lucide-react';
-import { DiagnosticCheckResult } from '../../shared/types';
+import { DiagnosticCheckResult, SystemMetrics } from '../../shared/types';
 import { Language, translations } from '../lib/i18n';
 import { api } from '../lib/api';
 
@@ -26,13 +26,18 @@ interface DiagnosticsViewProps {
 export const DiagnosticsView: React.FC<DiagnosticsViewProps> = ({ lang }) => {
   const t = translations[lang] || translations.en;
   const [results, setResults] = useState<DiagnosticCheckResult[]>([]);
+  const [metrics, setMetrics] = useState<SystemMetrics | null>(null);
   const [isRunning, setIsRunning] = useState(false);
 
   const runDiagnostics = async () => {
     setIsRunning(true);
     try {
-      const res = await api.runDiagnostics();
-      setResults(res);
+      const [diagRes, metricsRes] = await Promise.all([
+        api.runDiagnostics(),
+        api.getMetrics().catch(() => null),
+      ]);
+      setResults(diagRes);
+      if (metricsRes) setMetrics(metricsRes);
     } catch (err: any) {
       alert(`Diagnostics error: ${err.message}`);
     } finally {
@@ -46,6 +51,14 @@ export const DiagnosticsView: React.FC<DiagnosticsViewProps> = ({ lang }) => {
 
   const handleExport = () => {
     window.open('/api/diagnostics/export', '_blank');
+  };
+
+  const formatBytes = (bytes?: number) => {
+    if (!bytes || bytes <= 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return `${(bytes / Math.pow(k, i)).toFixed(1)} ${sizes[i]}`;
   };
 
   return (
@@ -81,6 +94,64 @@ export const DiagnosticsView: React.FC<DiagnosticsViewProps> = ({ lang }) => {
           </button>
         </div>
       </div>
+
+      {/* System Metrics Overview Cards */}
+      {metrics && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-2 shadow-lg">
+            <div className="flex items-center gap-2 text-slate-400 text-xs font-semibold">
+              <Cpu className="w-4 h-4 text-cyan-400" />
+              <span>Runtime & Platform</span>
+            </div>
+            <div className="text-lg font-bold text-white font-mono">
+              G1DM v1.0.0
+            </div>
+            <div className="text-[11px] text-slate-400">
+              Memory: <strong className="text-slate-200">{formatBytes(metrics.engine.memoryUsageBytes)}</strong> (Heap)
+            </div>
+          </div>
+
+          <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-2 shadow-lg">
+            <div className="flex items-center gap-2 text-slate-400 text-xs font-semibold">
+              <HardDrive className="w-4 h-4 text-blue-400" />
+              <span>Storage Free Space</span>
+            </div>
+            <div className="text-lg font-bold text-emerald-400 font-mono">
+              {formatBytes(metrics.storage.freeBytes)} Free
+            </div>
+            <div className="text-[11px] text-slate-400">
+              Total Capacity: <strong className="text-slate-200">{formatBytes(metrics.storage.totalBytes)}</strong>
+            </div>
+          </div>
+
+          <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-2 shadow-lg">
+            <div className="flex items-center gap-2 text-slate-400 text-xs font-semibold">
+              <Radio className="w-4 h-4 text-indigo-400" />
+              <span>Engine Workers</span>
+            </div>
+            <div className="text-lg font-bold text-cyan-400 font-mono">
+              {metrics.engine.activeWorkers} Active / {metrics.engine.queuedJobs} Queued
+            </div>
+            <div className="text-[11px] text-slate-400">
+              Sockets: <strong className="text-slate-200">{metrics.engine.totalConnections} active TCP/TLS</strong>
+            </div>
+          </div>
+
+          <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-2 shadow-lg">
+            <div className="flex items-center gap-2 text-slate-400 text-xs font-semibold">
+              <Globe className="w-4 h-4 text-emerald-400" />
+              <span>Network State</span>
+            </div>
+            <div className="text-lg font-bold text-white font-mono flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
+              <span>{metrics.network.online ? 'Online' : 'Offline'}</span>
+            </div>
+            <div className="text-[11px] text-slate-400">
+              Ping Latency: <strong className="text-emerald-400">{metrics.network.pingLatencyMs > 0 ? `${metrics.network.pingLatencyMs}ms` : '< 15ms'}</strong>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Diagnostics Results Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

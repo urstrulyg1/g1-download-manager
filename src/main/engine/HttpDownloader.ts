@@ -300,6 +300,18 @@ export class HttpDownloader extends EventEmitter {
           return;
         }
 
+        // Detect if server ignored Range request and sent HTTP 200 for offset > 0
+        if (startByte > 0 && statusCode === 200) {
+          this.log('warn', `Server returned HTTP 200 for range request on segment ${segment.id} (offset ${startByte}). Range not supported.`);
+          res.destroy();
+          this.activeSockets.delete(segment.id);
+          segment.status = 'failed';
+          segment.error = 'Server does not support byte range requests (HTTP 200 returned).';
+          this.item.serverCapabilities.supportsRange = false;
+          resolve();
+          return;
+        }
+
         if (statusCode !== 206 && statusCode !== 200) {
           res.destroy();
           this.activeSockets.delete(segment.id);
@@ -398,12 +410,16 @@ export class HttpDownloader extends EventEmitter {
 
   // Single-stream fallback
   private async downloadSingleStream(): Promise<void> {
-    // Reset downloaded bytes and truncate temp file on single-stream start/retry
-    this.item.downloadedBytes = 0;
-    if (this.fileFd !== null) {
-      try {
-        fs.ftruncateSync(this.fileFd, 0);
-      } catch {}
+    const isResuming = this.item.downloadedBytes > 0 && this.item.serverCapabilities.supportsRange;
+
+    // Reset downloaded bytes and truncate temp file only if starting from scratch
+    if (!isResuming) {
+      this.item.downloadedBytes = 0;
+      if (this.fileFd !== null) {
+        try {
+          fs.ftruncateSync(this.fileFd, 0);
+        } catch {}
+      }
     }
 
     return new Promise<void>((resolve, reject) => {
@@ -422,6 +438,13 @@ export class HttpDownloader extends EventEmitter {
         'Sec-Ch-Ua-Platform': '"macOS"',
         ...(this.item.auth?.customHeaders || {}),
       };
+
+      if (isResuming) {
+        headers['Range'] = `bytes=${this.item.downloadedBytes}-`;
+        if (this.item.serverCapabilities.etag) {
+          headers['If-Match'] = this.item.serverCapabilities.etag;
+        }
+      }
 
       if (this.item.auth?.cookies) {
         headers['Cookie'] = this.item.auth.cookies;
@@ -467,8 +490,22 @@ export class HttpDownloader extends EventEmitter {
           return;
         }
 
+        // If resume was requested with Range header but server returned HTTP 200 (full body),
+        // we must reset downloadedBytes to 0 and truncate temp file to prevent appending & corruption.
+        if (isResuming && statusCode === 200) {
+          this.log('warn', 'Server returned HTTP 200 for range resume request. Restarting from byte 0 to preserve integrity.');
+          this.item.downloadedBytes = 0;
+          this.item.serverCapabilities.supportsRange = false;
+          if (this.fileFd !== null) {
+            try {
+              fs.ftruncateSync(this.fileFd, 0);
+            } catch {}
+          }
+        }
+
         if (this.item.totalBytes <= 0 && res.headers['content-length']) {
-          this.item.totalBytes = parseInt(res.headers['content-length'], 10);
+          const len = parseInt(res.headers['content-length'], 10);
+          this.item.totalBytes = statusCode === 206 ? this.item.downloadedBytes + len : len;
         }
 
         this.item.activeConnections = 1;
@@ -711,6 +748,11 @@ export class HttpDownloader extends EventEmitter {
     this.cleanupFd();
     this.stopStateFlushTimer();
     this.emit('progress', this.item);
+  }
+
+  public setSpeedLimit(bytesPerSec: number): void {
+    this.rateLimiter.setLimit(bytesPerSec);
+    this.item.speedLimitBytesPerSec = bytesPerSec;
   }
 
   private finalizeCompletion(): void {

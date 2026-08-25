@@ -46,17 +46,57 @@ export class DiagnosticsService {
     // 6. Download Engine Health
     const downloads = engine.getAllDownloads();
     const activeWorkers = downloads.filter((d) => d.status === 'downloading').length;
+    const queuedCount = downloads.filter((d) => d.status === 'queued').length;
     results.push({
       id: 'diag-engine-workers',
       category: 'engine',
       name: 'Download Engine Status',
       status: 'ok',
-      message: `Engine online. Active downloads: ${activeWorkers}, Total managed: ${downloads.length}.`,
+      message: `Engine online. Active downloads: ${activeWorkers}, Queued: ${queuedCount}, Total managed: ${downloads.length}.`,
       details: `Rate limit: ${engine.getGlobalRateLimit() > 0 ? `${(engine.getGlobalRateLimit() / 1024).toFixed(0)} KB/s` : 'Unlimited'}`,
       timestamp: Date.now(),
     });
 
-    // 7. Security Scanner
+    // 7. Database Health & Latency
+    try {
+      const dbStart = Date.now();
+      db.getAllDownloads();
+      const dbLatency = Date.now() - dbStart;
+      results.push({
+        id: 'diag-database',
+        category: 'storage',
+        name: 'Database Engine (SQLite)',
+        status: dbLatency < 100 ? 'ok' : 'warning',
+        message: `Database responsive (Query latency: ${dbLatency}ms).`,
+        details: `Driver: sql.js WebAssembly SQLite. Total records indexed: ${downloads.length}.`,
+        timestamp: Date.now(),
+      });
+    } catch (err: any) {
+      results.push({
+        id: 'diag-database',
+        category: 'storage',
+        name: 'Database Engine (SQLite)',
+        status: 'error',
+        message: `Database error: ${err.message}`,
+        timestamp: Date.now(),
+      });
+    }
+
+    // 8. Memory Headroom
+    const totalMem = os.totalmem();
+    const freeMem = os.freemem();
+    const freeMemMb = Math.round(freeMem / 1024 / 1024);
+    results.push({
+      id: 'diag-memory',
+      category: 'engine',
+      name: 'System Memory Headroom',
+      status: freeMem > 256 * 1024 * 1024 ? 'ok' : 'warning',
+      message: `${freeMemMb} MB free RAM available.`,
+      details: `Total: ${Math.round(totalMem / 1024 / 1024)} MB, Process heap: ${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)} MB`,
+      timestamp: Date.now(),
+    });
+
+    // 9. Security Scanner
     results.push({
       id: 'diag-security-scanner',
       category: 'security',
@@ -69,7 +109,7 @@ export class DiagnosticsService {
       timestamp: Date.now(),
     });
 
-    // 8. Browser Integration Port
+    // 10. Browser Integration Port
     results.push({
       id: 'diag-browser-integration',
       category: 'browser',

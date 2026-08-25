@@ -11,6 +11,9 @@ import {
   Gauge,
   Network,
   ArrowUpDown,
+  ChevronUp,
+  ChevronDown,
+  GripVertical,
 } from 'lucide-react';
 import { DownloadQueue, DownloadItem, AppSettings } from '../../shared/types';
 import { Language } from '../lib/i18n';
@@ -27,6 +30,7 @@ interface QueuesViewProps {
 export const QueuesView: React.FC<QueuesViewProps> = ({ queues, downloads, settings, onRefresh }) => {
   const [editingQueue, setEditingQueue] = useState<Partial<DownloadQueue> | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [expandedQueueId, setExpandedQueueId] = useState<string | null>(null);
 
   const defaultDir = settings?.general.defaultDownloadDir ?? '';
 
@@ -77,6 +81,15 @@ export const QueuesView: React.FC<QueuesViewProps> = ({ queues, downloads, setti
     onRefresh();
   };
 
+  const handleReorder = async (queueId: string, downloadId: string, targetIndex: number) => {
+    try {
+      await api.reorderQueue(queueId, downloadId, targetIndex);
+      onRefresh();
+    } catch (err) {
+      console.error('Failed to reorder queue item:', err);
+    }
+  };
+
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto overflow-y-auto h-[calc(100vh-4rem)]">
       {/* Header */}
@@ -105,13 +118,16 @@ export const QueuesView: React.FC<QueuesViewProps> = ({ queues, downloads, setti
         {queues.map((queue) => {
           const queueItems = downloads.filter((d) => d.queueId === queue.id);
           const activeItems = queueItems.filter((d) => d.status === 'downloading');
-          const queuedItems = queueItems.filter((d) => d.status === 'queued');
+          const queuedItems = queueItems
+            .filter((d) => d.status === 'queued')
+            .sort((a, b) => a.createdAt - b.createdAt);
           const completedItems = queueItems.filter((d) => d.status === 'completed');
+          const isExpanded = expandedQueueId === queue.id;
 
           return (
             <div
               key={queue.id}
-              className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 shadow-lg shadow-indigo-500/10 space-y-4 relative overflow-hidden transition-all duration-200 hover:border-indigo-500/40 hover:shadow-xl hover:shadow-indigo-500/20 hover:-translate-y-0.5"
+              className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 shadow-lg shadow-indigo-500/10 space-y-4 relative overflow-hidden transition-all duration-200 hover:border-indigo-500/40 hover:shadow-xl hover:shadow-indigo-500/20"
             >
               <div className="flex items-start justify-between">
                 <div>
@@ -196,6 +212,60 @@ export const QueuesView: React.FC<QueuesViewProps> = ({ queues, downloads, setti
                   />
                 </div>
               </div>
+
+              {/* Queue Items Reordering Accordion */}
+              {queuedItems.length > 0 && (
+                <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800/80 text-xs space-y-2">
+                  <div
+                    onClick={() => setExpandedQueueId(isExpanded ? null : queue.id)}
+                    className="flex items-center justify-between cursor-pointer text-slate-300 hover:text-white"
+                  >
+                    <div className="flex items-center gap-1.5 font-semibold">
+                      <ArrowUpDown className="w-3.5 h-3.5 text-indigo-400" />
+                      <span>Queue Order ({queuedItems.length} queued)</span>
+                    </div>
+                    <span className="text-[10px] text-slate-500 font-mono">
+                      {isExpanded ? 'Hide' : 'Manage Order'}
+                    </span>
+                  </div>
+
+                  {isExpanded && (
+                    <div className="space-y-1.5 pt-2 border-t border-slate-800">
+                      {queuedItems.map((item, idx) => (
+                        <div
+                          key={item.id}
+                          className="flex items-center justify-between p-2 rounded-lg bg-slate-900 border border-slate-800 text-[11px]"
+                        >
+                          <div className="flex items-center gap-2 truncate flex-1 min-w-0 pr-2">
+                            <span className="w-4 text-center font-mono text-slate-500 font-bold">{idx + 1}</span>
+                            <span className="text-slate-200 truncate">{item.filename}</span>
+                          </div>
+                          <div className="flex items-center gap-1 flex-shrink-0">
+                            <button
+                              disabled={idx === 0}
+                              onClick={() => handleReorder(queue.id, item.id, idx - 1)}
+                              className="p-1 rounded bg-slate-800 hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed text-slate-300"
+                              title="Move Up"
+                              aria-label="Move Up"
+                            >
+                              <ChevronUp className="w-3 h-3" />
+                            </button>
+                            <button
+                              disabled={idx === queuedItems.length - 1}
+                              onClick={() => handleReorder(queue.id, item.id, idx + 1)}
+                              className="p-1 rounded bg-slate-800 hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed text-slate-300"
+                              title="Move Down"
+                              aria-label="Move Down"
+                            >
+                              <ChevronDown className="w-3 h-3" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Schedule Info Box */}
               <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800/80 text-xs space-y-1">

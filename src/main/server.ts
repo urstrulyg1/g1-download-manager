@@ -158,11 +158,20 @@ export async function createUnifiedServer(port: number = 8055) {
   };
   broadcastRef = broadcast;
 
-  // Attach engine events to WebSocket broadcast
-  engine.on('item_progress', (item) => broadcast('item_progress', item));
+  // Attach engine events to WebSocket broadcast with throttled progress updates
+  const lastProgressBroadcast = new Map<string, number>();
+  engine.on('item_progress', (item) => {
+    const now = Date.now();
+    const last = lastProgressBroadcast.get(item.id) || 0;
+    if (now - last >= 100) {
+      lastProgressBroadcast.set(item.id, now);
+      broadcast('item_progress', item);
+    }
+  });
   engine.on('item_added', (item) => broadcast('item_added', item));
   engine.on('item_updated', (item) => broadcast('item_updated', item));
   engine.on('item_completed', (item) => {
+    lastProgressBroadcast.delete(item.id);
     broadcast('item_completed', item);
     const settings = db.getSettings();
 
@@ -437,6 +446,29 @@ export async function createUnifiedServer(port: number = 8055) {
     }
   });
 
+  app.get('/api/downloads/interrupted', (req, res) => {
+    res.json(engine.getInterruptedDownloads());
+  });
+
+  app.post('/api/downloads/interrupted/dismiss', (req, res) => {
+    engine.dismissInterruptedDownloads();
+    res.json({ success: true });
+  });
+
+  app.post('/api/downloads/check-duplicate', (req, res) => {
+    try {
+      const result = engine.checkDuplicate(req.body);
+      res.json(result);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/downloads/start-all', (req, res) => {
+    engine.startAll();
+    res.json({ success: true });
+  });
+
   app.post('/api/downloads/pause-all', (req, res) => {
     engine.pauseAll();
     res.json({ success: true });
@@ -447,8 +479,41 @@ export async function createUnifiedServer(port: number = 8055) {
     res.json({ success: true });
   });
 
+  app.post('/api/downloads/retry-failed', async (req, res) => {
+    try {
+      await engine.retryFailed();
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/downloads/clear-completed', (req, res) => {
+    engine.clearCompleted();
+    res.json({ success: true });
+  });
+
+  app.post('/api/downloads/cancel-all', (req, res) => {
+    engine.cancelAll();
+    res.json({ success: true });
+  });
+
   app.post('/api/downloads/stop-all', (req, res) => {
     engine.stopAll();
+    res.json({ success: true });
+  });
+
+  app.patch('/api/downloads/:id/priority', (req, res) => {
+    const { priority } = req.body;
+    if (!priority) return res.status(400).json({ error: 'priority is required' });
+    engine.updatePriority(req.params.id, priority);
+    res.json({ success: true });
+  });
+
+  app.patch('/api/downloads/:id/bandwidth', (req, res) => {
+    const { limitBytesPerSec } = req.body;
+    if (typeof limitBytesPerSec !== 'number') return res.status(400).json({ error: 'limitBytesPerSec is required' });
+    engine.updateBandwidthLimit(req.params.id, limitBytesPerSec);
     res.json({ success: true });
   });
 
@@ -463,6 +528,15 @@ export async function createUnifiedServer(port: number = 8055) {
     if (!queue.createdAt) queue.createdAt = Date.now();
     db.saveQueue(queue);
     res.json(queue);
+  });
+
+  app.post('/api/queues/:id/reorder', (req, res) => {
+    const { downloadId, targetIndex } = req.body;
+    if (!downloadId || typeof targetIndex !== 'number') {
+      return res.status(400).json({ error: 'downloadId and targetIndex are required' });
+    }
+    engine.reorderQueueItem(req.params.id, downloadId, targetIndex);
+    res.json({ success: true });
   });
 
   app.delete('/api/queues/:id', (req, res) => {

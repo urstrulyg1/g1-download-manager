@@ -16,6 +16,8 @@ import {
   Zap,
   Power,
   Bot,
+  Gauge,
+  Info,
 } from 'lucide-react';
 import { AppSettings } from '../../shared/types';
 import { Language, translations } from '../lib/i18n';
@@ -31,7 +33,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, lang, onSa
   const t = translations[lang] || translations.en;
   const [formData, setFormData] = useState<AppSettings | null>(settings);
   const [activeSection, setActiveSection] = useState<
-    'general' | 'downloads' | 'network' | 'browser' | 'security' | 'scheduler' | 'automation' | 'power' | 'remote' | 'backup'
+    'general' | 'downloads' | 'bandwidth' | 'network' | 'browser' | 'security' | 'scheduler' | 'automation' | 'power' | 'remote' | 'backup' | 'about'
   >('general');
   const [saved, setSaved] = useState(false);
 
@@ -101,6 +103,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, lang, onSa
           {[
             { id: 'general', label: 'General', icon: Settings },
             { id: 'downloads', label: 'Downloads Engine', icon: Download },
+            { id: 'bandwidth', label: 'Bandwidth Limits', icon: Gauge },
             { id: 'network', label: 'Network & Proxy', icon: Globe },
             { id: 'browser', label: 'Browser Integration', icon: Layers },
             { id: 'security', label: 'Security & Privacy', icon: Shield },
@@ -109,6 +112,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, lang, onSa
             { id: 'power', label: 'Power Governor', icon: Power },
             { id: 'remote', label: 'Remote Control Bot', icon: Bot },
             { id: 'backup', label: 'Backup & Restore', icon: Database },
+            { id: 'about', label: 'About G1DM', icon: Info },
           ].map((sec) => {
             const IconComp = sec.icon;
             return (
@@ -915,6 +919,105 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, lang, onSa
                   <span>Restore from Backup</span>
                   <input type="file" accept=".json" onChange={handleImportBackup} className="hidden" />
                 </label>
+              </div>
+            </div>
+          )}
+
+          {/* 11. BANDWIDTH */}
+          {activeSection === 'bandwidth' && (
+            <div className="space-y-4">
+              <h3 className="text-sm font-bold text-white border-b border-slate-800 pb-2">Global Bandwidth Throttle</h3>
+              <p className="text-slate-300">
+                Configure global speed capping across all simultaneous downloads to prevent saturating your local network.
+              </p>
+
+              <div className="space-y-2">
+                <label className="text-slate-300 font-semibold">Speed Cap Presets</label>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    { label: 'Unlimited', val: 0 },
+                    { label: '20 MB/s', val: 20 * 1024 * 1024 },
+                    { label: '10 MB/s', val: 10 * 1024 * 1024 },
+                    { label: '5 MB/s', val: 5 * 1024 * 1024 },
+                    { label: '2 MB/s', val: 2 * 1024 * 1024 },
+                  ].map((preset) => {
+                    const isSelected = (formData.downloads.globalSpeedLimitBytesPerSec || 0) === preset.val;
+                    return (
+                      <button
+                        type="button"
+                        key={preset.label}
+                        onClick={() =>
+                          setFormData({
+                            ...formData,
+                            downloads: { ...formData.downloads, globalSpeedLimitBytesPerSec: preset.val },
+                          })
+                        }
+                        className={`px-3.5 py-1.5 rounded-xl font-mono text-xs font-semibold border transition-all ${
+                          isSelected
+                            ? 'bg-blue-600 border-blue-500 text-white shadow-md shadow-blue-600/30'
+                            : 'bg-slate-950 border-slate-800 text-slate-300 hover:border-slate-700'
+                        }`}
+                      >
+                        {preset.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-slate-300 font-semibold">Custom Limit (Bytes/sec)</label>
+                <input
+                  type="number"
+                  min={0}
+                  step={102400}
+                  value={formData.downloads.globalSpeedLimitBytesPerSec || 0}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      downloads: {
+                        ...formData.downloads,
+                        globalSpeedLimitBytesPerSec: Math.max(0, parseInt(e.target.value, 10) || 0),
+                      },
+                    })
+                  }
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-200 font-mono"
+                  placeholder="0 for Unlimited"
+                />
+                <p className="text-[11px] text-slate-500">
+                  {formData.downloads.globalSpeedLimitBytesPerSec > 0
+                    ? `Current Limit: ${(formData.downloads.globalSpeedLimitBytesPerSec / 1024 / 1024).toFixed(2)} MB/s`
+                    : 'Unlimited maximum throughput'}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* 12. ABOUT */}
+          {activeSection === 'about' && (
+            <div className="space-y-4">
+              <h3 className="text-sm font-bold text-white border-b border-slate-800 pb-2">About G1DM</h3>
+              <div className="p-4 rounded-2xl bg-gradient-to-r from-blue-950/60 to-indigo-950/60 border border-blue-500/30 space-y-2">
+                <div className="text-base font-bold text-white flex items-center gap-2">
+                  <span>G1DM — Download Engine 2.0</span>
+                  <span className="px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 font-mono text-[10px] font-bold">
+                    v1.0.0
+                  </span>
+                </div>
+                <p className="text-slate-300 text-xs leading-relaxed">
+                  Next-generation high-performance Internet Download Manager featuring dynamic multi-socket HTTP/HTTPS/HTTP2/FTP/HLS segmentation, live HTTP 206 stream preview seeking, atomic file finalization, and crash recovery.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 text-xs">
+                <div className="p-3 rounded-xl bg-slate-950 border border-slate-800">
+                  <div className="text-slate-400 font-semibold">Security Certification</div>
+                  <div className="text-emerald-400 font-bold mt-1">Audit Hardened & Verified</div>
+                </div>
+                <div className="p-3 rounded-xl bg-slate-950 border border-slate-800">
+                  <div className="text-slate-400 font-semibold">State Engine</div>
+                  <div className="text-cyan-400 font-bold mt-1">SQLite wasm + Journal</div>
+                </div>
               </div>
             </div>
           )}

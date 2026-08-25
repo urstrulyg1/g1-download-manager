@@ -25,6 +25,7 @@ import { SnapshotsView } from '../components/SnapshotsView';
 import { PowerFeaturesView } from '../components/PowerFeaturesView';
 import { IdmProgressModal } from '../components/IdmProgressModal';
 import { ActionCenterDrawer } from '../components/ui/ActionCenterDrawer';
+import { CrashRecoveryBanner } from '../components/CrashRecoveryBanner';
 import { InboxItem } from '../../main/engine/DownloadInbox';
 import { ProfileType } from '../../main/engine/DownloadProfiles';
 import type { ThemeMode, ViewMode } from '../design-system/tokens';
@@ -95,9 +96,7 @@ export default function Home() {
   const storageAlert = metrics ? metrics.storage.freeBytes < 2 * 1024 * 1024 * 1024 : false;
   const alertCount = (failedCount > 0 ? 1 : 0) + (storageAlert ? 1 : 0);
 
-  // Sync settings theme/lang. The server setting is authoritative after the
-  // initial connection, while localStorage is used only to avoid a first-paint
-  // flash before that request completes.
+  // Sync settings theme/lang.
   useEffect(() => {
     if (settings) {
       const configuredTheme = isThemeMode(settings.general.theme) ? settings.general.theme : 'dark';
@@ -121,18 +120,13 @@ export default function Home() {
     setTheme(nextTheme);
     storeTheme(nextTheme);
 
-    // The top-level switch is an immediate preference, so persist it as well
-    // when the engine settings are available. SettingsView still saves the
-    // complete form in one operation.
     if (settings) {
       const nextSettings = {
         ...settings,
         general: { ...settings.general, theme: nextTheme },
       };
       setSettings(nextSettings);
-      api.saveSettings(nextSettings).catch(() => {
-        // The local preference remains active if the backend is unavailable.
-      });
+      api.saveSettings(nextSettings).catch(() => {});
     }
   };
 
@@ -140,24 +134,49 @@ export default function Home() {
     handleThemeChange(theme === 'dark' ? 'light' : 'dark');
   };
 
-  // Global Keyboard Shortcuts (Ctrl+K, Ctrl+N, etc.)
+  // Global Keyboard Shortcuts (Ctrl+K, Ctrl+N, Ctrl+P, Ctrl+R, Ctrl+F, Escape)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      const isInput =
+        document.activeElement instanceof HTMLInputElement ||
+        document.activeElement instanceof HTMLTextAreaElement ||
+        document.activeElement instanceof HTMLSelectElement;
+
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
         setIsCommandPaletteOpen((prev) => !prev);
       } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'n') {
         e.preventDefault();
         setIsAddModalOpen(true);
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'p') {
+        e.preventDefault();
+        api.pauseAll().then(refreshAll).catch(console.error);
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'r' && !e.shiftKey) {
+        // Prevent accidental full page refresh if on downloads view
+        if (activeView === 'downloads' || activeView === 'queues') {
+          e.preventDefault();
+          api.resumeAll().then(refreshAll).catch(console.error);
+        }
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f' && !isInput) {
+        e.preventDefault();
+        setActiveView('downloads');
+        const searchInput = document.querySelector('input[type="text"]') as HTMLInputElement | null;
+        if (searchInput) searchInput.focus();
       } else if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'd') {
         e.preventDefault();
         setIsActionCenterOpen((prev) => !prev);
+      } else if (e.key === 'Escape') {
+        setIsAddModalOpen(false);
+        setIsCommandPaletteOpen(false);
+        setIsActionCenterOpen(false);
+        setSelectedDownload(null);
+        setActiveIdmDownloadId(null);
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [activeView, refreshAll]);
 
   // Zero-Leakage Clipboard Sniffer on window focus
   useEffect(() => {
@@ -265,7 +284,13 @@ export default function Home() {
         />
 
         {/* Center Viewport */}
-        <main className="flex-1 min-w-0 h-full overflow-y-auto overflow-x-hidden bg-slate-950/50">
+        <main className="flex-1 min-w-0 h-full overflow-y-auto overflow-x-hidden bg-slate-950/50 flex flex-col">
+          {/* Startup Crash Recovery Banner */}
+          <CrashRecoveryBanner
+            onRefresh={refreshAll}
+            onSelectDownload={(item) => setSelectedDownload(item)}
+          />
+
           {activeView === 'dashboard' && (
             <DashboardView
               downloads={downloads}

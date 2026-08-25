@@ -80,7 +80,26 @@ export const api = {
     req<{ success: boolean }>(`/downloads/${id}?deleteFile=${deleteFile}`, { method: 'DELETE' }),
   pauseAll: () => req<{ success: boolean }>('/downloads/pause-all', { method: 'POST' }),
   resumeAll: () => req<{ success: boolean }>('/downloads/resume-all', { method: 'POST' }),
+  startAll: () => req<{ success: boolean }>('/downloads/start-all', { method: 'POST' }),
+  retryFailed: () => req<{ success: boolean }>('/downloads/retry-failed', { method: 'POST' }),
+  clearCompleted: () => req<{ success: boolean }>('/downloads/clear-completed', { method: 'POST' }),
+  cancelAll: () => req<{ success: boolean }>('/downloads/cancel-all', { method: 'POST' }),
   stopAll: () => req<{ success: boolean }>('/downloads/stop-all', { method: 'POST' }),
+  updatePriority: (id: string, priority: string) =>
+    req<{ success: boolean }>(`/downloads/${id}/priority`, { method: 'PATCH', body: JSON.stringify({ priority }) }),
+  updateBandwidthLimit: (id: string, limitBytesPerSec: number) =>
+    req<{ success: boolean }>(`/downloads/${id}/bandwidth`, { method: 'PATCH', body: JSON.stringify({ limitBytesPerSec }) }),
+  getInterruptedDownloads: () => req<DownloadItem[]>('/downloads/interrupted'),
+  dismissInterruptedDownloads: () => req<{ success: boolean }>('/downloads/interrupted/dismiss', { method: 'POST' }),
+  checkDuplicate: (payload: { url: string; filename?: string; destinationDir?: string }) =>
+    req<{
+      isDuplicate: boolean;
+      classification: string;
+      existingItem?: DownloadItem;
+      fileExistsOnDisk: boolean;
+      existingFilePath?: string;
+      reason: string;
+    }>('/downloads/check-duplicate', { method: 'POST', body: JSON.stringify(payload) }),
   verifyChecksum: (id: string, checksum?: ChecksumInfo) =>
     req<ChecksumInfo>(`/downloads/${id}/verify`, { method: 'POST', body: JSON.stringify({ checksum }) }),
   scanFile: (id: string) => req<SecurityScanInfo>(`/downloads/${id}/scan`, { method: 'POST' }),
@@ -92,6 +111,11 @@ export const api = {
   getQueues: () => req<DownloadQueue[]>('/queues'),
   saveQueue: (queue: Partial<DownloadQueue>) =>
     req<DownloadQueue>('/queues', { method: 'POST', body: JSON.stringify(queue) }),
+  reorderQueue: (queueId: string, downloadId: string, targetIndex: number) =>
+    req<{ success: boolean }>(`/queues/${queueId}/reorder`, {
+      method: 'POST',
+      body: JSON.stringify({ downloadId, targetIndex }),
+    }),
   deleteQueue: (id: string) => req<{ success: boolean }>(`/queues/${id}`, { method: 'DELETE' }),
 
   // Categories

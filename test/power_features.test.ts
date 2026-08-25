@@ -35,6 +35,12 @@ describe('G1DM Master Power Features Suite', () => {
     await engine.init();
   });
 
+  beforeEach(() => {
+    if (!fs.existsSync(tempDir)) {
+      fs.mkdirSync(tempDir, { recursive: true });
+    }
+  });
+
   afterAll(() => {
     if (fs.existsSync(tempDir)) {
       fs.rmSync(tempDir, { recursive: true, force: true });

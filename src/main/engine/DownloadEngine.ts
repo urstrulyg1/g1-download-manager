@@ -28,6 +28,7 @@ import { SecretStore } from '../security/SecretStore';
 import { PathSanitizer } from '../storage/PathSanitizer';
 import { DownloadIntelligence } from './DownloadIntelligence';
 import { MaliciousLinkScanner } from '../security/MaliciousLinkScanner';
+import { RecoveryOrchestrator } from './RecoveryOrchestrator';
 
 export class DownloadEngine extends EventEmitter {
   private db: AppDatabase;
@@ -38,13 +39,16 @@ export class DownloadEngine extends EventEmitter {
     HttpDownloader | Http2Downloader | FtpDownloader | HlsDownloader | MediaStreamDownloader
   > = new Map();
   private policyEngine: ServerPolicyEngine = new ServerPolicyEngine();
+  private recoveryOrchestrator: RecoveryOrchestrator;
   private globalRateLimiter: TokenBucketRateLimiter;
   private isShuttingDown = false;
   private schedulerInterval: NodeJS.Timeout | null = null;
+  private interruptedRecoveredIds: Set<string> = new Set();
 
   constructor(db: AppDatabase) {
     super();
     this.db = db;
+    this.recoveryOrchestrator = new RecoveryOrchestrator(this.policyEngine, this.db);
     const settings = db.getSettings();
     this.globalRateLimiter = new TokenBucketRateLimiter(settings.downloads.globalSpeedLimitBytesPerSec || 0);
   }
@@ -89,13 +93,21 @@ export class DownloadEngine extends EventEmitter {
           const stat = fs.statSync(item.tempPath);
           if (item.totalBytes <= 0 && stat.size > 0) {
             item.downloadedBytes = stat.size;
+          } else if (stat.size > item.downloadedBytes) {
+            item.downloadedBytes = stat.size;
           }
         }
+
+        if (item.totalBytes > 0) {
+          item.progress = Math.min(100, Math.round((item.downloadedBytes / item.totalBytes) * 10000) / 100);
+        }
+
+        this.interruptedRecoveredIds.add(item.id);
 
         item.logs.push({
           timestamp: Date.now(),
           level: 'warn',
-          message: 'Recovered from previous unexpected shutdown. Resuming safely.',
+          message: `Recovered from previous unexpected shutdown (${item.progress.toFixed(1)}% downloaded). Resuming safely.`,
         });
 
         RecoveryJournal.logEvent(this.db, item.id, 'DOWNLOAD_PAUSED', { reason: 'Crash recovery' });
@@ -519,29 +531,97 @@ export class DownloadEngine extends EventEmitter {
 
     worker.on('error', (err, failedItem) => {
       this.activeWorkers.delete(id);
-      if (sm.canTransitionTo('FAILED')) {
-        sm.transitionTo('FAILED', err.message);
+      this.policyEngine.recordFailure(failedItem.url, err.message);
+
+      const decision = this.recoveryOrchestrator.evaluateFailure(failedItem, err);
+
+      // Non-retryable error (e.g. 404, 401/403, permission denied, invalid disk path)
+      if (decision.action === 'ABORT_UNRECOVERABLE' || decision.action === 'PAUSE_AND_EXPLAIN') {
+        if (sm.canTransitionTo('FAILED')) {
+          sm.transitionTo('FAILED', decision.explanation);
+        }
+        failedItem.status = decision.category === 'STORAGE_FAILURE' ? 'paused' : 'failed';
+        failedItem.error = {
+          code: decision.category,
+          message: decision.explanation,
+          technicalDetails: err.stack,
+          timestamp: Date.now(),
+          retryable: false,
+          retryCount: failedItem.retryCount,
+        };
+        failedItem.speed = 0;
+        failedItem.activeConnections = 0;
+
+        this.downloads.set(id, failedItem);
+        RecoveryJournal.logEvent(this.db, id, 'DOWNLOAD_FAILED', { error: decision.explanation, unrecoverable: true });
+        this.db.saveDownload(failedItem);
+        this.emit('item_error', err, failedItem);
+        this.processQueues();
+        return;
       }
 
-      this.policyEngine.recordFailure(failedItem.url, err.message);
-      this.downloads.set(id, failedItem);
-      RecoveryJournal.logEvent(this.db, id, 'DOWNLOAD_FAILED', { error: err.message });
-      this.db.saveDownload(failedItem);
-      this.emit('item_error', err, failedItem);
-
+      // Retryable error with exponential backoff & jitter
       if (failedItem.retryCount < failedItem.maxRetries) {
         failedItem.retryCount++;
-        if (sm.canTransitionTo('RETRYING')) {
-          sm.transitionTo('RETRYING', `Retry attempt ${failedItem.retryCount}`);
+        const backoffMs = decision.backoffMs > 0
+          ? decision.backoffMs
+          : Math.min(30000, Math.pow(2, failedItem.retryCount) * 1000 + Math.random() * 500);
+
+        if (decision.newConnectionCount) {
+          failedItem.maxConnections = decision.newConnectionCount;
         }
+
+        if (sm.canTransitionTo('RETRYING')) {
+          sm.transitionTo('RETRYING', `Retry ${failedItem.retryCount}/${failedItem.maxRetries} in ${Math.round(backoffMs / 1000)}s: ${decision.explanation}`);
+        }
+
         failedItem.status = 'queued';
+        (failedItem as any).statusMessage = `Retrying in ${Math.round(backoffMs / 1000)}s... (${failedItem.retryCount}/${failedItem.maxRetries})`;
+        failedItem.error = {
+          code: 'ERR_RETRYING',
+          message: `${decision.explanation} (Attempt ${failedItem.retryCount} of ${failedItem.maxRetries})`,
+          timestamp: Date.now(),
+          retryable: true,
+          retryCount: failedItem.retryCount,
+        };
+        failedItem.speed = 0;
+        failedItem.activeConnections = 0;
+
+        this.downloads.set(id, failedItem);
+        RecoveryJournal.logEvent(this.db, id, 'DOWNLOAD_RESUMED', {
+          reason: 'Retry scheduled',
+          attempt: failedItem.retryCount,
+          backoffMs,
+        });
         this.db.saveDownload(failedItem);
+        this.emit('item_updated', failedItem);
+
         setTimeout(() => {
           if (failedItem.status === 'queued') {
             this.startDownload(id).catch(() => {});
           }
-        }, (failedItem.retryCount * 2 + 1) * 1000);
+        }, backoffMs);
       } else {
+        // Max retries reached
+        if (sm.canTransitionTo('FAILED')) {
+          sm.transitionTo('FAILED', `Max retries (${failedItem.maxRetries}) exhausted: ${err.message}`);
+        }
+        failedItem.status = 'failed';
+        failedItem.error = {
+          code: 'ERR_RETRIES_EXHAUSTED',
+          message: `Max retries (${failedItem.maxRetries}) exceeded: ${err.message}`,
+          technicalDetails: err.stack,
+          timestamp: Date.now(),
+          retryable: true,
+          retryCount: failedItem.retryCount,
+        };
+        failedItem.speed = 0;
+        failedItem.activeConnections = 0;
+
+        this.downloads.set(id, failedItem);
+        RecoveryJournal.logEvent(this.db, id, 'DOWNLOAD_FAILED', { error: err.message, retriesExhausted: true });
+        this.db.saveDownload(failedItem);
+        this.emit('item_error', err, failedItem);
         this.processQueues();
       }
     });
@@ -693,20 +773,149 @@ export class DownloadEngine extends EventEmitter {
     }
   }
 
+  public getInterruptedDownloads(): DownloadItem[] {
+    return Array.from(this.downloads.values()).filter(
+      (d) => this.interruptedRecoveredIds.has(d.id) && d.status === 'paused'
+    );
+  }
+
+  public dismissInterruptedDownloads(): void {
+    this.interruptedRecoveredIds.clear();
+  }
+
+  public async retryFailed(): Promise<void> {
+    const failedItems = Array.from(this.downloads.values()).filter((d) => d.status === 'failed');
+    for (const item of failedItems) {
+      item.error = null;
+      item.retryCount = 0;
+      item.status = 'queued';
+      this.db.saveDownload(item);
+      this.emit('item_updated', item);
+    }
+    this.processQueues();
+  }
+
+  public clearCompleted(): void {
+    const completedItems = Array.from(this.downloads.values()).filter((d) => d.status === 'completed');
+    for (const item of completedItems) {
+      this.downloads.delete(item.id);
+      this.stateMachines.delete(item.id);
+      this.db.deleteDownload(item.id);
+      this.emit('item_deleted', item.id);
+    }
+  }
+
   public resumeAll(): void {
     for (const item of this.downloads.values()) {
       if (item.status === 'paused' || item.status === 'failed') {
         item.status = 'queued';
+        (item as any).manualStartRequired = false;
+        item.error = null;
         this.db.saveDownload(item);
+        this.emit('item_updated', item);
       }
     }
     this.processQueues();
+  }
+
+  public startAll(): void {
+    for (const item of this.downloads.values()) {
+      if (item.status === 'paused' || item.status === 'queued' || item.status === 'failed') {
+        item.status = 'queued';
+        (item as any).manualStartRequired = false;
+        item.error = null;
+        this.db.saveDownload(item);
+        this.emit('item_updated', item);
+      }
+    }
+    this.processQueues();
+  }
+
+  public reorderQueueItem(queueId: string, downloadId: string, targetIndex: number): void {
+    const queueItems = Array.from(this.downloads.values())
+      .filter((d) => d.queueId === queueId && d.status === 'queued')
+      .sort((a, b) => a.createdAt - b.createdAt);
+
+    const currentIndex = queueItems.findIndex((d) => d.id === downloadId);
+    if (currentIndex === -1 || targetIndex < 0 || targetIndex >= queueItems.length) return;
+
+    const [moved] = queueItems.splice(currentIndex, 1);
+    queueItems.splice(targetIndex, 0, moved);
+
+    // Adjust createdAt timestamps to preserve new sequence
+    const baseTime = Date.now() - queueItems.length * 1000;
+    queueItems.forEach((item, idx) => {
+      item.createdAt = baseTime + idx * 1000;
+      this.db.saveDownload(item);
+    });
+  }
+
+  public checkDuplicate(params: {
+    url: string;
+    filename?: string;
+    destinationDir?: string;
+  }): {
+    isDuplicate: boolean;
+    classification: string;
+    existingItem?: DownloadItem;
+    fileExistsOnDisk: boolean;
+    existingFilePath?: string;
+    reason: string;
+  } {
+    const dupCheck = DownloadIntelligence.detectDuplicate(
+      { url: params.url, filename: params.filename },
+      Array.from(this.downloads.values())
+    );
+
+    const destDir = params.destinationDir || this.db.getSettings().general.defaultDownloadDir;
+    const targetFile = params.filename ? path.join(destDir, params.filename) : null;
+    const fileExistsOnDisk = targetFile ? fs.existsSync(targetFile) : false;
+
+    const existing = dupCheck.matchedDownloadId ? this.downloads.get(dupCheck.matchedDownloadId) : undefined;
+
+    return {
+      isDuplicate: dupCheck.classification !== 'DIFFERENT_RESOURCE',
+      classification: dupCheck.classification,
+      existingItem: existing,
+      fileExistsOnDisk,
+      existingFilePath: fileExistsOnDisk && targetFile ? targetFile : undefined,
+      reason: dupCheck.reason,
+    };
   }
 
   public stopAll(): void {
     for (const id of this.activeWorkers.keys()) {
       this.cancelDownload(id);
     }
+  }
+
+  public cancelAll(): void {
+    for (const item of this.downloads.values()) {
+      if (item.status === 'downloading' || item.status === 'queued') {
+        this.cancelDownload(item.id);
+      }
+    }
+  }
+
+  public updatePriority(id: string, priority: Priority): void {
+    const item = this.downloads.get(id);
+    if (!item) return;
+    item.priority = priority;
+    this.db.saveDownload(item);
+    this.emit('item_updated', item);
+    this.processQueues();
+  }
+
+  public updateBandwidthLimit(id: string, limitBytesPerSec: number): void {
+    const item = this.downloads.get(id);
+    if (!item) return;
+    item.speedLimitBytesPerSec = limitBytesPerSec;
+    const worker = this.activeWorkers.get(id);
+    if (worker && typeof (worker as any).setSpeedLimit === 'function') {
+      (worker as any).setSpeedLimit(limitBytesPerSec);
+    }
+    this.db.saveDownload(item);
+    this.emit('item_updated', item);
   }
 
   public setGlobalSpeedLimit(bytesPerSec: number): void {

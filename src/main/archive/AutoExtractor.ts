@@ -360,13 +360,21 @@ export class AutoExtractor {
     const hasUnrar = ext === '.rar' && (await this.commandExists('unrar'));
 
     if (!has7z && !hasUnzip && !hasUnrar) {
+      const isMac = process.platform === 'darwin';
+      const isWin = process.platform === 'win32';
+      const installCmd = isMac
+        ? 'brew install p7zip'
+        : isWin
+        ? 'winget install 7zip.7zip'
+        : 'sudo apt install p7zip-full';
+
       return {
         extracted: false,
         destinationDir: destDir,
         extractedFiles: [],
         deletedArchive: false,
         engineUsed: 'none',
-        message: `No system extractor available for ${ext} archives. Install 7-Zip (7z)${ext === '.rar' ? ' or unrar' : ''} to enable extraction.`,
+        message: `No system extractor available for ${ext} archives. Install 7-Zip using: ${installCmd}`,
       };
     }
 

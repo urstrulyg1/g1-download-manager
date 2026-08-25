@@ -22,6 +22,9 @@ import {
   ShieldAlert,
   Film,
   Zap,
+  ExternalLink,
+  Copy,
+  Check,
 } from 'lucide-react';
 import { DownloadItem, DownloadQueue, CategoryRule } from '../../shared/types';
 import { Language, translations } from '../lib/i18n';
@@ -65,6 +68,7 @@ export const DownloadsView: React.FC<DownloadsViewProps> = ({
   const [previewItem, setPreviewItem] = useState<DownloadItem | null>(null);
   const [sortBy, setSortBy] = useState<'createdAt' | 'filename' | 'size' | 'progress' | 'speed'>('createdAt');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const formatBytes = (bytes: number) => {
     if (bytes <= 0) return '0 B';
@@ -73,6 +77,9 @@ export const DownloadsView: React.FC<DownloadsViewProps> = ({
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return `${(bytes / Math.pow(k, i)).toFixed(2)} ${sizes[i]}`;
   };
+
+  const [pageSize, setPageSize] = useState<number>(50);
+  const [currentPage, setCurrentPage] = useState<number>(1);
 
   // Filtered & Sorted downloads
   const filteredDownloads = useMemo(() => {
@@ -105,6 +112,13 @@ export const DownloadsView: React.FC<DownloadsViewProps> = ({
         return sortOrder === 'desc' ? -diff : diff;
       });
   }, [downloads, statusFilter, categoryFilter, queueFilter, searchQuery, sortBy, sortOrder]);
+
+  const totalPages = Math.ceil(filteredDownloads.length / (pageSize || 50)) || 1;
+  const paginatedDownloads = useMemo(() => {
+    if (pageSize <= 0) return filteredDownloads;
+    const start = (currentPage - 1) * pageSize;
+    return filteredDownloads.slice(start, start + pageSize);
+  }, [filteredDownloads, currentPage, pageSize]);
 
   const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.checked) {
@@ -139,6 +153,28 @@ export const DownloadsView: React.FC<DownloadsViewProps> = ({
     await Promise.all(ids.map((id) => api.deleteDownload(id, deleteFiles).catch(console.error)));
     if (onRefresh) onRefresh();
   };
+
+  const handleCopyUrl = (id: string, url: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    navigator.clipboard.writeText(url).then(() => {
+      setCopiedId(id);
+      setTimeout(() => setCopiedId(null), 2000);
+    }).catch(() => {});
+  };
+
+  const handleCyclePriority = async (item: DownloadItem, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const priorities = ['low', 'normal', 'high', 'urgent'];
+    const currentIdx = priorities.indexOf(item.priority || 'normal');
+    const nextPriority = priorities[(currentIdx + 1) % priorities.length];
+    await api.updatePriority(item.id, nextPriority).catch(console.error);
+    if (onRefresh) onRefresh();
+  };
+
+  const failedCount = downloads.filter((d) => d.status === 'failed').length;
+  const completedCount = downloads.filter((d) => d.status === 'completed').length;
+  const activeCount = downloads.filter((d) => d.status === 'downloading').length;
+  const queuedCount = downloads.filter((d) => d.status === 'queued').length;
 
   return (
     <div className="p-6 space-y-4 max-w-7xl mx-auto w-full flex flex-col">
@@ -208,6 +244,80 @@ export const DownloadsView: React.FC<DownloadsViewProps> = ({
               </option>
             ))}
           </select>
+        </div>
+      </div>
+
+      {/* Global Quick Action Bar */}
+      <div className="flex items-center justify-between gap-2 px-1 flex-wrap text-xs">
+        <div className="flex items-center gap-2 text-slate-400 font-medium">
+          <span>{filteredDownloads.length} item{filteredDownloads.length === 1 ? '' : 's'} displayed</span>
+          {activeCount > 0 && <span className="text-cyan-400">({activeCount} downloading)</span>}
+        </div>
+
+        <div className="flex items-center gap-2">
+          {queuedCount > 0 && (
+            <button
+              onClick={() => { api.startAll().then(onRefresh).catch(console.error); }}
+              className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-blue-300 border border-slate-700 flex items-center gap-1.5 font-semibold transition-colors"
+              title="Start all queued downloads"
+            >
+              <Play className="w-3.5 h-3.5 fill-blue-300" />
+              <span>Start All</span>
+            </button>
+          )}
+
+          {activeCount > 0 ? (
+            <button
+              onClick={() => { api.pauseAll().then(onRefresh).catch(console.error); }}
+              className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 flex items-center gap-1.5 font-semibold transition-colors"
+              title="Pause all active transfers"
+            >
+              <Pause className="w-3.5 h-3.5 fill-amber-300" />
+              <span>Pause All</span>
+            </button>
+          ) : (
+            <button
+              onClick={() => { api.resumeAll().then(onRefresh).catch(console.error); }}
+              className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-300 border border-slate-700 flex items-center gap-1.5 font-semibold transition-colors"
+              title="Resume all paused and failed downloads"
+            >
+              <Play className="w-3.5 h-3.5 fill-emerald-300" />
+              <span>Resume All</span>
+            </button>
+          )}
+
+          {activeCount > 0 && (
+            <button
+              onClick={() => { api.cancelAll().then(onRefresh).catch(console.error); }}
+              className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-rose-950 text-slate-400 hover:text-rose-300 border border-slate-700 flex items-center gap-1.5 font-semibold transition-colors"
+              title="Cancel all active and queued downloads"
+            >
+              <XCircle className="w-3.5 h-3.5 text-rose-400" />
+              <span>Cancel All</span>
+            </button>
+          )}
+
+          {failedCount > 0 && (
+            <button
+              onClick={() => { api.retryFailed().then(onRefresh).catch(console.error); }}
+              className="px-3 py-1.5 rounded-xl bg-rose-950/60 hover:bg-rose-900/60 text-rose-300 border border-rose-500/30 flex items-center gap-1.5 font-semibold transition-colors"
+              title="Retry all failed downloads"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span>Retry {failedCount} Failed</span>
+            </button>
+          )}
+
+          {completedCount > 0 && (
+            <button
+              onClick={() => { api.clearCompleted().then(onRefresh).catch(console.error); }}
+              className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 border border-slate-700 flex items-center gap-1.5 font-semibold transition-colors"
+              title="Clear completed download entries"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Clear Done</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -298,12 +408,58 @@ export const DownloadsView: React.FC<DownloadsViewProps> = ({
             <tbody className="divide-y divide-slate-800/60 text-xs">
               {filteredDownloads.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="text-center py-16 text-slate-500" data-testid="downloads-empty-state">
-                    No matching downloads found.
+                  <td colSpan={7} className="py-20 text-center text-slate-400" data-testid="downloads-empty-state">
+                    <div className="max-w-sm mx-auto flex flex-col items-center gap-3">
+                      <div className="w-12 h-12 rounded-2xl bg-slate-800/80 border border-slate-700 flex items-center justify-center text-slate-400 shadow-inner">
+                        {statusFilter === 'failed' ? (
+                          <CheckCircle2 className="w-6 h-6 text-emerald-400" />
+                        ) : searchQuery ? (
+                          <Search className="w-6 h-6 text-slate-400" />
+                        ) : (
+                          <Download className="w-6 h-6 text-blue-400" />
+                        )}
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-slate-200">
+                          {statusFilter === 'failed'
+                            ? 'No Failed Downloads'
+                            : searchQuery
+                            ? `No results for "${searchQuery}"`
+                            : statusFilter !== 'all'
+                            ? `No ${statusFilter} downloads`
+                            : 'No downloads yet'}
+                        </p>
+                        <p className="text-xs text-slate-400 mt-1">
+                          {statusFilter === 'failed'
+                            ? 'All queued and active transfers have completed successfully.'
+                            : searchQuery
+                            ? 'Check the spelling or try searching for another term.'
+                            : statusFilter !== 'all'
+                            ? `Switch filters to view active, queued, or completed downloads.`
+                            : 'Click "Add Download" in the navbar or paste any link to start.'}
+                        </p>
+                      </div>
+                      {searchQuery && (
+                        <button
+                          onClick={() => setSearchQuery('')}
+                          className="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition-colors"
+                        >
+                          Clear Search
+                        </button>
+                      )}
+                      {!searchQuery && statusFilter !== 'all' && (
+                        <button
+                          onClick={() => onStatusFilterChange('all')}
+                          className="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition-colors"
+                        >
+                          View All Downloads
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ) : (
-                filteredDownloads.map((item) => {
+                paginatedDownloads.map((item) => {
                   const isSelected = selectedIds.has(item.id);
                   return (
                     <tr
@@ -392,6 +548,23 @@ export const DownloadsView: React.FC<DownloadsViewProps> = ({
                           <span className="px-1.5 py-0.2 rounded bg-slate-800 text-slate-300 font-mono text-[10px]">
                             {item.category}
                           </span>
+                          <button
+                            type="button"
+                            onClick={(e) => handleCyclePriority(item, e)}
+                            className={`px-1.5 py-0.2 rounded font-mono text-[10px] uppercase font-bold border transition-colors ${
+                              item.priority === 'urgent'
+                                ? 'bg-rose-500/20 text-rose-300 border-rose-500/40'
+                                : item.priority === 'high'
+                                ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                                : item.priority === 'low'
+                                ? 'bg-slate-800 text-slate-400 border-slate-700'
+                                : 'bg-blue-500/20 text-blue-300 border-blue-500/40'
+                            }`}
+                            title="Click to cycle priority (Urgent / High / Normal / Low)"
+                            aria-label={`Priority: ${item.priority || 'normal'}. Click to cycle.`}
+                          >
+                            {item.priority || 'normal'}
+                          </button>
                           <span className="truncate">{new URL(item.url).hostname}</span>
                         </div>
                       </td>
@@ -504,15 +677,39 @@ export const DownloadsView: React.FC<DownloadsViewProps> = ({
                               <Play className="w-3.5 h-3.5 fill-emerald-400" />
                             </button>
                           ) : item.status === 'completed' ? (
-                            <button
-                              onClick={() => api.openFolder(item.id)}
-                              className="p-1.5 rounded-lg bg-slate-800 hover:bg-blue-950 text-blue-400 hover:text-blue-300 active:scale-95 transition-all shadow-sm"
-                              title="Show in Folder"
-                              aria-label="Show in Folder"
-                            >
-                              <FolderOpen className="w-3.5 h-3.5" />
-                            </button>
+                            <>
+                              <button
+                                onClick={() => api.openFile(item.id).catch(console.error)}
+                                className="p-1.5 rounded-lg bg-slate-800 hover:bg-emerald-950 text-emerald-400 hover:text-emerald-300 active:scale-95 transition-all shadow-sm"
+                                title="Open / Launch File"
+                                aria-label="Open File"
+                              >
+                                <ExternalLink className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={() => api.openFolder(item.id)}
+                                className="p-1.5 rounded-lg bg-slate-800 hover:bg-blue-950 text-blue-400 hover:text-blue-300 active:scale-95 transition-all shadow-sm"
+                                title="Show in Folder"
+                                aria-label="Show in Folder"
+                              >
+                                <FolderOpen className="w-3.5 h-3.5" />
+                              </button>
+                            </>
                           ) : null}
+
+                          {/* Copy URL button */}
+                          <button
+                            onClick={(e) => handleCopyUrl(item.id, item.url, e)}
+                            className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 active:scale-95 transition-all shadow-sm"
+                            title={copiedId === item.id ? 'Copied URL!' : 'Copy download URL'}
+                            aria-label="Copy download URL"
+                          >
+                            {copiedId === item.id ? (
+                              <Check className="w-3.5 h-3.5 text-emerald-400" />
+                            ) : (
+                              <Copy className="w-3.5 h-3.5" />
+                            )}
+                          </button>
 
                           {/* Media Live Preview Button */}
                           {(item.category === 'video' || item.category === 'audio' || item.filename?.match(/\.(mp4|mkv|webm|mov|ts|mp3|flac|wav|m4a)$/i)) && (
@@ -578,6 +775,45 @@ export const DownloadsView: React.FC<DownloadsViewProps> = ({
             </tbody>
           </table>
         </div>
+
+        {/* Pagination & Results Counter */}
+        {filteredDownloads.length > 0 && (
+          <div className="p-3 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400 bg-slate-950/60 flex-wrap gap-2">
+            <div className="flex items-center gap-2">
+              <span>Showing {Math.min(filteredDownloads.length, (currentPage - 1) * pageSize + 1)} - {Math.min(filteredDownloads.length, currentPage * pageSize)} of {filteredDownloads.length}</span>
+              <select
+                value={pageSize}
+                onChange={(e) => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}
+                className="bg-slate-900 border border-slate-800 rounded-lg px-2 py-1 text-slate-300 focus:outline-none"
+              >
+                <option value={25}>25 / page</option>
+                <option value={50}>50 / page</option>
+                <option value={100}>100 / page</option>
+                <option value={250}>250 / page</option>
+                <option value={1000}>1000 / page</option>
+              </select>
+            </div>
+            {totalPages > 1 && (
+              <div className="flex items-center gap-1.5">
+                <button
+                  disabled={currentPage <= 1}
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-30 text-slate-200"
+                >
+                  Prev
+                </button>
+                <span className="px-2 font-mono">{currentPage} / {totalPages}</span>
+                <button
+                  disabled={currentPage >= totalPages}
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-30 text-slate-200"
+                >
+                  Next
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* In-App Live Media Preview Player Modal */}

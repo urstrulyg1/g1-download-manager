@@ -72,6 +72,15 @@ export const AddDownloadModal: React.FC<AddDownloadModalProps> = ({
   const [probeError, setProbeError] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
+  // Duplicate / File collision prompt state
+  const [duplicatePrompt, setDuplicatePrompt] = useState<{
+    type: 'active_download' | 'file_exists';
+    existingItem?: DownloadItem;
+    existingFilename?: string;
+    existingPath?: string;
+    pendingAction: 'now' | 'later' | 'queue';
+  } | null>(null);
+
   useEffect(() => {
     if (!isOpen) return;
     setUrl(initialUrl);
@@ -86,6 +95,7 @@ export const AddDownloadModal: React.FC<AddDownloadModalProps> = ({
     setProbeResult(null);
     setProbeError(null);
     setSubmitError(null);
+    setDuplicatePrompt(null);
     setShowAuth(false);
     setAuthUsername('');
     setAuthPassword('');
@@ -159,9 +169,10 @@ export const AddDownloadModal: React.FC<AddDownloadModalProps> = ({
 
   if (!isOpen) return null;
 
-  const handleSubmit = async (action: 'now' | 'later' | 'queue') => {
-    if (!url.trim()) return;
-
+  const executeAdd = async (
+    action: 'now' | 'later' | 'queue',
+    options?: { fileCollisionAction?: 'rename' | 'overwrite' | 'skip' }
+  ) => {
     setSubmitError(null);
     setIsSubmitting(true);
     try {
@@ -202,6 +213,7 @@ export const AddDownloadModal: React.FC<AddDownloadModalProps> = ({
         proxy,
         checksum,
         startImmediately: action === 'now',
+        ...(options?.fileCollisionAction ? { fileCollisionAction: options.fileCollisionAction } : {}),
       });
 
       if (onDownloadStarted && newItem && action === 'now') {
@@ -213,7 +225,44 @@ export const AddDownloadModal: React.FC<AddDownloadModalProps> = ({
       setSubmitError(err?.message || 'Failed to add download.');
     } finally {
       setIsSubmitting(false);
+      setDuplicatePrompt(null);
     }
+  };
+
+  const handleSubmit = async (action: 'now' | 'later' | 'queue') => {
+    if (!url.trim()) return;
+
+    // Check duplicates and collisions first
+    try {
+      const dup = await api.checkDuplicate({
+        url: url.trim(),
+        filename: filename.trim() || undefined,
+        destinationDir: destinationDir.trim() || undefined,
+      });
+
+      if (dup.existingItem && (dup.existingItem.status === 'downloading' || dup.existingItem.status === 'queued')) {
+        setDuplicatePrompt({
+          type: 'active_download',
+          existingItem: dup.existingItem,
+          pendingAction: action,
+        });
+        return;
+      }
+
+      if (dup.fileExistsOnDisk) {
+        setDuplicatePrompt({
+          type: 'file_exists',
+          existingFilename: filename.trim() || dup.existingItem?.filename || 'File',
+          existingPath: dup.existingFilePath,
+          pendingAction: action,
+        });
+        return;
+      }
+    } catch {
+      // Fallback directly to adding
+    }
+
+    await executeAdd(action);
   };
 
   return (
@@ -573,6 +622,109 @@ export const AddDownloadModal: React.FC<AddDownloadModalProps> = ({
             </button>
           </div>
         </div>
+
+        {/* Duplicate / Collision Interactive Prompt */}
+        {duplicatePrompt && (
+          <div className="absolute inset-0 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-6 z-50 animate-in fade-in zoom-in-95 duration-150">
+            <div className="bg-slate-900 border border-slate-700 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4 text-xs">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center border border-amber-500/30 flex-shrink-0">
+                  <ShieldAlert className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white">
+                    {duplicatePrompt.type === 'active_download'
+                      ? 'Download Already Active'
+                      : 'File Already Exists'}
+                  </h3>
+                  <p className="text-slate-400 text-[11px] mt-0.5">
+                    {duplicatePrompt.type === 'active_download'
+                      ? 'This URL is already being managed by G1DM.'
+                      : 'A file with this name already exists in destination folder.'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800 space-y-1 font-mono text-[11px]">
+                <div className="text-slate-200 font-semibold truncate">
+                  {duplicatePrompt.existingItem?.filename || duplicatePrompt.existingFilename}
+                </div>
+                {duplicatePrompt.type === 'active_download' && duplicatePrompt.existingItem && (
+                  <div className="text-cyan-400 text-[10px]">
+                    Status: {duplicatePrompt.existingItem.status} ({duplicatePrompt.existingItem.progress.toFixed(1)}%)
+                  </div>
+                )}
+                {duplicatePrompt.existingPath && (
+                  <div className="text-slate-400 text-[10px] truncate">
+                    Path: {duplicatePrompt.existingPath}
+                  </div>
+                )}
+              </div>
+
+              <div className="pt-2 flex flex-col gap-2">
+                {duplicatePrompt.type === 'active_download' ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (onDownloadStarted && duplicatePrompt.existingItem) {
+                          onDownloadStarted(duplicatePrompt.existingItem);
+                        }
+                        setDuplicatePrompt(null);
+                        onClose();
+                      }}
+                      className="w-full py-2 px-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs transition-colors"
+                    >
+                      Open Existing Download
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => executeAdd(duplicatePrompt.pendingAction)}
+                      className="w-full py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs transition-colors border border-slate-700"
+                    >
+                      Download Again (Duplicate)
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDuplicatePrompt(null);
+                        onClose();
+                      }}
+                      className="w-full py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition-colors"
+                    >
+                      Use Existing File
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => executeAdd(duplicatePrompt.pendingAction, { fileCollisionAction: 'rename' })}
+                      className="w-full py-2 px-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs transition-colors"
+                    >
+                      Save as Copy (Auto-Rename)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => executeAdd(duplicatePrompt.pendingAction, { fileCollisionAction: 'overwrite' })}
+                      className="w-full py-2 px-3 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs transition-colors"
+                    >
+                      Replace Existing File
+                    </button>
+                  </>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => setDuplicatePrompt(null)}
+                  className="w-full py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 font-semibold text-xs transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
