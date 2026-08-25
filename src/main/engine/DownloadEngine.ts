@@ -1,5 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import { execFile } from 'child_process';
 import { EventEmitter } from 'events';
 import {
   DownloadItem,
@@ -18,7 +19,6 @@ import { HttpDownloader } from './HttpDownloader';
 import { Http2Downloader } from './Http2Downloader';
 import { FtpDownloader } from './FtpDownloader';
 import { HlsDownloader } from './HlsDownloader';
-import { MediaStreamDownloader } from '../media/MediaStreamDownloader';
 import { SecureMediaDetector, looksLikeStreamingMediaSource } from '../media/SecureMediaDetector';
 import { ProbeService } from './ProbeService';
 import { TokenBucketRateLimiter } from './RateLimiter';
@@ -32,6 +32,7 @@ import { MaliciousLinkScanner } from '../security/MaliciousLinkScanner';
 import { RecoveryOrchestrator } from './RecoveryOrchestrator';
 import { BandwidthGovernor } from '../qos/BandwidthGovernor';
 import { RuleEngine } from '../automation/RuleEngine';
+import { BinaryLocator } from '../platform/BinaryLocator';
 
 export class DownloadEngine extends EventEmitter {
   private db: AppDatabase;
@@ -39,7 +40,7 @@ export class DownloadEngine extends EventEmitter {
   private stateMachines: Map<string, DownloadStateMachine> = new Map();
   private activeWorkers: Map<
     string,
-    HttpDownloader | Http2Downloader | FtpDownloader | HlsDownloader | MediaStreamDownloader
+    HttpDownloader | Http2Downloader | FtpDownloader | HlsDownloader
   > = new Map();
   private policyEngine: ServerPolicyEngine = new ServerPolicyEngine();
   private recoveryOrchestrator: RecoveryOrchestrator;
@@ -432,6 +433,21 @@ export class DownloadEngine extends EventEmitter {
     return item;
   }
 
+  /** Resolve (but never download) a media URL with yt-dlp. */
+  private async resolveMediaStreamUrl(sourceUrl: string, formatSpec?: string): Promise<string> {
+    if (!(await BinaryLocator.isYtDlpAvailable())) {
+      throw new Error('Media stream resolution requires yt-dlp; direct files never require it.');
+    }
+    const format = formatSpec || 'best[protocol^=http][acodec!=none][vcodec!=none]/best[protocol^=http]/best';
+    const output = await new Promise<string>((resolve, reject) => {
+      execFile(BinaryLocator.getYtDlpPath(), ['--no-warnings', '--no-playlist', '-g', '-f', format, sourceUrl],
+        { timeout: 30000, maxBuffer: 1024 * 1024 }, (error, stdout) => error ? reject(error) : resolve(stdout));
+    });
+    const streamUrl = output.split(/\r?\n/).map((line) => line.trim()).find((line) => /^https?:\/\//i.test(line));
+    if (!streamUrl) throw new Error('Media resolver did not return a downloadable HTTP(S) stream URL.');
+    return streamUrl;
+  }
+
   private resolveFileCollision(
     dir: string,
     filename: string,
@@ -501,20 +517,28 @@ export class DownloadEngine extends EventEmitter {
 
     const workerItem = { ...item, auth: workerAuth };
 
-    let worker: HttpDownloader | Http2Downloader | FtpDownloader | HlsDownloader | MediaStreamDownloader;
-    const protocol = item.serverCapabilities.protocol;
-    // Direct HTTP(S) is the default for every resource, including unknown
-    // extensions and extensionless endpoints. The media worker is reserved
-    // for an explicit yt-dlp format (or a previously resolved media stream),
-    // so a failed HTML/media metadata probe can never turn an ordinary file
-    // download into a yt-dlp requirement.
+    let worker: HttpDownloader | Http2Downloader | FtpDownloader | HlsDownloader;
+    let protocol = item.serverCapabilities.protocol;
+    // yt-dlp is allowed to resolve media metadata and an expiring stream URL,
+    // but it must not become the ordinary transfer implementation. Resolve a
+    // direct URL, reprobe it, then hand the bytes to the same HTTP/HLS workers
+    // used for every other G1DM item.
     const isStreamPlatform =
       (protocol as string) === 'media_stream' ||
       Boolean((item as any).mediaFormatSpec);
-
     if (isStreamPlatform) {
-      worker = new MediaStreamDownloader(workerItem);
-    } else if (protocol === 'ftp' || protocol === 'ftps') {
+      const streamUrl = await this.resolveMediaStreamUrl(item.url, (item as any).mediaFormatSpec);
+      const streamProbe = await ProbeService.probe(streamUrl, workerAuth, item.proxy);
+      (item as any).mediaSourceUrl = item.url;
+      item.url = streamProbe.finalUrl || streamUrl;
+      item.serverCapabilities = streamProbe.capabilities;
+      item.totalBytes = streamProbe.size > 0 ? streamProbe.size : item.totalBytes;
+      protocol = item.serverCapabilities.protocol;
+      this.db.saveDownload(item);
+      Object.assign(workerItem, { url: item.url, totalBytes: item.totalBytes, serverCapabilities: item.serverCapabilities });
+    }
+
+    if (protocol === 'ftp' || protocol === 'ftps') {
       worker = new FtpDownloader(workerItem, this.globalRateLimiter);
     } else if (protocol === 'hls') {
       worker = new HlsDownloader(workerItem, this.globalRateLimiter);
