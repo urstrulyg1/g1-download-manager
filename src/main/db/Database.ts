@@ -680,53 +680,10 @@ export class AppDatabase {
       }
     }
 
-    // Seed Default Queue if empty
-    const queueRes = this.db.exec('SELECT id FROM queues');
-    if (queueRes.length === 0 || queueRes[0].values.length === 0) {
-      const defaultQueue: DownloadQueue = {
-        id: 'default',
-        name: 'Main Download Queue',
-        priority: 1,
-        mode: 'parallel',
-        maxConcurrentDownloads: 4,
-        maxConnectionsPerDownload: 8,
-        speedLimitBytesPerSec: 0,
-        destinationDir: this.defaultSettings.general.defaultDownloadDir,
-        status: 'active',
-        schedule: {
-          enabled: false,
-          startTime: '00:00',
-          stopTime: '23:59',
-          daysOfWeek: [0, 1, 2, 3, 4, 5, 6],
-          onCompleteAction: 'nothing',
-        },
-        downloadIds: [],
-        createdAt: Date.now(),
-      };
-      this.saveQueue(defaultQueue);
-
-      const nightQueue: DownloadQueue = {
-        id: 'night_queue',
-        name: 'Night Scheduler Queue',
-        priority: 2,
-        mode: 'sequential',
-        maxConcurrentDownloads: 2,
-        maxConnectionsPerDownload: 16,
-        speedLimitBytesPerSec: 0,
-        destinationDir: this.defaultSettings.general.defaultDownloadDir,
-        status: 'stopped',
-        schedule: {
-          enabled: true,
-          startTime: '01:00',
-          stopTime: '06:30',
-          daysOfWeek: [1, 2, 3, 4, 5],
-          onCompleteAction: 'nothing',
-        },
-        downloadIds: [],
-        createdAt: Date.now(),
-      };
-      this.saveQueue(nightQueue);
-    }
+    // Zero-seed policy: queues are NOT pre-populated. A fresh installation
+    // contains 0 downloads, 0 queue entries, and 0 history records. The engine
+    // creates a queue lazily the first time a user actually adds a download
+    // (see DownloadEngine.ensureQueueExists).
   }
 
   // --- Downloads CRUD ---

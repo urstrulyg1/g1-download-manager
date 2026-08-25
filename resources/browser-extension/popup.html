@@ -3,84 +3,24 @@
 <head>
   <meta charset="utf-8">
   <style>
-    body { width: 320px; margin: 0; padding: 16px; font-family: system-ui, -apple-system, sans-serif; background: #0f172a; color: #f8fafc; }
-    h2 { margin: 0 0 8px 0; font-size: 16px; color: #3b82f6; display: flex; align-items: center; gap: 8px; font-weight: 700; }
-    .status-badge { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: #94a3b8; margin-bottom: 14px; }
-    .status-dot { width: 8px; height: 8px; border-radius: 50%; background: #10b981; }
-    .status-dot.offline { background: #f59e0b; }
-    button { width: 100%; padding: 9px 12px; background: #2563eb; color: #fff; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 13px; transition: background 0.15s ease; }
+    body { width: 320px; margin: 0; padding: 16px; font-family: system-ui, sans-serif; background: #0f172a; color: #f8fafc; }
+    h2 { margin: 0 0 12px 0; font-size: 16px; color: #3b82f6; display: flex; align-items: center; gap: 8px; }
+    .status { font-size: 12px; color: #94a3b8; margin-bottom: 16px; }
+    button { width: 100%; padding: 8px 12px; background: #2563eb; color: #fff; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; }
     button:hover { background: #1d4ed8; }
-    .toggle-row { display: flex; justify-content: space-between; align-items: center; margin: 12px 0 16px 0; font-size: 13px; color: #e2e8f0; }
-    .toggle-row input { cursor: pointer; width: 16px; height: 16px; accent-color: #3b82f6; }
+    .toggle-row { display: flex; justify-content: space-between; align-items: center; margin: 12px 0; font-size: 13px; }
   </style>
 </head>
 <body>
   <h2>⚡ G1DM Companion</h2>
-  <div class="status-badge" id="statusBadge">
-    <span class="status-dot" id="statusDot"></span>
-    <span id="statusText">Connecting to G1DM Core Engine...</span>
-  </div>
+  <div class="status">Connected to G1DM Core Engine</div>
   <div class="toggle-row">
     <span>Automatic Interception</span>
     <input type="checkbox" id="interceptToggle" checked>
   </div>
-  <button id="downloadCurrentBtn" style="background: linear-gradient(135deg, #10b981, #059669); margin-bottom: 8px;">⚡ Download Current Video / Page</button>
   <button id="openApp">Open Download Manager</button>
   <script>
-    const interceptToggle = document.getElementById('interceptToggle');
-    const statusDot = document.getElementById('statusDot');
-    const statusText = document.getElementById('statusText');
-
-    // Load saved interception state
-    chrome.storage.local.get(['interceptionEnabled'], (data) => {
-      if (data && typeof data.interceptionEnabled === 'boolean') {
-        interceptToggle.checked = data.interceptionEnabled;
-      }
-    });
-
-    // Save changes when user toggles
-    interceptToggle?.addEventListener('change', (e) => {
-      chrome.storage.local.set({ interceptionEnabled: e.target.checked });
-    });
-
-    // Check engine status
-    fetch('http://127.0.0.1:8055/api/downloads', { method: 'GET', mode: 'cors' })
-      .then((res) => {
-        if (res.ok) {
-          statusDot.className = 'status-dot';
-          statusText.textContent = 'Connected to G1DM Core Engine';
-        } else {
-          statusDot.className = 'status-dot offline';
-          statusText.textContent = 'G1DM Engine Standby';
-        }
-      })
-      .catch(() => {
-        statusDot.className = 'status-dot offline';
-        statusText.textContent = 'G1DM Offline (App not running)';
-      });
-
-    document.getElementById('downloadCurrentBtn')?.addEventListener('click', async () => {
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-      if (tab && tab.id) {
-        chrome.tabs.sendMessage(
-          tab.id,
-          {
-            type: 'SHOW_DOWNLOAD_MODAL',
-            url: tab.url,
-            filename: tab.title ? `${tab.title}.mp4` : 'download.mp4',
-            category: 'video'
-          },
-          (res) => {
-            if (chrome.runtime.lastError || !res?.success) {
-              chrome.tabs.create({ url: `http://127.0.0.1:8055/#add?url=${encodeURIComponent(tab.url)}` });
-            }
-          }
-        );
-        window.close();
-      }
-    });
-
-    document.getElementById('openApp')?.addEventListener('click', () => {
+    document.getElementById('openApp').addEventListener('click', () => {
       chrome.tabs.create({ url: 'http://127.0.0.1:8055' });
     });
   </script>

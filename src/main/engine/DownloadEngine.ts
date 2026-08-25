@@ -124,6 +124,39 @@ export class DownloadEngine extends EventEmitter {
     }
   }
 
+  /**
+   * Materializes the queue record for a download target if it does not exist.
+   * Driven exclusively by real user download actions — never at startup — so a
+   * fresh installation contains zero queue entries until the user adds a
+   * download that needs one.
+   */
+  private ensureQueueExists(queueId: string, defaultDestinationDir: string): void {
+    const existing = this.db.getQueues().find((q) => q.id === queueId);
+    if (existing) return;
+
+    const queue: DownloadQueue = {
+      id: queueId,
+      name: queueId === 'default' ? 'Main Download Queue' : queueId,
+      priority: 1,
+      mode: 'parallel',
+      maxConcurrentDownloads: 4,
+      maxConnectionsPerDownload: 8,
+      speedLimitBytesPerSec: 0,
+      destinationDir: defaultDestinationDir,
+      status: 'active',
+      schedule: {
+        enabled: false,
+        startTime: '00:00',
+        stopTime: '23:59',
+        daysOfWeek: [0, 1, 2, 3, 4, 5, 6],
+        onCompleteAction: 'nothing',
+      },
+      downloadIds: [],
+      createdAt: Date.now(),
+    };
+    this.db.saveQueue(queue);
+  }
+
   private startEngineLoop(): void {
     if (this.schedulerInterval) clearInterval(this.schedulerInterval);
     this.schedulerInterval = setInterval(() => {
@@ -236,6 +269,12 @@ export class DownloadEngine extends EventEmitter {
     const category = params.category || ruleMatch.category || probe.suggestedCategory || 'other';
     const priority = params.priority || ruleMatch.priority || 'normal';
 
+    // Queues are created lazily, driven by real user actions only: a fresh
+    // install ships with 0 queue entries, and the target queue record is
+    // materialized the first time a download actually targets it.
+    const queueId = params.queueId || 'default';
+    this.ensureQueueExists(queueId, settings.general.defaultDownloadDir);
+
     let destDir = params.destinationDir || ruleMatch.destinationDir;
     if (!destDir) {
       const categories = this.db.getCategories();
@@ -347,7 +386,7 @@ export class DownloadEngine extends EventEmitter {
       peakSpeed: 0,
       eta: 0,
       category,
-      queueId: params.queueId || 'default',
+      queueId,
       priority: params.priority || 'normal',
       maxConnections: recommendedConns,
       activeConnections: 0,

@@ -103,7 +103,7 @@ export class BrowserIntegrationService {
     const manifest = {
       manifest_version: 3,
       name: 'G1DM — Internet Download Manager Integration',
-      version: '1.0.0',
+      version: '4.0.0',
       description: 'Official companion extension for G1DM Next-Generation Download Manager',
       permissions: ['contextMenus', 'storage', 'activeTab'],
       host_permissions: ['<all_urls>'],

@@ -188,11 +188,11 @@ export class HttpDownloader extends EventEmitter {
 
       const failedSegment = this.item.segments.find((segment) => segment.status === 'failed');
       if (failedSegment) {
-        if ((this.item.retryCount || 0) < (this.item.maxRetries || 5)) {
+        if ((this.item.retryCount || 0) < (this.item.maxRetries ?? 5)) {
           this.item.retryCount = (this.item.retryCount || 0) + 1;
           this.log(
             'warn',
-            `Segment ${failedSegment.id} failed (${failedSegment.error || 'error'}). Retrying (${this.item.retryCount}/${this.item.maxRetries || 5})...`
+            `Segment ${failedSegment.id} failed (${failedSegment.error || 'error'}). Retrying (${this.item.retryCount}/${this.item.maxRetries ?? 5})...`
           );
           for (const s of this.item.segments) {
             if (s.status === 'failed') s.status = 'pending';
@@ -275,7 +275,7 @@ export class HttpDownloader extends EventEmitter {
       const reqOptions: https.RequestOptions = {
         method: 'GET',
         headers,
-        timeout: (this.item.maxRetries || 5) * 5000,
+        timeout: (this.item.maxRetries ?? 5) * 5000,
         agent,
         rejectUnauthorized: TlsPolicy.rejectUnauthorized(),
       };
@@ -762,6 +762,54 @@ export class HttpDownloader extends EventEmitter {
     this.item.speedLimitBytesPerSec = bytesPerSec;
   }
 
+  /**
+   * Detects a real media container signature in the first bytes of a file.
+   * Used to distinguish genuinely small media files (a 1-second clip is
+   * legitimate user-requested content) from HTML/JSON error responses saved
+   * with a media extension.
+   */
+  private hasValidMediaSignature(filePath: string, ext: string): boolean {
+    try {
+      const readLen = Math.min(64, fs.statSync(filePath).size);
+      if (readLen < 8) return false;
+      const buf = Buffer.alloc(readLen);
+      const fd = fs.openSync(filePath, 'r');
+      fs.readSync(fd, buf, 0, readLen, 0);
+      fs.closeSync(fd);
+
+      if (ext === '.mp4' || ext === '.m4a' || ext === '.mov') {
+        // ISO base media: box size (u32 BE) followed by 'ftyp'/'moov'/'mdat'/'free'/'skip'
+        const brand = buf.toString('ascii', 4, 8);
+        return ['ftyp', 'moov', 'mdat', 'free', 'skip', 'wide'].includes(brand);
+      }
+      if (ext === '.mkv' || ext === '.webm') {
+        // EBML magic
+        return buf[0] === 0x1a && buf[1] === 0x45 && buf[2] === 0xdf && buf[3] === 0xa3;
+      }
+      if (ext === '.ts') {
+        // MPEG-TS sync byte, also at the start of the second 188-byte packet
+        return buf[0] === 0x47 && (readLen < 188 || buf[188] === 0x47);
+      }
+      if (ext === '.mp3') {
+        // ID3 tag or MPEG audio frame sync
+        return (buf[0] === 0x49 && buf[1] === 0x44 && buf[2] === 0x33) || (buf[0] === 0xff && (buf[1] & 0xe0) === 0xe0);
+      }
+      if (ext === '.flac') {
+        return buf.toString('ascii', 0, 4) === 'fLaC';
+      }
+      if (ext === '.wav') {
+        return buf.toString('ascii', 0, 4) === 'RIFF' && buf.toString('ascii', 8, 12) === 'WAVE';
+      }
+      if (ext === '.aac') {
+        // ADTS frame sync
+        return buf[0] === 0xff && (buf[1] & 0xf6) === 0xf0;
+      }
+      return false;
+    } catch {
+      return false;
+    }
+  }
+
   private finalizeCompletion(): void {
     if (this.isCompleted) return;
     this.cleanupFd();
@@ -785,7 +833,7 @@ export class HttpDownloader extends EventEmitter {
 
     // Reject invalid small media files and error responses
     if (isMedia) {
-      if (stat.size < 4096) {
+      if (stat.size < 4096 && !this.hasValidMediaSignature(targetTemp, ext)) {
         try { fs.unlinkSync(targetTemp); } catch {}
         if (fs.existsSync(this.item.stateFilePath)) {
           try { fs.unlinkSync(this.item.stateFilePath); } catch {}

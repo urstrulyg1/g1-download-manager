@@ -31,8 +31,10 @@ describe('G1DM Version Migration & Schema Safety', () => {
     const categories = db.getCategories();
     expect(categories.length).toBeGreaterThanOrEqual(6);
 
+    // Zero-seed policy: a fresh installation must contain zero queue entries.
+    // Queues are created lazily by real user download actions.
     const queues = db.getQueues();
-    expect(queues.length).toBeGreaterThanOrEqual(2);
+    expect(queues.length).toBe(0);
 
     const migrations = db.getMigrationHistory();
     expect(migrations.length).toBeGreaterThanOrEqual(1);

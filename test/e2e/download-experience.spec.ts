@@ -77,7 +77,20 @@ async function getFixtureHealth() {
 }
 
 async function openDownloadsView(page: Page) {
-  await page.locator('aside').getByRole('button', { name: /downloads/i }).first().click();
+  // The IDM popup legitimately covers the UI while a real download runs and
+  // may open asynchronously — dismiss it (Escape) and retry, as a user would.
+  const navButton = page.locator('aside').getByRole('button', { name: /downloads/i }).first();
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      await navButton.click({ timeout: 3000 });
+      await expect(page.locator('table')).toBeVisible({ timeout: 5000 });
+      return;
+    } catch {
+      await page.keyboard.press('Escape');
+      await page.waitForTimeout(300);
+    }
+  }
+  await navButton.click();
   await expect(page.locator('table')).toBeVisible();
 }
 
@@ -100,7 +113,7 @@ async function createDownloadViaModal(
 
   page.on('request', requestListener);
   try {
-    await page.getByRole('button', { name: /new download/i }).click();
+    await page.getByRole('button', { name: /new download|add download/i }).first().click();
     await expect(page.getByTestId('add-download-modal')).toBeVisible();
     await page.getByTestId('download-url-input').fill(url);
 
@@ -142,7 +155,7 @@ async function createDownloadViaModal(
 }
 
 async function submitDownloadExpectInlineError(page: Page, url: string, destinationDir: string) {
-  await page.getByRole('button', { name: /new download/i }).click();
+  await page.getByRole('button', { name: /new download|add download/i }).first().click();
   await expect(page.getByTestId('add-download-modal')).toBeVisible();
   await page.getByTestId('download-url-input').fill(url);
   await page.waitForTimeout(1000);
@@ -183,20 +196,38 @@ async function openPopupForDownload(page: Page, id: string) {
 
 test.describe.configure({ mode: 'serial' });
 
+
+/**
+ * Navigate to the app and dismiss the genuine first-run onboarding modal when
+ * present (a real fresh-profile condition). Onboarding is user-facing setup,
+ * not download data; tests dismiss it the same way a real user would.
+ */
+async function gotoApp(page: Page) {
+  await page.goto('/');
+  const skipButton = page.getByRole('button', { name: /skip setup/i });
+  if (await skipButton.isVisible().catch(() => false)) {
+    await skipButton.click();
+    await expect(page.getByRole('heading', { name: /welcome to g1dm/i })).toBeHidden();
+  }
+  // Close any overlay left open by a previous test in the shared context
+  // (theme menu, popup, etc.) so navigation is not blocked.
+  await page.keyboard.press('Escape');
+}
+
 test.describe('G1DM browser download experience', () => {
   test.beforeEach(async ({ request }) => {
     await resetAppState(request);
   });
 
   test('starts with a real empty state and no dummy downloads', async ({ page, request }) => {
-    await page.goto('/');
+    await gotoApp(page);
     await expect(page.getByText('G1DM')).toBeVisible();
 
     let state = await getTestState(request);
     expect(state.downloads).toHaveLength(0);
 
     await openDownloadsView(page);
-    await expect(page.getByTestId('downloads-empty-state')).toContainText('No matching downloads found.');
+    await expect(page.getByTestId('downloads-empty-state')).toContainText('No downloads yet');
     await expect(page.locator('[data-download-id]')).toHaveCount(0);
 
     await page.reload();
@@ -211,7 +242,7 @@ test.describe('G1DM browser download experience', () => {
     const fixtureHealth = await getFixtureHealth();
     const sourceUrl = `${FIXTURE_BASE}/files/slow-media?name=Actual%20Video%20Title.mp4&mime=video/mp4&profile=10mb&delayMs=80`;
 
-    await page.goto('/');
+    await gotoApp(page);
 
     const { item: createdItem, createRequestCount } = await createDownloadViaModal(page, sourceUrl, {
       action: 'now',
@@ -319,7 +350,7 @@ test.describe('G1DM browser download experience', () => {
   });
 
   test('Cancel in the popup stops the active download without completing it', async ({ page, request }) => {
-    await page.goto('/');
+    await gotoApp(page);
     const sourceUrl = `${FIXTURE_BASE}/files/slow-media?name=Cancel%20Scenario.mp4&mime=video/mp4&profile=5mb&delayMs=70`;
     const { item } = await createDownloadViaModal(page, sourceUrl, {
       action: 'now',
@@ -342,7 +373,7 @@ test.describe('G1DM browser download experience', () => {
   test('Retry in the popup resumes the same logical download ID after a controlled failure', async ({ page, request }) => {
     const fixtureHealth = await getFixtureHealth();
     await resetAppState(request, 0);
-    await page.goto('/');
+    await gotoApp(page);
 
     const { item } = await createDownloadViaModal(page, `${FIXTURE_BASE}/files/flaky-retry.mp4`, {
       action: 'now',
@@ -371,11 +402,11 @@ test.describe('G1DM browser download experience', () => {
   });
 
   test('refresh and websocket reconnect recover the active download without duplication or fake jumps', async ({ page, request }) => {
-    await page.goto('/');
+    await gotoApp(page);
 
     const { item } = await createDownloadViaModal(
       page,
-      `${FIXTURE_BASE}/files/slow-media?name=Refresh%20Recovery.mp4&mime=video/mp4&profile=10mb&delayMs=80`,
+      `${FIXTURE_BASE}/files/slow-media?name=Refresh%20Recovery.mp4&mime=video/mp4&profile=10mb&delayMs=600`,
       { action: 'now', expectedFilename: /Refresh Recovery\.mp4/ }
     );
 
@@ -406,7 +437,7 @@ test.describe('G1DM browser download experience', () => {
   });
 
   test('multiple downloads keep unique IDs and the single popup safely switches exact items', async ({ page, request }) => {
-    await page.goto('/');
+    await gotoApp(page);
 
     const urls = [
       `${FIXTURE_BASE}/files/slow-media?name=Download%20A.mp4&mime=video/mp4&profile=5mb&delayMs=75`,
@@ -447,9 +478,9 @@ test.describe('G1DM browser download experience', () => {
   });
 
   test('probe and media quality preview do not auto-start downloads, and Start Later stays queued after refresh', async ({ page, request }) => {
-    await page.goto('/');
+    await gotoApp(page);
 
-    await page.getByRole('button', { name: /new download/i }).click();
+    await page.getByRole('button', { name: /new download|add download/i }).first().click();
     await expect(page.getByTestId('add-download-modal')).toBeVisible();
     await page.getByTestId('download-url-input').fill(`${FIXTURE_BASE}/files/idm-video.mp4`);
     await expect(page.getByTestId('download-filename-input')).toHaveValue(/Actual Video Title\.mp4/, { timeout: 20_000 });
@@ -483,7 +514,7 @@ test.describe('G1DM browser download experience', () => {
 
   test('the popup supports keyboard access, focus return, reduced motion, and responsive viewports', async ({ page, request }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
-    await page.goto('/');
+    await gotoApp(page);
 
     const { item } = await createDownloadViaModal(
       page,
@@ -543,7 +574,7 @@ test.describe('G1DM browser download experience', () => {
 
   test('browser error UX reports real 404, 403, 500, network, invalid URL, and permission failures', async ({ page, request }) => {
     await resetAppState(request, 0);
-    await page.goto('/');
+    await gotoApp(page);
 
     for (const scenario of [
       { label: '404', url: `${FIXTURE_BASE}/error/404`, expected: /404/i },
@@ -558,7 +589,7 @@ test.describe('G1DM browser download experience', () => {
       await page.getByTestId('idm-hide-button').click();
     }
 
-    await page.getByRole('button', { name: /new download/i }).click();
+    await page.getByRole('button', { name: /new download|add download/i }).first().click();
     await expect(page.getByTestId('add-download-modal')).toBeVisible();
     await page.getByTestId('download-url-input').fill('http://:');
     await expect(page.getByTestId('download-probe-error')).toBeVisible();

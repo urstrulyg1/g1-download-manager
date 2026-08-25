@@ -248,7 +248,7 @@ export async function createUnifiedServer(port: number = 8055) {
   // Periodic metrics broadcast
   const metricsInterval = setInterval(() => {
     if (clients.size === 0) return;
-    const metrics = collectSystemMetrics(db, engine, networkQualitySvc);
+    const metrics = collectSystemMetrics(db, engine, networkQualitySvc, networkIntelligence);
     broadcast('metrics_tick', metrics);
   }, 1000);
 
@@ -644,7 +644,7 @@ export async function createUnifiedServer(port: number = 8055) {
 
   // System Metrics
   app.get('/api/metrics', (req, res) => {
-    res.json(collectSystemMetrics(db, engine, networkQualitySvc));
+    res.json(collectSystemMetrics(db, engine, networkQualitySvc, networkIntelligence));
   });
 
   // History
@@ -1522,7 +1522,7 @@ export async function createUnifiedServer(port: number = 8055) {
   });
 }
 
-function collectSystemMetrics(db: AppDatabase, engine: DownloadEngine, networkQualitySvc?: any): SystemMetrics {
+function collectSystemMetrics(db: AppDatabase, engine: DownloadEngine, networkQualitySvc?: any, networkIntelligence?: { getStatus(): { online: boolean } }): SystemMetrics {
   const settings = db.getSettings();
   const downloads = engine.getAllDownloads();
 
@@ -1549,10 +1549,12 @@ function collectSystemMetrics(db: AppDatabase, engine: DownloadEngine, networkQu
   }
 
   const realRtt = networkQualitySvc ? networkQualitySvc.getLatestRtt() : 0;
+  // Real connectivity state from the live connectivity monitor — never assumed.
+  const realOnline = networkIntelligence ? networkIntelligence.getStatus().online : false;
 
   return {
     network: {
-      online: true,
+      online: realOnline,
       interfaces,
       activeDownloadSpeed: activeSpeed,
       activeUploadSpeed: 0,

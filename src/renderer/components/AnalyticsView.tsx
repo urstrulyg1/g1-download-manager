@@ -37,7 +37,9 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ downloads, metrics
   const completedItems = downloads.filter((d) => d.status === 'completed');
   const failedItems = downloads.filter((d) => d.status === 'failed');
 
-  const successRatePct = downloads.length > 0 ? Math.round((completedItems.length / downloads.length) * 100) : 100;
+  // Honest statistics: a success rate is only defined when at least one real
+  // download exists — no fabricated 100% for an empty history.
+  const successRatePct = downloads.length > 0 ? Math.round((completedItems.length / downloads.length) * 100) : null;
   const avgSpeed = completedItems.length > 0 ? Math.round(completedItems.reduce((sum, d) => sum + (d.avgSpeed || 0), 0) / completedItems.length) : 0;
   const peakSpeed = Math.max(...downloads.map((d) => d.peakSpeed || 0), 0);
 
@@ -145,7 +147,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ downloads, metrics
 
         <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 shadow-xl space-y-1">
           <div className="text-slate-400 font-semibold">Transfer Success Rate</div>
-          <div className="text-2xl font-extrabold text-purple-400 font-mono">{successRatePct}%</div>
+          <div className="text-2xl font-extrabold text-purple-400 font-mono">{successRatePct === null ? '—' : `${successRatePct}%`}</div>
           <div className="text-[11px] text-slate-500">{failedItems.length} unrecoverable failures</div>
         </div>
       </div>

@@ -36,7 +36,7 @@ async function sendToG1DM(url, filename) {
   try {
     const payload = { url, startImmediately: true };
     if (filename) payload.filename = filename;
-    const res = await fetch(\`http://127.0.0.1:\${G1DM_API_PORT}/api/downloads\`, {
+    const res = await fetch(`http://127.0.0.1:${G1DM_API_PORT}/api/downloads`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
