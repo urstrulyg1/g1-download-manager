@@ -380,7 +380,17 @@ export class DownloadEngine extends EventEmitter {
       ],
     };
 
+    const clarity =
+      (params as any).qualityLabel ||
+      (params as any).clarity ||
+      (params as any).resolution ||
+      ((params as any).height ? `${(params as any).height}p` : undefined) ||
+      mediaAnalysis?.recommendedQuality?.resolutionLabel;
+
     (item as any).thumbnailUrl = mediaAnalysis?.thumbnailUrl || (params as any).thumbnailUrl;
+    (item as any).qualityLabel = clarity;
+    (item as any).clarity = clarity;
+    (item as any).resolution = clarity;
     (item as any).mediaFormatSpec =
       (params as any).formatSpec ||
       (params as any).mediaFormatSpec ||
@@ -392,7 +402,7 @@ export class DownloadEngine extends EventEmitter {
     (item as any).filenameSource = resolved.source;
     (item as any).mediaMetadata = {
       title: mediaAnalysis?.title || resolved.stem,
-      resolution: (params as any).height ? `${(params as any).height}p` : mediaAnalysis?.recommendedQuality?.resolutionLabel,
+      resolution: clarity,
       codec: (params as any).codec || mediaAnalysis?.recommendedQuality?.videoCodec,
       container: (params as any).container || mediaAnalysis?.recommendedQuality?.container || resolved.ext,
     };

@@ -151,11 +151,45 @@
     }
   }
 
+  function cleanPageTitle(raw) {
+    if (!raw) return '';
+    return raw.replace(/\s*[-–—|]\s*(YouTube|Vimeo|Dailymotion|Twitch|TikTok|SoundCloud|Reddit)$/i, '').trim();
+  }
+
   function getPageVideoTitle() {
-    const ogTitle = document.querySelector('meta[property="og:title"]')?.getAttribute('content');
-    const docTitle = document.title;
-    const h1 = document.querySelector('h1')?.innerText;
-    return (ogTitle || h1 || docTitle || 'video').trim().replace(/[/\\?%*:|"<>]/g, '-').slice(0, 100);
+    // 1. YouTube specific title elements in DOM
+    const ytTitleEl = document.querySelector('ytd-watch-metadata #title h1, #title.ytd-watch-metadata h1, h1.ytd-watch-metadata, #title h1 yt-formatted-string, #video-title');
+    const ytText = ytTitleEl?.innerText?.trim() || ytTitleEl?.textContent?.trim();
+    if (ytText && ytText.length > 0 && ytText.toLowerCase() !== 'youtube') {
+      return cleanPageTitle(ytText).replace(/[/\\?%*:|"<>]/g, '-').slice(0, 150);
+    }
+
+    // 2. Meta tags
+    const ogTitle = document.querySelector('meta[property="og:title"]')?.getAttribute('content')?.trim();
+    if (ogTitle && ogTitle.length > 0 && ogTitle.toLowerCase() !== 'youtube') {
+      return cleanPageTitle(ogTitle).replace(/[/\\?%*:|"<>]/g, '-').slice(0, 150);
+    }
+
+    const metaTitle = document.querySelector('meta[name="title"], meta[name="twitter:title"]')?.getAttribute('content')?.trim();
+    if (metaTitle && metaTitle.length > 0 && metaTitle.toLowerCase() !== 'youtube') {
+      return cleanPageTitle(metaTitle).replace(/[/\\?%*:|"<>]/g, '-').slice(0, 150);
+    }
+
+    // 3. Document / H1 title
+    const h1 = document.querySelector('h1')?.innerText?.trim();
+    if (h1 && h1.length > 0 && h1.toLowerCase() !== 'youtube') {
+      return cleanPageTitle(h1).replace(/[/\\?%*:|"<>]/g, '-').slice(0, 150);
+    }
+
+    const docTitle = document.title?.trim();
+    if (docTitle && docTitle.length > 0) {
+      const cleaned = cleanPageTitle(docTitle);
+      if (cleaned && cleaned.toLowerCase() !== 'youtube') {
+        return cleaned.replace(/[/\\?%*:|"<>]/g, '-').slice(0, 150);
+      }
+    }
+
+    return 'video';
   }
 
   function getBestMediaSource(video) {
@@ -724,7 +758,10 @@
         formatSpec: item.formatSpec || (item.isAudio ? 'bestaudio/best' : 'bestvideo+bestaudio/best'),
         mediaFormatSpec: item.formatSpec || (item.isAudio ? 'bestaudio/best' : 'bestvideo+bestaudio/best'),
         codec: item.codec,
-        height: item.height
+        height: item.height,
+        qualityLabel: item.badge || (item.height ? `${item.height}p` : undefined),
+        clarity: item.badge || (item.height ? `${item.height}p` : undefined),
+        resolution: item.resolution,
       };
 
       // Show the IDM-style Download File Info dialog box popup

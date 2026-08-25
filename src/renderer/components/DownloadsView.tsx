@@ -30,6 +30,7 @@ import { DownloadItem, DownloadQueue, CategoryRule } from '../../shared/types';
 import { Language, translations } from '../lib/i18n';
 import { api } from '../lib/api';
 import { MediaPreviewModal } from './MediaPreviewModal';
+import { getDownloadClarity } from '../lib/downloadClarity';
 
 interface DownloadsViewProps {
   downloads: DownloadItem[];
@@ -586,6 +587,14 @@ export const DownloadsView: React.FC<DownloadsViewProps> = ({
                           <span className="px-1.5 py-0.2 rounded bg-slate-800 text-slate-300 font-mono text-[10px]">
                             {item.category}
                           </span>
+                          {(() => {
+                            const clarity = getDownloadClarity(item);
+                            return clarity ? (
+                              <span className="px-1.5 py-0.2 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 font-mono text-[10px] font-bold">
+                                {clarity}
+                              </span>
+                            ) : null;
+                          })()}
                           <button
                             type="button"
                             onClick={(e) => handleCyclePriority(item, e)}

@@ -26,6 +26,7 @@ import { DownloadItem, SystemMetrics, CategoryRule } from '../../shared/types';
 import { Language, translations } from '../lib/i18n';
 import { ActiveView } from './Sidebar';
 import { api } from '../lib/api';
+import { getDownloadClarity } from '../lib/downloadClarity';
 
 interface DashboardViewProps {
   downloads: DownloadItem[];
@@ -376,6 +377,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     </div>
                     <div className="text-[11px] text-slate-400 flex items-center gap-2 mt-0.5">
                       <span>{item.category.toUpperCase()}</span>
+                      {(() => {
+                        const clarity = getDownloadClarity(item);
+                        return clarity ? (
+                          <>
+                            <span>•</span>
+                            <span className="px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-300 font-mono text-[10px] font-bold border border-cyan-500/30">
+                              {clarity}
+                            </span>
+                          </>
+                        ) : null;
+                      })()}
                       <span>•</span>
                       <span>{formatBytes(item.downloadedBytes)} / {item.totalBytes > 0 ? formatBytes(item.totalBytes) : 'Stream'}</span>
                       {item.speed > 0 && (

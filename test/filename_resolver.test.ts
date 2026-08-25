@@ -146,14 +146,25 @@ describe('FilenameResolver — priority chain & safety', () => {
       }
     });
 
-    it('honors even a generic user filename over inferred metadata', () => {
+    it('prefers real media title when userFilename is generic (e.g. YouTube.mkv)', () => {
       const r = FilenameResolver.resolve({
         url: 'https://youtube.com/watch?v=1',
-        userFilename: 'watch',
+        userFilename: 'YouTube.mkv',
         mediaTitle: 'Real Title',
-        mediaContainer: 'mp4',
+        mediaContainer: 'mkv',
       });
-      expect(r.filename).toBe('watch');
+      expect(r.filename).toBe('Real Title.mkv');
+      expect(r.source).toBe('media_title');
+    });
+
+    it('honors a specific custom non-generic user filename over media title', () => {
+      const r = FilenameResolver.resolve({
+        url: 'https://youtube.com/watch?v=1',
+        userFilename: 'My Custom Movie.mkv',
+        mediaTitle: 'Real Title',
+        mediaContainer: 'mkv',
+      });
+      expect(r.filename).toBe('My Custom Movie.mkv');
       expect(r.source).toBe('user');
     });
   });

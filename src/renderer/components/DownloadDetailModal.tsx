@@ -27,6 +27,7 @@ import {
 import { DownloadItem, SegmentInfo, ChecksumInfo, ArchiveInfo, SecurityScanInfo } from '../../shared/types';
 import { DownloadIntelligence, DownloadHealthReport } from '../../main/engine/DownloadIntelligence';
 import { api } from '../lib/api';
+import { getDownloadClarity } from '../lib/downloadClarity';
 
 interface DownloadDetailModalProps {
   item: DownloadItem | null;
@@ -110,10 +111,21 @@ export const DownloadDetailModal: React.FC<DownloadDetailModalProps> = ({ item, 
               <h2 className="text-sm font-bold text-white truncate" title={item.filename}>
                 {item.filename}
               </h2>
-              <div className="flex items-center gap-2 text-xs text-slate-400 mt-0.5">
+              <div className="flex items-center gap-2 text-xs text-slate-400 mt-0.5 flex-wrap">
                 <span className="font-mono">{formatBytes(item.downloadedBytes)} / {item.totalBytes > 0 ? formatBytes(item.totalBytes) : 'Stream'}</span>
                 <span>•</span>
                 <span className="text-cyan-400 font-mono font-semibold">{item.progress.toFixed(1)}%</span>
+                {(() => {
+                  const clarity = getDownloadClarity(item);
+                  return clarity ? (
+                    <>
+                      <span>•</span>
+                      <span className="px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 font-mono font-bold text-[10px] border border-cyan-500/30">
+                        {clarity}
+                      </span>
+                    </>
+                  ) : null;
+                })()}
                 {item.speed > 0 && (
                   <>
                     <span>•</span>

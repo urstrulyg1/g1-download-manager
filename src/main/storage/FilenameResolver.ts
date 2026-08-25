@@ -71,6 +71,9 @@ const PAGE_EXTS = new Set(['htm', 'html', 'php', 'asp', 'aspx', '']);
 const GENERIC_STEMS = new Set([
   'watch', 'play', 'video', 'stream', 'download', 'file', 'media',
   'index', 'default', 'item', 'clip', 'embed', 'e', 'v', 'd',
+  'youtube', 'youtu', 'vimeo', 'tiktok', 'instagram', 'facebook',
+  'twitter', 'twitch', 'dailymotion', 'reddit', 'bilibili', 'rumble',
+  'bitchute', 'odysee', 'soundcloud',
 ]);
 
 export class FilenameResolver {
@@ -102,9 +105,10 @@ export class FilenameResolver {
       return true;
     };
 
-    // 1. User-provided filename. The user is the authority. A caller may
-    // deliberately choose a generic or extensionless name, so unlike inferred
-    // metadata this candidate is never discarded merely because of its shape.
+    // 1. User-provided filename.
+    // If the user explicitly provided a non-generic filename, it is authoritative.
+    // If the supplied filename is generic (e.g. "YouTube.mkv", "video.mp4", "watch.mp4"),
+    // we only use it if no better mediaTitle, contentDispositionFilename, or pageTitle exists.
     if (input.userFilename) {
       const user = this.sanitizeFull(input.userFilename);
       if (user) {
@@ -112,9 +116,13 @@ export class FilenameResolver {
         const userExt = userRawExt.replace(/^\./, '');
         const userStem = this.sanitizeStem(path.basename(user, userRawExt));
         if (userStem) {
-          if (!userExt) return this.buildExtensionless(userStem, 'user');
-          const useExt = !PAGE_EXTS.has(userExt.toLowerCase()) ? userExt : ext;
-          return this.build(userStem, useExt, 'user');
+          const isGeneric = this.isGenericStem(userStem);
+          const hasBetterCandidate = Boolean(input.mediaTitle || input.contentDispositionFilename || input.pageTitle);
+          if (!isGeneric || !hasBetterCandidate) {
+            if (!userExt) return this.buildExtensionless(userStem, 'user');
+            const useExt = !PAGE_EXTS.has(userExt.toLowerCase()) ? userExt : ext;
+            return this.build(userStem, useExt, 'user');
+          }
         }
       }
     }

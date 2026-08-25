@@ -704,16 +704,38 @@ export class SecureMediaDetector {
 
     const og = html.match(/<meta[^>]+property=["']og:title["'][^>]*content=["']([^"']+)["']/i)
       || html.match(/<meta[^>]+content=["']([^"']+)["'][^>]*property=["']og:title["']/i);
-    if (og && og[1]) return this.decodeHtmlEntities(og[1]).trim();
+    if (og && og[1]) return this.cleanWebTitle(this.decodeHtmlEntities(og[1]).trim());
+
+    const metaTitle = html.match(/<meta[^>]+name=["']title["'][^>]*content=["']([^"']+)["']/i)
+      || html.match(/<meta[^>]+content=["']([^"']+)["'][^>]*name=["']title["']/i);
+    if (metaTitle && metaTitle[1]) return this.cleanWebTitle(this.decodeHtmlEntities(metaTitle[1]).trim());
 
     const tw = html.match(/<meta[^>]+name=["']twitter:title["'][^>]*content=["']([^"']+)["']/i)
       || html.match(/<meta[^>]+content=["']([^"']+)["'][^>]*name=["']twitter:title["']/i);
-    if (tw && tw[1]) return this.decodeHtmlEntities(tw[1]).trim();
+    if (tw && tw[1]) return this.cleanWebTitle(this.decodeHtmlEntities(tw[1]).trim());
+
+    // Check embedded JSON video details (e.g. YouTube ytInitialPlayerResponse)
+    const ytTitle = html.match(/"videoDetails"\s*:\s*\{[^}]*"title"\s*:\s*"([^"\\]*(?:\\.[^"\\]*)*)"/i)
+      || html.match(/"title"\s*:\s*\{"runs"\s*:\s*\[\{"text"\s*:\s*"([^"\\]*(?:\\.[^"\\]*)*)"/i)
+      || html.match(/"title"\s*:\s*\{"simpleText"\s*:\s*"([^"\\]*(?:\\.[^"\\]*)*)"/i);
+    if (ytTitle && ytTitle[1]) {
+      try {
+        const unescaped = JSON.parse(`"${ytTitle[1]}"`);
+        if (unescaped && unescaped.trim()) return this.cleanWebTitle(unescaped.trim());
+      } catch {}
+    }
 
     const titleMatch = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
-    if (titleMatch && titleMatch[1]) return this.decodeHtmlEntities(titleMatch[1]).trim();
+    if (titleMatch && titleMatch[1]) return this.cleanWebTitle(this.decodeHtmlEntities(titleMatch[1]).trim());
 
     return '';
+  }
+
+  public static cleanWebTitle(raw: string): string {
+    if (!raw) return '';
+    return raw
+      .replace(/\s*[-–—|]\s*(YouTube|Vimeo|Dailymotion|Twitch|TikTok|SoundCloud|Reddit)$/i, '')
+      .trim();
   }
 
   private static decodeHtmlEntities(raw: string): string {

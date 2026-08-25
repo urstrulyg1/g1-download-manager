@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { DownloadItem } from '../../shared/types';
 import { api } from '../lib/api';
+import { getDownloadClarity } from '../lib/downloadClarity';
 
 interface IdmProgressModalProps {
   item: DownloadItem | null;
@@ -66,7 +67,7 @@ export const IdmProgressModal: React.FC<IdmProgressModalProps> = ({
 
   const metadata = item ? (item as any).mediaMetadata || {} : {};
   const displayTitle = metadata.title || item?.filename || '';
-  const qualityBadge = metadata.resolution || (item?.filename.match(/(4320p|2160p|1440p|1080p|720p|480p|360p|8K|4K|2K)/i)?.[0]) || 'HD';
+  const qualityBadge = getDownloadClarity(item) || metadata.resolution || (item?.filename.match(/(4320p|2160p|1440p|1080p|720p|480p|360p|8K|4K|2K)/i)?.[0]) || 'HD';
   const codecBadge = metadata.codec || (item?.filename.match(/(HEVC|AV1|VP9|H\.264|AVC|AAC|OPUS|MP3)/i)?.[0]) || 'Video';
   const containerBadge = (metadata.container || item?.filename.split('.').pop() || 'MP4').toUpperCase();
   const thumbnailUrl = item ? (item as any).thumbnailUrl : undefined;

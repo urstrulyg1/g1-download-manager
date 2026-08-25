@@ -183,6 +183,18 @@ export interface DownloadItem {
   logs: { timestamp: number; level: 'info' | 'warn' | 'error'; message: string }[];
   /** Session-level guard for queued items explicitly created without auto-start. */
   manualStartRequired?: boolean;
+  qualityLabel?: string;
+  clarity?: string;
+  resolution?: string;
+  mediaFormatSpec?: string;
+  thumbnailUrl?: string;
+  mediaMetadata?: {
+    title?: string;
+    resolution?: string;
+    codec?: string;
+    container?: string;
+    height?: number;
+  };
 }
 
 export interface QueueSchedule {
