@@ -5,6 +5,7 @@ import { EventEmitter } from 'events';
 import { SiteGrabberProject, SiteGrabberDiscoveredUrl } from '../../shared/types';
 import { AppDatabase } from '../db/Database';
 import { DownloadEngine } from '../engine/DownloadEngine';
+import { UrlGuard } from '../security/UrlGuard';
 
 export class SiteGrabber extends EventEmitter {
   private db: AppDatabase;
@@ -186,14 +187,22 @@ export class SiteGrabber extends EventEmitter {
           },
           timeout: 10000,
         },
-        (res) => {
+        async (res) => {
           if (
             (res.statusCode === 301 || res.statusCode === 302 || res.statusCode === 307 || res.statusCode === 308) &&
             res.headers.location
           ) {
-            const redirect = new URL(res.headers.location, targetUrl).href;
-            this.fetchHtml(redirect).then(resolve).catch(reject);
-            return;
+            try {
+              const redirect = new URL(res.headers.location, targetUrl).href;
+              if (process.env.G1DM_E2E !== '1') {
+                await UrlGuard.assertSafePublicUrl(redirect);
+              }
+              this.fetchHtml(redirect).then(resolve).catch(reject);
+              return;
+            } catch (err) {
+              reject(err);
+              return;
+            }
           }
 
           if (res.statusCode && res.statusCode >= 400) {

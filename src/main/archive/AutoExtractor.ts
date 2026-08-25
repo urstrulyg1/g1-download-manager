@@ -113,12 +113,39 @@ export class AutoExtractor {
     };
   }
 
-  /** Resolve an archive entry path safely inside destDir (zip-slip / path traversal guard). */
+  // Maximum uncompressed size allowed across an archive to defend against zip bombs (50GB)
+  private static readonly MAX_UNCOMPRESSED_TOTAL_BYTES = 50 * 1024 * 1024 * 1024;
+  private static readonly MAX_ARCHIVE_ENTRY_COUNT = 100000;
+
+  /** Resolve an archive entry path safely inside destDir (zip-slip / path traversal / symlink guard). */
   private static safeJoin(destDir: string, entryName: string): string | null {
+    if (!destDir || !entryName || entryName.includes('\0')) return null;
     const normalized = path.normalize(entryName).replace(/^([/\\])+/, '');
     if (normalized.split(/[/\\]/).includes('..')) return null;
     const target = path.join(destDir, normalized);
-    if (!target.startsWith(path.resolve(destDir) + path.sep) && target !== path.resolve(destDir)) return null;
+    const resolvedDest = path.resolve(destDir);
+    if (!target.startsWith(resolvedDest + path.sep) && target !== resolvedDest) return null;
+
+    // Canonical verification: Ensure existing ancestor directories do not escape destDir via symlinks
+    try {
+      if (fs.existsSync(resolvedDest)) {
+        const canonicalDest = fs.realpathSync.native ? fs.realpathSync.native(resolvedDest) : fs.realpathSync(resolvedDest);
+        let cur = path.dirname(target);
+        while (cur && cur !== path.dirname(cur)) {
+          if (fs.existsSync(cur)) {
+            const realCur = fs.realpathSync.native ? fs.realpathSync.native(cur) : fs.realpathSync(cur);
+            if (realCur !== canonicalDest && !realCur.startsWith(canonicalDest + path.sep)) {
+              return null;
+            }
+            break;
+          }
+          cur = path.dirname(cur);
+        }
+      }
+    } catch {
+      // ignore
+    }
+
     return target;
   }
 
@@ -131,8 +158,16 @@ export class AutoExtractor {
 
         const extractedFiles: string[] = [];
         let sawEncrypted = false;
+        let totalExtractedBytes = 0;
+        let entryCount = 0;
 
         zipfile.on('entry', (entry: yauzl.Entry) => {
+          entryCount++;
+          if (entryCount > AutoExtractor.MAX_ARCHIVE_ENTRY_COUNT) {
+            zipfile.close();
+            return reject(new Error('Archive exceeds maximum allowed entry count (decompression bomb protection)'));
+          }
+
           const isEncrypted = (entry.generalPurposeBitFlag & 0x1) !== 0;
           if (isEncrypted) {
             sawEncrypted = true;
@@ -142,7 +177,14 @@ export class AutoExtractor {
 
           if (/\/$/.test(entry.fileName)) {
             const dirTarget = this.safeJoin(destDir, entry.fileName);
-            if (dirTarget) fs.mkdirSync(dirTarget, { recursive: true });
+            if (dirTarget) {
+              try {
+                if (fs.existsSync(dirTarget) && fs.lstatSync(dirTarget).isSymbolicLink()) {
+                  fs.unlinkSync(dirTarget);
+                }
+                fs.mkdirSync(dirTarget, { recursive: true });
+              } catch {}
+            }
             zipfile.readEntry();
             return;
           }
@@ -158,8 +200,28 @@ export class AutoExtractor {
               zipfile.readEntry();
               return;
             }
-            fs.mkdirSync(path.dirname(target), { recursive: true });
+
+            try {
+              if (fs.existsSync(target) && fs.lstatSync(target).isSymbolicLink()) {
+                fs.unlinkSync(target);
+              }
+              fs.mkdirSync(path.dirname(target), { recursive: true });
+            } catch {}
+
             const writeStream = fs.createWriteStream(target);
+            let entryBytes = 0;
+
+            readStream.on('data', (chunk: Buffer) => {
+              entryBytes += chunk.length;
+              totalExtractedBytes += chunk.length;
+              if (totalExtractedBytes > AutoExtractor.MAX_UNCOMPRESSED_TOTAL_BYTES) {
+                readStream.destroy();
+                writeStream.destroy();
+                zipfile.close();
+                reject(new Error('Archive exceeds maximum allowed uncompressed size (decompression bomb protection)'));
+              }
+            });
+
             readStream.pipe(writeStream);
             writeStream.on('close', () => {
               extractedFiles.push(target);
@@ -207,11 +269,16 @@ export class AutoExtractor {
   private static extractTarBuffer(buf: Buffer, destDir: string): string[] {
     const extracted: string[] = [];
     let offset = 0;
+    let totalExtractedBytes = 0;
+    let entryCount = 0;
 
     while (offset + 512 <= buf.length) {
       const header = buf.subarray(offset, offset + 512);
       // Two consecutive zero blocks = end of archive
       if (header.every((b) => b === 0)) break;
+
+      entryCount++;
+      if (entryCount > AutoExtractor.MAX_ARCHIVE_ENTRY_COUNT) break;
 
       let name = header.subarray(0, 100).toString('utf8').replace(/\0.*$/, '');
       const sizeOctal = header.subarray(124, 136).toString('utf8').replace(/\0.*$/, '').trim();
@@ -226,9 +293,18 @@ export class AutoExtractor {
       if (name) {
         const target = this.safeJoin(destDir, name);
         if (target) {
+          try {
+            if (fs.existsSync(target) && fs.lstatSync(target).isSymbolicLink()) {
+              fs.unlinkSync(target);
+            }
+          } catch {}
+
           if (typeFlag === '5' || name.endsWith('/')) {
             fs.mkdirSync(target, { recursive: true });
           } else if (typeFlag === '0' || typeFlag === '\0' || typeFlag === '') {
+            totalExtractedBytes += Math.min(size, buf.length - offset);
+            if (totalExtractedBytes > AutoExtractor.MAX_UNCOMPRESSED_TOTAL_BYTES) break;
+
             fs.mkdirSync(path.dirname(target), { recursive: true });
             fs.writeFileSync(target, buf.subarray(offset, Math.min(dataEnd, buf.length)));
             extracted.push(target);

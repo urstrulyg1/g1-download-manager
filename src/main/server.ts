@@ -218,11 +218,16 @@ export async function createUnifiedServer(port: number = 8055) {
   grabber.on('project_updated', (proj) => broadcast('grabber_project_updated', proj));
 
   // Periodic metrics broadcast
-  setInterval(() => {
+  const metricsInterval = setInterval(() => {
     if (clients.size === 0) return;
     const metrics = collectSystemMetrics(db, engine, networkQualitySvc);
     broadcast('metrics_tick', metrics);
   }, 1000);
+
+  server.on('close', () => {
+    clearInterval(metricsInterval);
+    scheduler.stop();
+  });
 
   // Validate a user-supplied URL before the backend fetches it (SSRF guard).
   // Local / private addresses are allowed for actual downloads (NAS, dev
@@ -724,7 +729,8 @@ export async function createUnifiedServer(port: number = 8055) {
   app.post('/api/security/vault/export', async (req, res) => {
     try {
       const { vaultItemId, outputDir } = req.body;
-      const exportedPath = await EncryptedVault.decryptAndExportFile(vaultItemId, outputDir);
+      const safeOutputDir = PathGuard.assertSafeLocalPath(outputDir);
+      const exportedPath = await EncryptedVault.decryptAndExportFile(vaultItemId, safeOutputDir);
       res.json({ exportedPath });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -1262,7 +1268,15 @@ export async function createUnifiedServer(port: number = 8055) {
     return nextHandler(req, res);
   });
 
-  return new Promise<{ server: any; app: any; db: AppDatabase; engine: DownloadEngine }>((resolve, reject) => {
+  return new Promise<{
+    server: any;
+    wss: WebSocketServer;
+    app: any;
+    db: AppDatabase;
+    engine: DownloadEngine;
+    scheduler: SchedulerService;
+    clipboardMonitor: ClipboardMonitor;
+  }>((resolve, reject) => {
     // Bind to all interfaces so the mobile PWA / remote clients on the local
     // network (or Tailscale) can reach the dashboard. Override with G1DM_HOST.
     const host = process.env.G1DM_HOST || '0.0.0.0';
@@ -1270,7 +1284,7 @@ export async function createUnifiedServer(port: number = 8055) {
     server.listen(port, host, () => {
       server.off('error', reject);
       console.log(`[G1DM] Application running at http://${host === '0.0.0.0' ? '127.0.0.1' : host}:${port} (bound to ${host})`);
-      resolve({ server, app, db, engine });
+      resolve({ server, wss, app, db, engine, scheduler, clipboardMonitor });
     });
   });
 }
@@ -1333,31 +1347,55 @@ function collectSystemMetrics(db: AppDatabase, engine: DownloadEngine, networkQu
 
 if (require.main === module) {
   createUnifiedServer(parseInt(process.env.PORT || '8055', 10))
-    .then(({ server, db }) => {
+    .then(({ server, wss, db, engine, scheduler, clipboardMonitor }) => {
       let _exiting = false;
 
-      const shutdown = (signal: string) => {
+      const shutdown = async (signal: string) => {
         if (_exiting) return;
         _exiting = true;
         console.log(`\n[G1DM] Received ${signal} — shutting down gracefully...`);
 
-        // Stop accepting new HTTP/WS connections.
-        server.close(() => {
-          // Flush the SQLite database before the process exits.
-          try { db.flush(); } catch { /* best-effort */ }
-          console.log('[G1DM] Clean shutdown complete.');
-          process.exit(0);
-        });
-
-        // Force-exit after 6 s if the server hangs (active connections, etc.).
-        setTimeout(() => {
+        // Force-exit watchdog timer (3s hard limit)
+        const watchdog = setTimeout(() => {
           console.error('[G1DM] Forced exit after timeout.');
           process.exit(1);
-        }, 6000).unref();
+        }, 3000);
+        if (typeof watchdog.unref === 'function') watchdog.unref();
+
+        try {
+          // 1. Stop background schedulers & services
+          try { scheduler?.stop(); } catch {}
+          try { PowerGovernor.stop(); } catch {}
+          try { clipboardMonitor?.setEnabled(false); } catch {}
+          try { await engine.shutdown(); } catch {}
+
+          // 2. Terminate all active WebSocket client connections and close WSS
+          if (wss) {
+            for (const client of wss.clients) {
+              try { client.terminate(); } catch {}
+            }
+            try { wss.close(); } catch {}
+          }
+
+          // 3. Stop accepting new HTTP connections and close server
+          await new Promise<void>((resolve) => {
+            server.close(() => resolve());
+            setTimeout(resolve, 300);
+          });
+
+          // 4. Flush and close SQLite database
+          try { db.close(); } catch {}
+
+          console.log('[G1DM] Clean shutdown complete.');
+          process.exit(0);
+        } catch (err) {
+          console.error('[G1DM] Error during shutdown:', err);
+          process.exit(1);
+        }
       };
 
-      process.on('SIGINT',  () => shutdown('SIGINT'));
-      process.on('SIGTERM', () => shutdown('SIGTERM'));
+      process.on('SIGINT',  () => void shutdown('SIGINT'));
+      process.on('SIGTERM', () => void shutdown('SIGTERM'));
     })
     .catch((err) => {
       console.error('[G1DM] Failed to start:', err);

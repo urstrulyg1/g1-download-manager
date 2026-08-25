@@ -1,5 +1,5 @@
 import * as fs from 'fs';
-import { exec } from 'child_process';
+import { execFile } from 'child_process';
 import { SecurityScanInfo } from '../../shared/types';
 
 export class SecurityScanner {
@@ -12,16 +12,21 @@ export class SecurityScanner {
       };
     }
 
-    // If a custom antivirus command is configured, attempt to invoke it
+    // If a custom antivirus command is configured, attempt to invoke it safely without a shell
     if (configuredCommand && configuredCommand.trim()) {
+      const parts = configuredCommand.trim().match(/(?:[^\s"]+|"[^"]*")+/g) || configuredCommand.trim().split(/\s+/);
+      const cleanParts = parts.map((p) => p.replace(/^"|"$/g, '')).filter(Boolean);
+      const bin = cleanParts[0];
+      const initialArgs = cleanParts.slice(1);
+      const scannerName = bin;
+
       return new Promise<SecurityScanInfo>((resolve) => {
-        const cmd = `${configuredCommand.trim()} "${filePath.replace(/"/g, '\\"')}"`;
-        exec(cmd, { timeout: 30000 }, (err, stdout, stderr) => {
-          if (err && (err as any).code === 127) {
+        execFile(bin, [...initialArgs, filePath], { timeout: 30000 }, (err, stdout, stderr) => {
+          if (err && ((err as any).code === 127 || (err as any).code === 'ENOENT')) {
             // Command not found
             resolve({
               status: 'unsupported',
-              scannerName: configuredCommand.split(' ')[0],
+              scannerName,
               resultDetails: 'Configured scanner command not found in system PATH.',
               timestamp: Date.now(),
             });
@@ -30,18 +35,18 @@ export class SecurityScanner {
 
           if (err) {
             // Non-zero exit might mean threat found or scanner error
-            const output = (stdout + '\n' + stderr).trim();
+            const output = ((stdout || '') + '\n' + (stderr || '')).trim();
             if (output.toLowerCase().includes('found') || output.toLowerCase().includes('threat') || output.toLowerCase().includes('infected')) {
               resolve({
                 status: 'threat',
-                scannerName: configuredCommand.split(' ')[0],
+                scannerName,
                 resultDetails: output || 'Threat detected by antivirus scanner.',
                 timestamp: Date.now(),
               });
             } else {
               resolve({
                 status: 'error',
-                scannerName: configuredCommand.split(' ')[0],
+                scannerName,
                 resultDetails: output || err.message,
                 timestamp: Date.now(),
               });
@@ -51,8 +56,8 @@ export class SecurityScanner {
 
           resolve({
             status: 'clean',
-            scannerName: configuredCommand.split(' ')[0],
-            resultDetails: stdout.trim() || 'Scan completed: No threats detected.',
+            scannerName,
+            resultDetails: (stdout || '').trim() || 'Scan completed: No threats detected.',
             timestamp: Date.now(),
           });
         });
@@ -61,7 +66,7 @@ export class SecurityScanner {
 
     // Default: Check if clamscan is installed
     return new Promise<SecurityScanInfo>((resolve) => {
-      exec('clamscan --version', (err) => {
+      execFile('clamscan', ['--version'], (err) => {
         if (err) {
           resolve({
             status: 'unsupported',
@@ -71,12 +76,12 @@ export class SecurityScanner {
           return;
         }
 
-        exec(`clamscan --no-summary "${filePath.replace(/"/g, '\\"')}"`, { timeout: 30000 }, (sErr, stdout) => {
+        execFile('clamscan', ['--no-summary', filePath], { timeout: 30000 }, (sErr, stdout) => {
           if (sErr) {
             resolve({
-              status: stdout.includes('FOUND') ? 'threat' : 'error',
+              status: stdout && stdout.includes('FOUND') ? 'threat' : 'error',
               scannerName: 'ClamAV',
-              resultDetails: stdout.trim(),
+              resultDetails: (stdout || '').trim(),
               timestamp: Date.now(),
             });
             return;

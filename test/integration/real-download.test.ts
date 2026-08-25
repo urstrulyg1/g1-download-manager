@@ -124,8 +124,7 @@ describe('Real Download Integration Tests', () => {
     app.use(express.json());
     
     // Initialize database and engine
-    const testDbPath = path.join(TEST_DOWNLOAD_DIR, 'test.db');
-    db = new AppDatabase(testDbPath);
+    db = new AppDatabase(':memory:');
     await db.init();
     
     // Override download directory

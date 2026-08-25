@@ -1,4 +1,5 @@
 import * as path from 'path';
+import * as fs from 'fs';
 
 /**
  * Path traversal defence for endpoints that accept a `filePath` and perform
@@ -30,10 +31,34 @@ export class PathGuard {
     return [...PathGuard.allowedRoots];
   }
 
+  private static getCanonicalPath(target: string): string {
+    const resolved = path.resolve(target);
+    try {
+      if (fs.existsSync(resolved)) {
+        return fs.realpathSync.native ? fs.realpathSync.native(resolved) : fs.realpathSync(resolved);
+      }
+      // If path does not exist yet, resolve the nearest existing ancestor
+      let cur = path.dirname(resolved);
+      while (cur && cur !== path.dirname(cur)) {
+        if (fs.existsSync(cur)) {
+          const realCur = fs.realpathSync.native ? fs.realpathSync.native(cur) : fs.realpathSync(cur);
+          const rel = path.relative(cur, resolved);
+          return path.join(realCur, rel);
+        }
+        cur = path.dirname(cur);
+      }
+    } catch {}
+    return resolved;
+  }
+
   /** Resolve and validate a caller-supplied local path. Throws on violation. */
   public static assertSafeLocalPath(filePath: string): string {
     if (!filePath || typeof filePath !== 'string') {
       throw new Error('A file path is required');
+    }
+
+    if (filePath.includes('\0')) {
+      throw new Error('Invalid path: null bytes are prohibited');
     }
 
     const resolved = path.resolve(filePath);
@@ -42,8 +67,14 @@ export class PathGuard {
       return resolved;
     }
 
+    const canonicalPath = this.getCanonicalPath(resolved);
+    const isWindows = process.platform === 'win32';
+    const normCanonical = isWindows ? canonicalPath.toLowerCase() : canonicalPath;
+
     const inside = PathGuard.allowedRoots.some((root) => {
-      return resolved === root || resolved.startsWith(root + path.sep);
+      const canonicalRoot = this.getCanonicalPath(root);
+      const normRoot = isWindows ? canonicalRoot.toLowerCase() : canonicalRoot;
+      return normCanonical === normRoot || normCanonical.startsWith(normRoot + path.sep);
     });
 
     if (!inside) {

@@ -48,6 +48,13 @@ function playChime(type: 'success' | 'error' | 'start') {
       osc.start(now);
       osc.stop(now + 0.2);
     }
+
+    // Release audio context resource after chime finishes
+    setTimeout(() => {
+      try {
+        if (ctx.state !== 'closed') ctx.close();
+      } catch {}
+    }, 600);
   } catch {
     // ignore audio failure
   }
@@ -67,6 +74,7 @@ export function useDownloadEngine() {
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimerRef = useRef<NodeJS.Timeout | null>(null);
   const reconnectAttemptRef = useRef(0);
+  const isMountedRef = useRef(true);
 
   const refreshAll = useCallback(async () => {
     // Hydrate concurrently, but return only after every request has settled so
@@ -104,12 +112,14 @@ export function useDownloadEngine() {
       wsRef.current = ws;
 
       ws.onopen = () => {
+        if (!isMountedRef.current) return;
         reconnectAttemptRef.current = 0;
         setIsConnected(true);
         void refreshAll();
       };
 
       ws.onmessage = (event) => {
+        if (!isMountedRef.current) return;
         try {
           const { type, data } = JSON.parse(event.data);
 
@@ -219,16 +229,19 @@ export function useDownloadEngine() {
       };
 
       ws.onclose = () => {
+        if (!isMountedRef.current) return;
         setIsConnected(false);
         if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
         const delay = Math.min(30_000, 1_000 * 2 ** reconnectAttemptRef.current++);
         reconnectTimerRef.current = setTimeout(() => {
-          connectWebSocket();
+          if (isMountedRef.current) {
+            connectWebSocket();
+          }
         }, delay);
       };
 
       ws.onerror = () => {
-        ws.close();
+        try { ws.close(); } catch {}
       };
     } catch {
       // Best-effort WebSocket setup
@@ -236,13 +249,21 @@ export function useDownloadEngine() {
   }, [refreshAll]);
 
   useEffect(() => {
+    isMountedRef.current = true;
     connectWebSocket();
     refreshAll();
 
     return () => {
-      if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
+      isMountedRef.current = false;
+      if (reconnectTimerRef.current) {
+        clearTimeout(reconnectTimerRef.current);
+        reconnectTimerRef.current = null;
+      }
       if (wsRef.current) {
-        wsRef.current.close();
+        try {
+          wsRef.current.onclose = null;
+          wsRef.current.close();
+        } catch {}
         wsRef.current = null;
       }
     };

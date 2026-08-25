@@ -137,15 +137,27 @@ REM ═════════════════════════�
 REM  STEP 4 — Build
 REM ════════════════════════════════════════════════════════════════════════════
 echo %BBLUE%%BOLD%┌── [4/5] Build  ^(TypeScript backend + Next.js frontend^)%R%
-echo %GRAY%│  Compiling — this may take a moment on first run...%R%
-call npm run build
-if !errorlevel! neq 0 (
-    echo %RED%%BOLD%│  ^✖  Build failed. See output above for details.%R%
-    echo %RED%└── Aborted.%R%
-    echo.
-    pause & exit /b 1
+
+set "REBUILD_NEEDED=0"
+if "%1"=="--rebuild" set "REBUILD_NEEDED=1"
+if "%1"=="--build"   set "REBUILD_NEEDED=1"
+if "%1"=="-b"        set "REBUILD_NEEDED=1"
+if not exist "dist\main\server.js" set "REBUILD_NEEDED=1"
+if not exist "src\renderer\.next\BUILD_ID" set "REBUILD_NEEDED=1"
+
+if "!REBUILD_NEEDED!"=="1" (
+    echo %GRAY%│  Compiling — this may take a moment on first run...%R%
+    call npm run build
+    if !errorlevel! neq 0 (
+        echo %RED%%BOLD%│  ^✖  Build failed. See output above for details.%R%
+        echo %RED%└── Aborted.%R%
+        echo.
+        pause & exit /b 1
+    )
+    echo %GREEN%│  ^✔  Build complete.%R%
+) else (
+    echo %GREEN%│  ^✔  Build artifacts up to date  %GRAY%^(pass --rebuild for clean build^)%R%
 )
-echo %GREEN%│  ^✔  Build complete.%R%
 echo %BBLUE%└── Done.%R%
 echo.
 
@@ -270,7 +282,14 @@ REM  STEP 5 — Start G1DM server
 REM ════════════════════════════════════════════════════════════════════════════
 echo.
 echo %BBLUE%%BOLD%┌── [5/5] Starting G1DM Core Service%R%
-echo %CYAN%│  • Binding to %BWHITE%127.0.0.1:%PORT%%CYAN% ^(loopback only^)...%R%
+REM ── Reclaim port if occupied ─────────────────────────────────────────────
+for /f "tokens=5" %%p in ('netstat -ano 2^>nul ^| findstr /r /c:":%PORT% .*LISTENING"') do (
+    if not "%%p"=="" if not "%%p"=="0" (
+        echo %YELLOW%│  ^⚠  Reclaiming port %PORT% from previous instance ^(PID %%p^)...%R%
+        taskkill /F /PID %%p >nul 2>nul
+        timeout /t 1 /nobreak >nul
+    )
+)
 
 REM Start server in background; logs go to g1dm-server.log
 set NODE_ENV=production
@@ -324,5 +343,9 @@ echo %GRAY%  ──────────────────────�
 echo   %BYELLOW%%BOLD%^💡%R%  %GRAY%Press %BWHITE%Ctrl + C%GRAY% to stop the server gracefully.%R%
 echo.
 
-REM ── Keep window alive — blocking call; Ctrl+C terminates ─────────────────
-node dist\main\server.js
+REM ── Stream server logs until user presses Ctrl+C ─────────────────────────
+if exist "%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" (
+    powershell -NoProfile -Command "Get-Content -Path 'g1dm-server.log' -Wait -Tail 10" 2>nul
+) else (
+    pause
+)

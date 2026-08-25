@@ -83,22 +83,32 @@ export class ArchiveInspector {
         zipfile.readEntry();
 
         zipfile.on('entry', (entry) => {
-          // Check for path traversal (zip slip)
-          if (entry.fileName.includes('..') || path.isAbsolute(entry.fileName)) {
+          // Check for path traversal (zip slip, absolute paths, Windows drives, UNC shares, null bytes)
+          const rawName = entry.fileName || '';
+          const normalized = path.normalize(rawName).replace(/^([/\\])+/, '');
+          if (
+            rawName.includes('\0') ||
+            normalized.split(/[/\\]/).includes('..') ||
+            path.isAbsolute(rawName) ||
+            /^[a-zA-Z]:[/\\]/.test(rawName) ||
+            rawName.startsWith('\\\\')
+          ) {
             hasDangerous = true;
           }
 
           const isDir = /\/$/.test(entry.fileName);
           const isEncrypted = Boolean((entry.generalPurposeBitFlag & 0x1) !== 0);
 
-          entries.push({
-            name: entry.fileName,
-            size: entry.uncompressedSize,
-            compressedSize: entry.compressedSize,
-            modifiedDate: entry.getLastModDate ? entry.getLastModDate().toISOString() : new Date().toISOString(),
-            isDirectory: isDir,
-            isEncrypted,
-          });
+          if (entries.length < 5000) {
+            entries.push({
+              name: entry.fileName,
+              size: entry.uncompressedSize,
+              compressedSize: entry.compressedSize,
+              modifiedDate: entry.getLastModDate ? entry.getLastModDate().toISOString() : new Date().toISOString(),
+              isDirectory: isDir,
+              isEncrypted,
+            });
+          }
 
           totalUncompressed += entry.uncompressedSize;
           zipfile.readEntry();

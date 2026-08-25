@@ -166,8 +166,21 @@ echo ""
 echo -e "  ${MAGENTA}${BOLD}🏗️   BUILD & COMPILATION PIPELINE${RESET}"
 echo -e "  ${DARK_GRAY}───────────────────────────────────────────────────────────────────────────────${RESET}"
 
-run_with_spinner "Compiling TypeScript core engine (tsc)" npm run build:backend
-run_with_spinner "Optimizing Next.js Web UI & static chunks" npm run build:frontend
+# Check if build is needed or explicitly requested
+REBUILD_REQUESTED=0
+for arg in "$@"; do
+    if [ "$arg" = "--rebuild" ] || [ "$arg" = "--build" ] || [ "$arg" = "-b" ]; then
+        REBUILD_REQUESTED=1
+        break
+    fi
+done
+
+if [ "$REBUILD_REQUESTED" -eq 1 ] || [ ! -f "dist/main/server.js" ] || [ ! -f "src/renderer/.next/BUILD_ID" ]; then
+    run_with_spinner "Compiling TypeScript core engine (tsc)" npm run build:backend
+    run_with_spinner "Optimizing Next.js Web UI & static chunks" npm run build:frontend
+else
+    echo -e "  ${EMERALD}✔${RESET}  Core build artifacts verified up to date ${GRAY}(use --rebuild for clean build)${RESET}"
+fi
 
 echo ""
 
@@ -285,12 +298,26 @@ echo -e "  ${GREEN}${BOLD}🚀  ACTIVATING CORE SERVICE DAEMON${RESET}"
 echo -e "  ${DARK_GRAY}───────────────────────────────────────────────────────────────────────────────${RESET}"
 
 # Reclaim port if occupied
+_EXISTING_PID=""
 if command -v lsof >/dev/null 2>&1; then
     _EXISTING_PID=$(lsof -ti :"${PORT}" 2>/dev/null || true)
-    if [ -n "$_EXISTING_PID" ]; then
-        echo -e "  ${YELLOW}⚠  Reclaiming port ${PORT} from previous instance (PID ${_EXISTING_PID})...${RESET}"
+elif command -v fuser >/dev/null 2>&1; then
+    _EXISTING_PID=$(fuser "${PORT}/tcp" 2>/dev/null | tr -d ' ' || true)
+elif command -v ss >/dev/null 2>&1; then
+    _EXISTING_PID=$(ss -lptn "sport = :${PORT}" 2>/dev/null | grep -o 'pid=[0-9]*' | cut -d= -f2 | head -n1 || true)
+fi
+
+if [ -n "$_EXISTING_PID" ]; then
+    echo -e "  ${YELLOW}⚠  Reclaiming port ${PORT} from previous instance (PID ${_EXISTING_PID})...${RESET}"
+    kill -TERM $_EXISTING_PID 2>/dev/null || true
+    _waited=0
+    while kill -0 $_EXISTING_PID 2>/dev/null && [ $_waited -lt 15 ]; do
+        sleep 0.1
+        _waited=$((_waited + 1))
+    done
+    if kill -0 $_EXISTING_PID 2>/dev/null; then
         kill -9 $_EXISTING_PID 2>/dev/null || true
-        sleep 0.4
+        sleep 0.2
     fi
 fi
 
@@ -319,7 +346,7 @@ trap '_do_shutdown; exit 0' INT TERM
 trap '_do_shutdown'          EXIT
 
 # Launch daemon in background with quiet logging
-LOG_FILE="/tmp/g1dm-server.log"
+LOG_FILE="${TMPDIR:-/tmp}/g1dm-server-${EUID:-${UID:-0}}.log"
 PORT="${PORT}" NODE_ENV=production node dist/main/server.js >"$LOG_FILE" 2>&1 &
 SERVER_PID=$!
 

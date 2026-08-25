@@ -16,6 +16,7 @@ export class AppDatabase {
   private dbPath: string;
   private isDirty = false;
   private saveTimer: NodeJS.Timeout | null = null;
+  private initPromise: Promise<void> | null = null;
 
   private static resolveHomeDir(): string {
     return process.env.G1DM_HOME || process.env.HOME || '/home/user';
@@ -112,6 +113,10 @@ export class AppDatabase {
 
   constructor(customPath?: string) {
     const configuredDbPath = customPath || process.env.G1DM_DB_PATH;
+    if (configuredDbPath === ':memory:') {
+      this.dbPath = ':memory:';
+      return;
+    }
     const dataDir = configuredDbPath
       ? path.dirname(configuredDbPath)
       : AppDatabase.resolveDataDir();
@@ -122,22 +127,49 @@ export class AppDatabase {
   }
 
   public async init(): Promise<void> {
-    const SQL = await initSqlJs();
-    if (fs.existsSync(this.dbPath)) {
-      try {
-        const fileBuffer = fs.readFileSync(this.dbPath);
-        this.db = new SQL.Database(fileBuffer);
-      } catch (err) {
-        console.warn('Failed to load existing database file, creating fresh one:', err);
+    if (this.db) return;
+    if (this.initPromise) return this.initPromise;
+
+    this.initPromise = (async () => {
+      const SQL = await initSqlJs();
+      if (this.dbPath !== ':memory:' && fs.existsSync(this.dbPath)) {
+        try {
+          const fileBuffer = fs.readFileSync(this.dbPath);
+          this.db = new SQL.Database(fileBuffer);
+        } catch (err) {
+          console.warn('Failed to load existing database file, creating fresh one:', err);
+          this.db = new SQL.Database();
+        }
+      } else {
         this.db = new SQL.Database();
       }
-    } else {
-      this.db = new SQL.Database();
-    }
 
-    this.migrateSchema();
-    this.seedDefaults();
-    this.flush();
+      this.cleanupDanglingTempFiles();
+      this.migrateSchema();
+      this.seedDefaults();
+      if (this.dbPath !== ':memory:') {
+        this.flush();
+      }
+    })();
+
+    return this.initPromise;
+  }
+
+  private cleanupDanglingTempFiles(): void {
+    if (this.dbPath === ':memory:') return;
+    try {
+      const dir = path.dirname(this.dbPath);
+      const base = path.basename(this.dbPath);
+      if (!fs.existsSync(dir)) return;
+      const files = fs.readdirSync(dir);
+      for (const file of files) {
+        if (file.startsWith(`${base}.tmp.`)) {
+          try {
+            fs.unlinkSync(path.join(dir, file));
+          } catch {}
+        }
+      }
+    } catch {}
   }
 
   private migrateSchema(): void {
@@ -953,6 +985,7 @@ export class AppDatabase {
 
   private markDirty(): void {
     this.isDirty = true;
+    if (this.dbPath === ':memory:') return;
     if (!this.saveTimer) {
       this.saveTimer = setTimeout(() => {
         this.saveTimer = null;
@@ -962,16 +995,19 @@ export class AppDatabase {
   }
 
   public flush(): void {
-    if (!this.db || !this.isDirty) return;
+    if (!this.db || !this.isDirty || this.dbPath === ':memory:') return;
+    const tempPath = `${this.dbPath}.tmp.${process.pid}.${Date.now()}.${Math.random().toString(36).slice(2, 8)}`;
     try {
       const data = this.db.export();
-      const tempPath = `${this.dbPath}.tmp.${Date.now()}`;
       fs.mkdirSync(path.dirname(this.dbPath), { recursive: true });
       fs.writeFileSync(tempPath, Buffer.from(data));
       fs.renameSync(tempPath, this.dbPath);
       this.isDirty = false;
     } catch (err) {
       console.error('Failed to flush database to disk:', err);
+      try {
+        if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
+      } catch {}
     }
   }
 
@@ -985,5 +1021,6 @@ export class AppDatabase {
       this.db.close();
       this.db = null;
     }
+    this.initPromise = null;
   }
 }

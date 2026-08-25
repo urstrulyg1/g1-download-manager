@@ -4,6 +4,7 @@ import * as path from 'path';
 import * as mime from 'mime-types';
 import { LinkBatchCandidate } from '../../shared/types';
 import { ProbeService } from '../engine/ProbeService';
+import { UrlGuard } from '../security/UrlGuard';
 
 export class LinkBatchExtractor {
   public static async extractFromUrlOrText(input: string): Promise<LinkBatchCandidate[]> {
@@ -36,14 +37,22 @@ export class LinkBatchExtractor {
           },
           timeout: 10000,
         },
-        (res) => {
+        async (res) => {
           if (
             (res.statusCode === 301 || res.statusCode === 302 || res.statusCode === 307 || res.statusCode === 308) &&
             res.headers.location
           ) {
-            const redirect = new URL(res.headers.location, targetUrl).href;
-            this.fetchHtml(redirect).then(resolve).catch(reject);
-            return;
+            try {
+              const redirect = new URL(res.headers.location, targetUrl).href;
+              if (process.env.G1DM_E2E !== '1') {
+                await UrlGuard.assertSafePublicUrl(redirect);
+              }
+              this.fetchHtml(redirect).then(resolve).catch(reject);
+              return;
+            } catch (err) {
+              reject(err);
+              return;
+            }
           }
 
           if (res.statusCode && res.statusCode >= 400) {

@@ -159,22 +159,29 @@ export default function Home() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  // Clipboard Polling on window focus
+  // Zero-Leakage Clipboard Sniffer on window focus
   useEffect(() => {
     const handleFocus = async () => {
       try {
-        if (navigator.clipboard && navigator.clipboard.readText) {
+        if (typeof window !== 'undefined' && navigator.clipboard && navigator.clipboard.readText) {
           const text = await navigator.clipboard.readText();
-          const res = await api.checkClipboard(text);
-          if (res.isDownloadable && res.url) {
-            setClipboardUrl(res.url);
+          if (!text || typeof text !== 'string') return;
+          const trimmed = text.trim().replace(/^["'<]|["'>]$/g, '');
+          // Privacy check: only process if client-side regex confirms it is an actual URL (< 2048 chars)
+          if (trimmed.length > 0 && trimmed.length <= 2048 && /^(https?|ftp|ftps):\/\/[^\s$.?#].[^\s]*$/i.test(trimmed)) {
+            const res = await api.checkClipboard(trimmed);
+            if (res.isDownloadable && res.url) {
+              setClipboardUrl(res.url);
+            }
           }
         }
       } catch {
-        // Clipboard read permission might be denied
+        // Clipboard read permission might be denied or window not focused
       }
     };
 
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
   }, []);
 
   // Hash Navigation Handler (#add?url=..., #batch, #media)

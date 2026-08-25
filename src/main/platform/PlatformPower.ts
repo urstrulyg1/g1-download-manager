@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { exec } from 'child_process';
+import { execFile } from 'child_process';
 import { PlatformCapabilities } from './PlatformCapabilities';
 
 export interface BatteryState {
@@ -44,7 +44,7 @@ export class PlatformPower {
 
     if (platform === 'macos') {
       return new Promise<BatteryState>((resolve) => {
-        exec('pmset -g batt', (err, stdout) => {
+        execFile('pmset', ['-g', 'batt'], { timeout: 5000 }, (err, stdout) => {
           if (err || !stdout) {
             resolve({ hasBattery: false, isCharging: true, batteryPercentage: 100, isLowPowerMode: false });
             return;

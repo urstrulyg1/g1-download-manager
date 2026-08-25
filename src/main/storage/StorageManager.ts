@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { MaintenanceScanResult } from '../../shared/types';
 import { AppDatabase } from '../db/Database';
+import { PathGuard } from '../security/PathGuard';
 
 export class StorageManager {
   public static getStorageStats(targetPath: string): { totalBytes: number; freeBytes: number; usedBytes: number } {
@@ -105,15 +106,31 @@ export class StorageManager {
     let freedBytes = 0;
 
     for (const p of filePaths) {
-      if (fs.existsSync(p)) {
-        try {
-          const stat = fs.statSync(p);
-          fs.unlinkSync(p);
-          cleaned++;
-          freedBytes += stat.size;
-        } catch {
-          // ignore
+      if (!p || typeof p !== 'string') continue;
+      try {
+        const safePath = PathGuard.assertSafeLocalPath(p);
+        const lower = safePath.toLowerCase();
+        // Guardrail: only allow cleaning temporary or partial download files (.part, .g1dm, .tmp)
+        const isAllowedExt =
+          lower.endsWith('.part') ||
+          lower.endsWith('.g1dm') ||
+          lower.endsWith('.tmp') ||
+          lower.includes('.part.');
+
+        if (!isAllowedExt) {
+          continue;
         }
+
+        if (fs.existsSync(safePath)) {
+          const stat = fs.statSync(safePath);
+          if (!stat.isDirectory()) {
+            fs.unlinkSync(safePath);
+            cleaned++;
+            freedBytes += stat.size;
+          }
+        }
+      } catch {
+        // ignore invalid/unauthorized paths
       }
     }
 

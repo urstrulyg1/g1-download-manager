@@ -1,6 +1,7 @@
 import * as crypto from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
+import { PathSanitizer } from '../storage/PathSanitizer';
 
 export interface VaultItem {
   id: string;
@@ -99,7 +100,7 @@ export class EncryptedVault {
     fs.mkdirSync(this.vaultDir, { recursive: true });
 
     const id = `v_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-    const originalFilename = path.basename(sourceFilePath);
+    const originalFilename = PathSanitizer.sanitizeFilename(path.basename(sourceFilePath));
     const vaultFilePath = path.join(this.vaultDir, `${id}.enc`);
 
     const iv = crypto.randomBytes(16);
@@ -149,7 +150,15 @@ export class EncryptedVault {
     const decryptedData = Buffer.concat([decipher.update(encryptedData), decipher.final()]);
 
     fs.mkdirSync(outputDir, { recursive: true });
-    const targetPath = path.join(outputDir, item.originalFilename);
+    const safeName = PathSanitizer.sanitizeFilename(item.originalFilename || 'decrypted_file');
+    const targetPath = path.join(outputDir, safeName);
+
+    try {
+      if (fs.existsSync(targetPath) && fs.lstatSync(targetPath).isSymbolicLink()) {
+        fs.unlinkSync(targetPath);
+      }
+    } catch {}
+
     fs.writeFileSync(targetPath, decryptedData);
 
     return targetPath;
