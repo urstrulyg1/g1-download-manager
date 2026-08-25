@@ -306,7 +306,7 @@ export const IdmProgressModal: React.FC<IdmProgressModalProps> = ({
           <div className="w-full bg-slate-950 rounded-xl p-1 border border-slate-800 shadow-inner">
             <div className="h-3 w-full bg-slate-900 rounded-lg overflow-hidden relative" role="progressbar" aria-label="Download progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.max(0, Math.min(100, item.progress || 0))}>
               <div
-                className={`h-full transition-all duration-200 rounded-lg ${
+                className={`h-full transition-all duration-200 motion-reduce:transition-none rounded-lg ${
                   isCompleted
                     ? 'bg-gradient-to-r from-emerald-500 to-teal-400'
                     : isFailed
@@ -314,9 +314,9 @@ export const IdmProgressModal: React.FC<IdmProgressModalProps> = ({
                     : isPaused
                     ? 'bg-amber-500'
                     : isMerging
-                    ? 'bg-gradient-to-r from-purple-500 via-pink-500 to-cyan-400 animate-pulse'
+                    ? 'bg-gradient-to-r from-purple-500 via-pink-500 to-cyan-400 animate-pulse motion-reduce:animate-none'
                     : isVerifying
-                    ? 'bg-gradient-to-r from-amber-500 to-orange-500 animate-pulse'
+                    ? 'bg-gradient-to-r from-amber-500 to-orange-500 animate-pulse motion-reduce:animate-none'
                     : 'bg-gradient-to-r from-blue-600 via-cyan-500 to-indigo-500'
                 }`}
                 style={{
