@@ -19,13 +19,14 @@ import { Http2Downloader } from './Http2Downloader';
 import { FtpDownloader } from './FtpDownloader';
 import { HlsDownloader } from './HlsDownloader';
 import { MediaStreamDownloader } from '../media/MediaStreamDownloader';
-import { SecureMediaDetector } from '../media/SecureMediaDetector';
+import { SecureMediaDetector, looksLikeStreamingMediaSource } from '../media/SecureMediaDetector';
 import { ProbeService } from './ProbeService';
 import { TokenBucketRateLimiter } from './RateLimiter';
 import { ChecksumVerifier } from './ChecksumVerifier';
 import { RecoveryJournal } from '../db/RecoveryJournal';
 import { SecretStore } from '../security/SecretStore';
 import { PathSanitizer } from '../storage/PathSanitizer';
+import { FilenameResolver } from '../storage/FilenameResolver';
 import { DownloadIntelligence } from './DownloadIntelligence';
 import { MaliciousLinkScanner } from '../security/MaliciousLinkScanner';
 import { RecoveryOrchestrator } from './RecoveryOrchestrator';
@@ -209,6 +210,9 @@ export class DownloadEngine extends EventEmitter {
       const fallbackName = ProbeService.extractFilenameFromUrl(params.url);
       return {
         filename: fallbackName,
+        contentDispositionFilename: undefined,
+        urlFilename: fallbackName,
+        finalUrl: params.url,
         suggestedCategory: ProbeService.categorizeFile(fallbackName),
         mimeType: 'application/octet-stream',
         size: -1,
@@ -240,13 +244,13 @@ export class DownloadEngine extends EventEmitter {
 
     PathSanitizer.ensureDirectory(destDir);
 
+    const hasExplicitFormatSpec = Boolean((params as any).mediaFormatSpec) || Boolean((params as any).formatSpec);
     const isStreamPlatform =
-      /youtube\.com|youtu\.be|googlevideo\.com|vimeo\.com|soundcloud\.com|twitch\.tv|twitter\.com|x\.com|tiktok\.com|tiktokcdn\.com|instagram\.com|facebook\.com|fbcdn\.net|dailymotion\.com|reddit\.com|bilibili\.com|pinterest\.com|streamable\.com|rumble\.com|bitchute\.com|odysee\.com/i.test(
-        params.url
-      ) ||
-      params.url.includes('videoplayback') ||
-      Boolean((params as any).mediaFormatSpec) ||
-      Boolean((params as any).formatSpec);
+      looksLikeStreamingMediaSource(
+        params.url,
+        { filename: probe.filename, mimeType: probe.mimeType },
+        hasExplicitFormatSpec
+      ) || hasExplicitFormatSpec;
 
     let mediaAnalysis: any = null;
     if (isStreamPlatform) {
@@ -255,19 +259,28 @@ export class DownloadEngine extends EventEmitter {
       } catch {}
     }
 
-    let initialFilename = params.filename;
-    const isGenericFilename =
-      !initialFilename ||
-      /^YouTube_|^video(\.mp4)?$|^watch(\.mp4)?$|^stream(\.mp4)?$/i.test(initialFilename);
+    // --- Centralized filename resolution ------------------------------------
+    // Single source of truth for the filename priority chain:
+    //   user -> media/yt-dlp title -> Content-Disposition -> HTML/OG title
+    //        -> URL filename -> safe fallback.
+    const mediaContainer =
+      (params as any).container ||
+      (params as any).format ||
+      mediaAnalysis?.recommendedQuality?.container;
+    const isAudio = category === 'audio';
 
-    if (mediaAnalysis && mediaAnalysis.title && isGenericFilename) {
-      const mediaContainer = (params as any).container || (params as any).format || mediaAnalysis.recommendedQuality?.container;
-      const ext = mediaContainer || path.extname(probe.filename || '').replace('.', '') || 'bin';
-      initialFilename = `${mediaAnalysis.title}.${ext.replace(/^\./, '')}`;
-    }
-
-    let filename = initialFilename || probe.filename;
-    filename = PathSanitizer.sanitizeFilename(filename);
+    const resolved = FilenameResolver.resolve({
+      url: params.url,
+      userFilename: params.filename,
+      mediaTitle: mediaAnalysis?.title,
+      contentDispositionFilename: probe.contentDispositionFilename,
+      pageTitle: mediaAnalysis?.pageTitle,
+      probeFilename: probe.filename || probe.urlFilename,
+      mimeType: probe.mimeType,
+      mediaContainer,
+      isAudio,
+    });
+    let filename = resolved.filename;
 
     const finalPath = this.resolveFileCollision(destDir, filename, settings.downloads.fileCollisionAction);
     if (finalPath === null) {
@@ -363,11 +376,12 @@ export class DownloadEngine extends EventEmitter {
       (params as any).mediaFormatSpec ||
       (mediaAnalysis?.recommendedQuality as any)?.formatSpec ||
       (isStreamPlatform ? 'bestvideo+bestaudio/best' : undefined);
+    (item as any).filenameSource = resolved.source;
     (item as any).mediaMetadata = {
-      title: mediaAnalysis?.title || filename,
+      title: mediaAnalysis?.title || resolved.stem,
       resolution: (params as any).height ? `${(params as any).height}p` : mediaAnalysis?.recommendedQuality?.resolutionLabel,
       codec: (params as any).codec || mediaAnalysis?.recommendedQuality?.videoCodec,
-      container: (params as any).container || mediaAnalysis?.recommendedQuality?.container || path.extname(filename).replace('.', ''),
+      container: (params as any).container || mediaAnalysis?.recommendedQuality?.container || resolved.ext,
     };
 
     let startOk = params.startImmediately !== false;
@@ -473,12 +487,13 @@ export class DownloadEngine extends EventEmitter {
     let worker: HttpDownloader | Http2Downloader | FtpDownloader | HlsDownloader | MediaStreamDownloader;
     const protocol = item.serverCapabilities.protocol;
     const isStreamPlatform =
-      /youtube\.com|youtu\.be|googlevideo\.com|vimeo\.com|soundcloud\.com|twitch\.tv|twitter\.com|x\.com|tiktok\.com|tiktokcdn\.com|instagram\.com|facebook\.com|fbcdn\.net|dailymotion\.com|reddit\.com|bilibili\.com|pinterest\.com|streamable\.com|rumble\.com|bitchute\.com|odysee\.com/i.test(
-        item.url
-      ) ||
-      item.url.includes('videoplayback') ||
+      (protocol as string) === 'media_stream' ||
       Boolean((item as any).mediaFormatSpec) ||
-      (protocol as string) === 'media_stream';
+      looksLikeStreamingMediaSource(
+        item.url,
+        { filename: item.filename, mimeType: item.serverCapabilities.contentType },
+        Boolean((item as any).mediaFormatSpec)
+      );
 
     if (isStreamPlatform) {
       worker = new MediaStreamDownloader(workerItem);

@@ -31,6 +31,91 @@ export interface ComprehensiveMediaAnalysis {
   availableAudioTracks: AnalyzedAudioTrack[];
   recommendedQuality?: AnalyzedVideoQuality;
   isDownloadable: boolean;
+  /** HTML <title> / OpenGraph / twitter:title when the source is a webpage. */
+  pageTitle?: string;
+}
+
+/**
+ * Generic (provider-agnostic) test for whether a URL + probe result looks like
+ * it may host a streaming-media page (YouTube/Vimeo/any video page) rather
+ * than a direct file download. We intentionally do NOT hardcode hostnames
+ * here — detection is based on the URL shape, protocol, and response metadata.
+ */
+export function looksLikeStreamingMediaSource(
+  targetUrl: string,
+  probe?: { filename?: string; mimeType?: string } | null,
+  hasExplicitFormatSpec?: boolean
+): boolean {
+  if (hasExplicitFormatSpec) return true;
+
+  let parsed: URL;
+  try {
+    parsed = new URL(targetUrl);
+  } catch {
+    return false;
+  }
+
+  const pathname = parsed.pathname.toLowerCase();
+  if (pathname.endsWith('.m3u8') || pathname.endsWith('.mpd')) return true;
+  if (targetUrl.toLowerCase().includes('.m3u8') || targetUrl.toLowerCase().includes('.mpd')) return true;
+  if (targetUrl.includes('videoplayback')) return true;
+
+  // A direct file with a known media extension is handled by the regular
+  // HTTP downloader (or the direct-media analyzer), not the streaming engine.
+  const directExts = ['.mp4', '.webm', '.mkv', '.mov', '.ts', '.mp3', '.flac', '.wav', '.aac', '.m4a', '.ogg', '.opus'];
+  if (directExts.some((e) => pathname.endsWith(e))) return false;
+
+  // Streaming manifests reported via Content-Type.
+  const mt = (probe?.mimeType || '').toLowerCase();
+  if (mt.includes('mpegurl') || mt === 'application/dash+xml') return true;
+
+  // A direct binary/file response is NOT a media page. Only HTML / XHTML
+  // responses (and unknown content types) can possibly be video pages; this
+  // prevents routing direct downloads at extensionless URLs (chunked files,
+  // CDN endpoints, signed-URL redirects) through the streaming engine.
+  if (mt) {
+    const isHtml = mt.includes('text/html') || mt.includes('application/xhtml');
+    const isManifest = mt.includes('mpegurl') || mt === 'application/dash+xml';
+    if (!isHtml && !isManifest) return false;
+  }
+
+  // If the server supplied a real file via Content-Disposition or a media
+  // Content-Type with a non-generic filename, treat it as a direct file.
+  if (probe?.filename) {
+    const base = path.basename(probe.filename);
+    const ext = path.extname(base).replace(/^\./, '').toLowerCase();
+    if (ext && !['download', 'html', 'htm'].includes(ext)) {
+      return false;
+    }
+    // Generic basename (watch / video / index ...) on an HTML-ish response is
+    // likely a media *page*, so continue to media analysis.
+  }
+
+  // Extensionless or generic path tokens commonly used by media sites
+  // (/watch, /watch?v=..., /video/123, /shorts/..., /embed/...).
+  const genericTokens = ['/watch', '/video', '/videos', '/shorts', '/embed', '/live', '/stream', '/playlist'];
+  if (genericTokens.some((t) => pathname === t || pathname.startsWith(t + '/') || pathname.startsWith(t + '?'))) {
+    return true;
+  }
+
+  // HTML responses with no usable filename are web pages — worth attempting
+  // yt-dlp / HTML sniffing in case they embed a player.
+  if (mt && (mt.includes('text/html') || mt.includes('application/xhtml'))) {
+    return true;
+  }
+
+  // Last resort: an extensionless root/path with an UNKNOWN content type is
+  // ambiguous but could be a short-link or video page; attempt analysis
+  // (failures are caught). A known non-HTML content type was already ruled
+  // out above, so direct binary downloads never reach here.
+  if (!mt) {
+    const base = path.basename(parsed.pathname);
+    if (!base || !path.extname(base)) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 export class SecureMediaDetector {
@@ -78,8 +163,10 @@ export class SecureMediaDetector {
       const html = await this.fetchText(targetUrl, timeoutMs);
       return this.analyzeWebpage(html, targetUrl, tlsResult, timeoutMs);
     } catch (err: any) {
+      const fallbackTitle = path.basename(parsed.pathname) || 'Media Stream';
       return {
-        title: path.basename(parsed.pathname) || 'Media Stream',
+        title: fallbackTitle,
+        pageTitle: fallbackTitle,
         pageUrl: targetUrl,
         sourceUrl: targetUrl,
         deliveryType: targetUrl.startsWith('https:') ? 'DIRECT_HTTPS' : 'DIRECT_HTTP',
@@ -281,6 +368,7 @@ export class SecureMediaDetector {
 
       return {
         title,
+        pageTitle: title,
         pageUrl: targetUrl,
         sourceUrl: targetUrl,
         deliveryType: 'DIRECT_HTTPS',
@@ -393,8 +481,10 @@ export class SecureMediaDetector {
     const sortedQualities = VideoResolutionEngine.sortQualities(videoQualities, 'RECOMMENDED');
     if (sortedQualities.length > 0) sortedQualities[0].isRecommended = true;
 
+    const hlsTitle = path.basename(new URL(manifestUrl).pathname, '.m3u8') || 'HLS Video Stream';
     return {
-      title: path.basename(new URL(manifestUrl).pathname, '.m3u8') || 'HLS Video Stream',
+      title: hlsTitle,
+      pageTitle: hlsTitle,
       pageUrl,
       sourceUrl: manifestUrl,
       deliveryType: 'HLS',
@@ -459,8 +549,10 @@ export class SecureMediaDetector {
     const sortedQualities = VideoResolutionEngine.sortQualities(videoQualities, 'RECOMMENDED');
     if (sortedQualities.length > 0) sortedQualities[0].isRecommended = true;
 
+    const dashTitle = path.basename(new URL(mpdUrl).pathname, '.mpd') || 'DASH Media Manifest';
     return {
-      title: path.basename(new URL(mpdUrl).pathname, '.mpd') || 'DASH Media Manifest',
+      title: dashTitle,
+      pageTitle: dashTitle,
       pageUrl,
       sourceUrl: mpdUrl,
       deliveryType: 'DASH',
@@ -516,8 +608,10 @@ export class SecureMediaDetector {
       recommendationScore: 100,
     };
 
+    const directTitle = probe?.filename || path.basename(new URL(mediaUrl).pathname) || 'Direct Video File';
     return {
-      title: probe?.filename || path.basename(new URL(mediaUrl).pathname) || 'Direct Video File',
+      title: directTitle,
+      pageTitle: directTitle,
       pageUrl,
       sourceUrl: mediaUrl,
       deliveryType: mediaUrl.startsWith('https:') ? 'DIRECT_HTTPS' : 'DIRECT_HTTP',
@@ -550,16 +644,14 @@ export class SecureMediaDetector {
     tlsResult: TlsInspectionResult,
     timeoutMs: number
   ): Promise<ComprehensiveMediaAnalysis> {
-    let title = 'Webpage Media';
-    const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
-    if (titleMatch && titleMatch[1]) {
-      title = titleMatch[1].trim();
-    }
+    const pageTitle = this.extractPageTitle(html);
+    let title = pageTitle || 'Webpage Media';
 
     const hlsMatch = html.match(/https?:\/\/[^\s"'<>]+\.m3u8[^\s"'<>]*/i);
     if (hlsMatch) {
       const res = await this.analyzeHlsManifest(hlsMatch[0], pageUrl, tlsResult, timeoutMs);
       if (title && title !== 'Webpage Media') res.title = title;
+      res.pageTitle = pageTitle;
       return res;
     }
 
@@ -567,6 +659,7 @@ export class SecureMediaDetector {
     if (dashMatch) {
       const res = await this.analyzeDashManifest(dashMatch[0], pageUrl, tlsResult, timeoutMs);
       if (title && title !== 'Webpage Media') res.title = title;
+      res.pageTitle = pageTitle;
       return res;
     }
 
@@ -577,6 +670,7 @@ export class SecureMediaDetector {
       const fullUrl = new URL(directVideoMatch[1], pageUrl).href;
       const res = await this.analyzeDirectMedia(fullUrl, pageUrl, tlsResult, timeoutMs);
       if (title && title !== 'Webpage Media') res.title = title;
+      res.pageTitle = pageTitle;
       return res;
     }
 
@@ -584,6 +678,7 @@ export class SecureMediaDetector {
 
     return {
       title,
+      pageTitle,
       pageUrl,
       sourceUrl: pageUrl,
       deliveryType: 'DIRECT_HTTPS',
@@ -597,6 +692,40 @@ export class SecureMediaDetector {
       availableVideoQualities: [],
       availableAudioTracks: [],
     };
+  }
+
+  /**
+   * Extract the best available human-readable page title from raw HTML:
+   * OpenGraph `og:title`, then `twitter:title`, then the `<title>` tag.
+   * Returns an empty string when nothing usable is found.
+   */
+  public static extractPageTitle(html: string): string {
+    if (!html || typeof html !== 'string') return '';
+
+    const og = html.match(/<meta[^>]+property=["']og:title["'][^>]*content=["']([^"']+)["']/i)
+      || html.match(/<meta[^>]+content=["']([^"']+)["'][^>]*property=["']og:title["']/i);
+    if (og && og[1]) return this.decodeHtmlEntities(og[1]).trim();
+
+    const tw = html.match(/<meta[^>]+name=["']twitter:title["'][^>]*content=["']([^"']+)["']/i)
+      || html.match(/<meta[^>]+content=["']([^"']+)["'][^>]*name=["']twitter:title["']/i);
+    if (tw && tw[1]) return this.decodeHtmlEntities(tw[1]).trim();
+
+    const titleMatch = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+    if (titleMatch && titleMatch[1]) return this.decodeHtmlEntities(titleMatch[1]).trim();
+
+    return '';
+  }
+
+  private static decodeHtmlEntities(raw: string): string {
+    return raw
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .replace(/&#(\d+);/g, (_, dec) => String.fromCharCode(parseInt(dec, 10)))
+      .replace(/&#x([0-9a-f]+);/gi, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
+      .replace(/\s+/g, ' ');
   }
 
   private static formatSeconds(totalSec: number): string {

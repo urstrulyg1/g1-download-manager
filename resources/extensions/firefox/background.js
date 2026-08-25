@@ -99,8 +99,10 @@ chrome.downloads.onCreated.addListener(async (downloadItem) => {
       return;
     }
 
-    // Check extension rules
-    const filename = downloadItem.filename || parsed.pathname;
+    // Check extension rules. The browser may report a full native path here;
+    // extract a safe basename. The G1DM engine re-runs its full filename
+    // resolution pipeline, so a generic/empty name never locks in a bad name.
+    const filename = sanitizeInterceptFilename(downloadItem.filename || parsed.pathname);
     const ext = filename.split('.').pop()?.toLowerCase() || '';
     const exts = data.interceptExtensions || DEFAULT_EXTENSIONS;
 
@@ -130,6 +132,22 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true; // async
   }
 });
+
+// Strip directory components / illegal characters from a browser-reported
+// filename. Multi-byte (Unicode) titles are preserved. The G1DM daemon
+// re-sanitizes and resolves the final name, so this is defense-in-depth.
+function sanitizeInterceptFilename(rawName) {
+  if (!rawName) return '';
+  let name = String(rawName);
+  const parts = name.split(/[\\/]/);
+  name = parts[parts.length - 1] || name;
+  name = name.replace(/[\\/:*?"<>|\u0000-\u001f]/g, '_').trim();
+  name = name.replace(/\.{2,}/g, '_');
+  if (!name || name === '.' || name === '..' || /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(\.|$)/i.test(name)) {
+    return '';
+  }
+  return name;
+}
 
 async function sendToG1DM(url, filename, category, formatSpec, container) {
   // First attempt: Native Messaging Host if configured

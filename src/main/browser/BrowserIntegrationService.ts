@@ -174,19 +174,42 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
 chrome.downloads.onCreated.addListener((downloadItem) => {
   chrome.storage.local.get(["interceptionEnabled"], (data) => {
     if (data.interceptionEnabled !== false) {
-      // Send to G1DM and cancel browser download
-      sendToG1DM(downloadItem.url, downloadItem.filename);
+      // The browser reports a full native path (or sometimes just a basename).
+      // Extract a safe basename here; the G1DM engine then re-runs its full
+      // filename resolution pipeline (user name -> media title ->
+      // Content-Disposition -> page title -> URL filename -> safe fallback),
+      // so a generic or empty name here does NOT lock in a bad filename.
+      const suggested = sanitizeBrowserFilename(downloadItem.filename);
+      sendToG1DM(downloadItem.url, suggested);
       chrome.downloads.cancel(downloadItem.id);
     }
   });
 });
 
+// Strip directory components the browser included and remove characters that
+// are illegal on common filesystems. Multi-byte (Unicode) characters are kept.
+function sanitizeBrowserFilename(rawName) {
+  if (!rawName) return undefined;
+  let name = String(rawName);
+  // Both Windows and POSIX separators may appear across platforms.
+  const parts = name.split(/[\\/]/);
+  name = parts[parts.length - 1] || name;
+  name = name.replace(/[\\/:*?"<>|\u0000-\u001f]/g, '_').trim();
+  name = name.replace(/\.{2,}/g, '_');
+  if (!name || name === '.' || name === '..' || /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(\.|$)/i.test(name)) {
+    return undefined;
+  }
+  return name;
+}
+
 async function sendToG1DM(url, filename) {
   try {
+    const payload = { url, startImmediately: true };
+    if (filename) payload.filename = filename;
     const res = await fetch(\`http://127.0.0.1:\${G1DM_API_PORT}/api/downloads\`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url, filename, startImmediately: true })
+      body: JSON.stringify(payload)
     });
     const json = await res.json();
     console.log('Successfully enqueued to G1DM:', json);
