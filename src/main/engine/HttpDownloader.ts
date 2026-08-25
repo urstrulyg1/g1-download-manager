@@ -188,6 +188,19 @@ export class HttpDownloader extends EventEmitter {
 
       const failedSegment = this.item.segments.find((segment) => segment.status === 'failed');
       if (failedSegment) {
+        if ((this.item.retryCount || 0) < (this.item.maxRetries || 5)) {
+          this.item.retryCount = (this.item.retryCount || 0) + 1;
+          this.log(
+            'warn',
+            `Segment ${failedSegment.id} failed (${failedSegment.error || 'error'}). Retrying (${this.item.retryCount}/${this.item.maxRetries || 5})...`
+          );
+          for (const s of this.item.segments) {
+            if (s.status === 'failed') s.status = 'pending';
+          }
+          await new Promise((resolve) => setTimeout(resolve, 300));
+          await this.runSegmentEngine();
+          return;
+        }
         this.handleDownloadError(new Error(failedSegment.error || `Segment ${failedSegment.id} failed`));
         return;
       }
@@ -290,13 +303,7 @@ export class HttpDownloader extends EventEmitter {
           this.activeSockets.delete(segment.id);
           segment.status = 'failed';
           segment.error = `HTTP ${statusCode} Server Throttled`;
-          // Schedule retry with backoff
-          const timer = setTimeout(() => {
-            if (!this.isPaused && !this.isCancelled) {
-              this.downloadSegment(segment).then(resolve);
-            }
-          }, 4000);
-          this.retryTimeouts.set(segment.id, timer);
+          resolve();
           return;
         }
 
@@ -827,13 +834,18 @@ export class HttpDownloader extends EventEmitter {
     // Rename tempPath to finalPath
     try {
       if (fs.existsSync(this.item.finalPath)) {
-        // Handle collision if needed
+        try {
+          const destStat = fs.lstatSync(this.item.finalPath);
+          if (destStat.isSymbolicLink() || destStat.isFile()) {
+            fs.unlinkSync(this.item.finalPath);
+          }
+        } catch {}
       }
       fs.renameSync(targetTemp, this.item.finalPath);
 
       // Remove sidecar state file
       if (fs.existsSync(this.item.stateFilePath)) {
-        fs.unlinkSync(this.item.stateFilePath);
+        try { fs.unlinkSync(this.item.stateFilePath); } catch {}
       }
     } catch (err: any) {
       this.log('error', `Failed to finalize file: ${err.message}`);

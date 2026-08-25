@@ -33,9 +33,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, lang, onSa
   const t = translations[lang] || translations.en;
   const [formData, setFormData] = useState<AppSettings | null>(settings);
   const [activeSection, setActiveSection] = useState<
-    'general' | 'downloads' | 'bandwidth' | 'network' | 'browser' | 'security' | 'scheduler' | 'automation' | 'power' | 'remote' | 'backup' | 'about'
+    'general' | 'downloads' | 'bandwidth' | 'network' | 'browser' | 'security' | 'privacy' | 'scheduler' | 'automation' | 'power' | 'remote' | 'backup' | 'about'
   >('general');
   const [saved, setSaved] = useState(false);
+  const [wipePhrase, setWipePhrase] = useState('');
+  const [wipeMessage, setWipeMessage] = useState<string | null>(null);
 
   // Settings arrive asynchronously from the engine. Keep the form in sync so
   // opening the Settings view after the first render never leaves it blank.
@@ -102,7 +104,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, lang, onSa
             { id: 'bandwidth', label: 'Bandwidth Limits', icon: Gauge },
             { id: 'network', label: 'Network & Proxy', icon: Globe },
             { id: 'browser', label: 'Browser Integration', icon: Layers },
-            { id: 'security', label: 'Security & Privacy', icon: Shield },
+            { id: 'security', label: 'Security & Antivirus', icon: Shield },
+            { id: 'privacy', label: 'Privacy Center', icon: Shield },
             { id: 'scheduler', label: 'Scheduler', icon: Clock },
             { id: 'automation', label: 'Post-Download Automation', icon: Zap },
             { id: 'power', label: 'Power Governor', icon: Power },
@@ -541,7 +544,162 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, lang, onSa
             </div>
           )}
 
-          {/* 6. SCHEDULER */}
+          {/* PRIVACY CENTER */}
+          {activeSection === 'privacy' && (
+            <div className="space-y-5">
+              <div>
+                <h3 className="text-sm font-bold text-white border-b border-slate-800 pb-2 flex items-center justify-between">
+                  <span>Privacy Center</span>
+                  <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-mono">
+                    Strict Local-First Guarantee
+                  </span>
+                </h3>
+                <p className="text-xs text-slate-400 mt-1">
+                  G1DM is engineered from the ground up to respect user sovereignty and privacy. All database storage, state journals, and download caches remain strictly on your local machine.
+                </p>
+              </div>
+
+              {/* Status Matrix */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="p-3.5 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-slate-200">Clipboard Monitoring</span>
+                    <span className="text-xs px-2 py-0.5 rounded-md bg-blue-500/20 text-blue-300 font-semibold">
+                      Enabled
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-400">
+                    Only inspects clipboard on app focus for valid download URLs. Clipboard content is never logged or transmitted.
+                  </p>
+                </div>
+
+                <div className="p-3.5 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-slate-200">Browser Integration</span>
+                    <span className="text-xs px-2 py-0.5 rounded-md bg-blue-500/20 text-blue-300 font-semibold">
+                      Enabled
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-400">
+                    Native messaging host communicates exclusively over local loopback (127.0.0.1) using length-prefixed JSON.
+                  </p>
+                </div>
+
+                <div className="p-3.5 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-slate-200">Diagnostic Collection</span>
+                    <span className="text-xs px-2 py-0.5 rounded-md bg-slate-800 text-slate-300 font-semibold">
+                      Disabled (On-Demand Only)
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-400">
+                    Diagnostics are computed locally in real time when you visit the Diagnostics view and are automatically sanitized.
+                  </p>
+                </div>
+
+                <div className="p-3.5 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-slate-200">Local History</span>
+                    <span className="text-xs px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 font-semibold">
+                      Enabled (Local SQLite)
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-400">
+                    Stored in ~/.g1dm/g1dm.db on your local storage drive. Never uploaded or synchronized to remote servers.
+                  </p>
+                </div>
+
+                <div className="p-3.5 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-1 sm:col-span-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-slate-200">External Telemetry</span>
+                    <span className="text-xs px-2 py-0.5 rounded-md bg-rose-500/20 text-rose-300 font-semibold font-mono">
+                      Disabled (0% External Tracking)
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-400">
+                    G1DM does NOT transmit any analytics, telemetry, usage statistics, user tracking IDs, or crash dumps to external cloud servers.
+                  </p>
+                </div>
+              </div>
+
+              {/* What G1DM reads, stores, and transmits */}
+              <div className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-3">
+                <h4 className="text-xs font-bold text-slate-200 uppercase tracking-wider">Privacy Disclosure</h4>
+                <ul className="text-xs text-slate-300 space-y-2 list-disc list-inside">
+                  <li><strong className="text-white">Reads:</strong> URLs explicitly submitted by you or clicked via the companion browser extension.</li>
+                  <li><strong className="text-white">Stores:</strong> Download state files (.g1dm sidecars), category rules, and SQLite records in your home directory (<code className="text-cyan-400">~/.g1dm</code>).</li>
+                  <li><strong className="text-white">Transmits:</strong> Direct HTTP/HTTPS/FTP requests exclusively to the origin host specified by the download URL.</li>
+                </ul>
+              </div>
+
+              {/* Crash Reports & Sanitized Diagnostics */}
+              <div className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="text-xs font-bold text-slate-200">Sanitized Crash Reports</h4>
+                    <p className="text-[11px] text-slate-400">
+                      Export a sanitized diagnostics snapshot for debugging. All tokens, passwords, and private paths are automatically redacted.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => window.open('/api/diagnostics/crash-report', '_blank')}
+                    className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-300 text-xs font-semibold border border-slate-700 transition-colors flex items-center gap-1.5"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>Export Crash Report</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Permanent Wipe Section */}
+              <div className="p-4 rounded-2xl bg-rose-950/20 border border-rose-900/40 space-y-3">
+                <h4 className="text-xs font-bold text-rose-300">Permanent Data Wipe</h4>
+                <p className="text-[11px] text-rose-200/80">
+                  Permanently erase all local download records, history, queue assignments, and crash journals from your local SQLite database.
+                </p>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    placeholder='Type "DELETE ALL G1DM DATA"'
+                    value={wipePhrase}
+                    onChange={(e) => setWipePhrase(e.target.value)}
+                    className="flex-1 bg-slate-950 border border-rose-900/60 rounded-xl px-3 py-2 text-xs font-mono text-slate-200 focus:outline-none focus:border-rose-500"
+                  />
+                  <button
+                    type="button"
+                    disabled={wipePhrase !== 'DELETE ALL G1DM DATA'}
+                    onClick={async () => {
+                      try {
+                        const res = await fetch('/api/privacy/wipe', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ confirmationPhrase: wipePhrase }),
+                        });
+                        const data = await res.json();
+                        setWipeMessage(data.message || 'Wipe completed');
+                        setWipePhrase('');
+                      } catch (err: any) {
+                        setWipeMessage(`Error: ${err.message}`);
+                      }
+                    }}
+                    className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                      wipePhrase === 'DELETE ALL G1DM DATA'
+                        ? 'bg-rose-600 hover:bg-rose-500 text-white cursor-pointer shadow-lg shadow-rose-600/30'
+                        : 'bg-slate-800 text-slate-600 cursor-not-allowed'
+                    }`}
+                  >
+                    Wipe Everything
+                  </button>
+                </div>
+                {wipeMessage && (
+                  <div className="text-xs text-emerald-400 font-semibold mt-1">
+                    {wipeMessage}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
           {activeSection === 'scheduler' && (
             <div className="space-y-4">
               <h3 className="text-sm font-bold text-white border-b border-slate-800 pb-2">Working Hours Bandwidth Schedules</h3>
@@ -995,20 +1153,20 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, lang, onSa
               <h3 className="text-sm font-bold text-white border-b border-slate-800 pb-2">About G1DM</h3>
               <div className="p-4 rounded-2xl bg-gradient-to-r from-blue-950/60 to-indigo-950/60 border border-blue-500/30 space-y-2">
                 <div className="text-base font-bold text-white flex items-center gap-2">
-                  <span>G1DM — Download Engine 2.0</span>
-                  <span className="px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 font-mono text-[10px] font-bold">
-                    v1.0.0
+                  <span>G1DM — Next-Generation Download Manager</span>
+                  <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-mono text-[10px] font-bold">
+                    v4.0.0-FREE
                   </span>
                 </div>
                 <p className="text-slate-300 text-xs leading-relaxed">
-                  Next-generation high-performance Internet Download Manager featuring dynamic multi-socket HTTP/HTTPS/HTTP2/FTP/HLS segmentation, live HTTP 206 stream preview seeking, atomic file finalization, and crash recovery.
+                  High-performance, production-grade Internet Download Manager featuring dynamic multi-socket HTTP/HTTPS/FTP/HLS segmentation, live HTTP 206 stream preview seeking, atomic file finalization, and crash recovery.
                 </p>
               </div>
 
               <div className="grid grid-cols-2 gap-3 text-xs">
                 <div className="p-3 rounded-xl bg-slate-950 border border-slate-800">
-                  <div className="text-slate-400 font-semibold">Security Certification</div>
-                  <div className="text-emerald-400 font-bold mt-1">Audit Hardened & Verified</div>
+                  <div className="text-slate-400 font-semibold">Security & Privacy Certification</div>
+                  <div className="text-emerald-400 font-bold mt-1">100% Local-First & Zero Telemetry</div>
                 </div>
                 <div className="p-3 rounded-xl bg-slate-950 border border-slate-800">
                   <div className="text-slate-400 font-semibold">State Engine</div>

@@ -7,6 +7,7 @@ const REDACTED = '***REDACTED***';
  * the result is safe to include in exports, backups, and diagnostics reports.
  */
 export function redactSettings(settings: AppSettings): AppSettings {
+  if (!settings) return settings;
   const clean = JSON.parse(JSON.stringify(settings)) as AppSettings;
 
   if (clean.network) {
@@ -25,5 +26,48 @@ export function redactSettings(settings: AppSettings): AppSettings {
     if (clean.remote.discordWebhookUrl) clean.remote.discordWebhookUrl = REDACTED;
   }
 
+  return clean;
+}
+
+/**
+ * Redacts embedded credentials from URLs, e.g. http://user:pass@host/file -> http://user:***REDACTED***@host/file
+ */
+export function redactUrlCredentials(rawUrl: string): string {
+  if (!rawUrl || typeof rawUrl !== 'string') return rawUrl;
+  try {
+    const parsed = new URL(rawUrl);
+    if (parsed.password) {
+      parsed.password = REDACTED;
+      return parsed.toString();
+    }
+    return rawUrl;
+  } catch {
+    // Regex fallback for non-standard or partial URLs
+    return rawUrl.replace(/(https?:\/\/|ftp:\/\/|ftps:\/\/)([^:]+):([^@]+)@/i, `$1$2:${REDACTED}@`);
+  }
+}
+
+/**
+ * Sanitizes headers object, redacting Authorization, Cookies, X-Api-Key, etc.
+ */
+export function redactHeaders(headers: Record<string, any>): Record<string, any> {
+  if (!headers || typeof headers !== 'object') return headers;
+  const clean: Record<string, any> = { ...headers };
+  for (const key of Object.keys(clean)) {
+    const lower = key.toLowerCase();
+    if (
+      lower === 'authorization' ||
+      lower === 'cookie' ||
+      lower === 'set-cookie' ||
+      lower === 'x-api-key' ||
+      lower === 'proxy-authorization' ||
+      lower === 'x-g1dm-key' ||
+      lower.includes('token') ||
+      lower.includes('secret') ||
+      lower.includes('password')
+    ) {
+      clean[key] = REDACTED;
+    }
+  }
   return clean;
 }

@@ -639,11 +639,11 @@ export const DownloadsView: React.FC<DownloadsViewProps> = ({
                                 return (
                                   <div
                                     key={seg.id}
-                                    className="h-full bg-slate-800 rounded-sm overflow-hidden flex-1 relative"
+                                    className="h-full bg-slate-800 rounded-sm overflow-hidden flex-1 relative segment-cell"
                                     title={`Segment ${seg.id}: ${seg.status} (${segPct.toFixed(0)}%)`}
                                   >
                                     <div
-                                      className={`h-full transition-all duration-200 ${
+                                      className={`h-full transition-all duration-200 smooth-progress-bar ${
                                         seg.status === 'completed'
                                           ? 'bg-emerald-400'
                                           : seg.status === 'downloading'
@@ -659,7 +659,7 @@ export const DownloadsView: React.FC<DownloadsViewProps> = ({
                           ) : (
                             <div className="h-2 w-full bg-slate-950 rounded-full overflow-hidden border border-slate-800">
                               <div
-                                className={`h-full rounded-full transition-all duration-300 ${
+                                className={`h-full rounded-full transition-all duration-300 smooth-progress-bar ${
                                   item.status === 'completed'
                                     ? 'bg-emerald-400'
                                     : item.status === 'failed'

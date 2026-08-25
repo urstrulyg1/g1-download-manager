@@ -22,6 +22,7 @@ import {
   Network,
   Cpu,
   Zap,
+  AlertTriangle,
 } from 'lucide-react';
 import { DownloadItem, SegmentInfo, ChecksumInfo, ArchiveInfo, SecurityScanInfo } from '../../shared/types';
 import { DownloadIntelligence, DownloadHealthReport } from '../../main/engine/DownloadIntelligence';
@@ -97,8 +98,8 @@ export const DownloadDetailModal: React.FC<DownloadDetailModalProps> = ({ item, 
   };
 
   return (
-    <div className="theme-overlay fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
-      <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-4xl max-h-[90vh] shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+    <div className="theme-overlay fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in-up">
+      <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-4xl max-h-[90vh] shadow-2xl flex flex-col overflow-hidden animate-modal-in">
         {/* Header */}
         <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-950/60">
           <div className="flex items-center gap-3 min-w-0 pr-4">
@@ -228,6 +229,62 @@ export const DownloadDetailModal: React.FC<DownloadDetailModalProps> = ({ item, 
 
         {/* Tab Content */}
         <div className="p-5 flex-1 overflow-y-auto space-y-4">
+          {/* Actionable Error Recovery Banner */}
+          {item.status === 'failed' && (
+            <div className="p-4 rounded-2xl bg-rose-950/40 border border-rose-500/40 space-y-3 shadow-lg shadow-rose-950/20">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-xl bg-rose-500/20 text-rose-400 flex items-center justify-center shrink-0 mt-0.5">
+                    <AlertTriangle className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-rose-200">
+                      Transfer Interrupted: {item.error?.code || 'ERR_DOWNLOAD_FAILED'}
+                    </h4>
+                    <p className="text-xs text-rose-300/90 mt-0.5">
+                      {item.error?.message || 'Download encountered an unrecoverable server or socket error.'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Actionable Recovery Options */}
+              <div className="flex items-center gap-2 pt-1 flex-wrap">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await api.retryDownload(item.id);
+                  }}
+                  className="px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-rose-600/30 transition-all"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span>Retry Transfer</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await api.restartDownload(item.id);
+                  }}
+                  className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition-colors flex items-center gap-1.5"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span>Restart Fresh (Clear State)</span>
+                </button>
+
+                {item.error?.message?.toLowerCase().includes('checksum') && (
+                  <button
+                    type="button"
+                    onClick={handleVerifyChecksum}
+                    className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-300 text-xs font-semibold border border-slate-700 transition-colors flex items-center gap-1.5"
+                  >
+                    <FileCheck className="w-3.5 h-3.5" />
+                    <span>Re-verify Checksum</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
           {/* TAB 1: Dynamic Segment Visualizer */}
           {activeTab === 'segments' && (
             <div className="space-y-4">

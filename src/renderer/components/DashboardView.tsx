@@ -396,7 +396,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     </div>
                     <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
                       <div
-                        className={`h-full rounded-full transition-all duration-300 ${
+                        className={`h-full rounded-full transition-all duration-300 smooth-progress-bar ${
                           item.status === 'completed'
                             ? 'bg-emerald-400'
                             : item.status === 'failed'

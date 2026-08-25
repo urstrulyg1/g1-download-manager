@@ -11,7 +11,30 @@ import {
   SpeedHistoryPoint,
 } from '../../shared/types';
 
+export interface CrashLogEntry {
+  id: string;
+  timestamp: number;
+  appVersion: string;
+  platform: string;
+  errorCategory: string;
+  message: string;
+  stack?: string;
+  activeOperationsState?: any;
+  sanitizedDiagnostics?: any;
+}
+
+export interface MigrationRecord {
+  id: number;
+  fromVersion: number;
+  toVersion: number;
+  appliedAt: number;
+  success: boolean;
+  details?: string;
+}
+
 export class AppDatabase {
+  public static readonly CURRENT_SCHEMA_VERSION = 4;
+
   private db: SqlJsDatabase | null = null;
   private dbPath: string;
   private isDirty = false;
@@ -172,157 +195,406 @@ export class AppDatabase {
     } catch {}
   }
 
+  public getSchemaVersion(): number {
+    if (!this.db) return 0;
+    try {
+      const res = this.db.exec('SELECT version FROM schema_version LIMIT 1');
+      if (res.length > 0 && res[0].values.length > 0) {
+        return Number(res[0].values[0][0]);
+      }
+    } catch {
+      // Table may not exist yet
+    }
+    return 0;
+  }
+
+  public setSchemaVersion(version: number): void {
+    if (!this.db) return;
+    this.db.run('CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY);');
+    this.db.run('DELETE FROM schema_version;');
+    this.db.run('INSERT INTO schema_version (version) VALUES (?);', [version]);
+    this.markDirty();
+  }
+
+  private createPreMigrationBackup(currentVer: number): void {
+    if (this.dbPath === ':memory:' || !this.db || !fs.existsSync(this.dbPath)) return;
+    try {
+      const backupPath = `${this.dbPath}.pre-migration-v${currentVer}.${Date.now()}.bak`;
+      fs.copyFileSync(this.dbPath, backupPath);
+    } catch (err) {
+      console.warn('Could not create pre-migration backup:', err);
+    }
+  }
+
+  private recordMigration(fromVer: number, toVer: number, success: boolean, details?: string): void {
+    if (!this.db) return;
+    try {
+      this.db.run(
+        `
+        CREATE TABLE IF NOT EXISTS migration_history (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          fromVersion INTEGER NOT NULL,
+          toVersion INTEGER NOT NULL,
+          appliedAt INTEGER NOT NULL,
+          success INTEGER NOT NULL,
+          details TEXT
+        );
+      `
+      );
+      this.db.run(
+        `
+        INSERT INTO migration_history (fromVersion, toVersion, appliedAt, success, details)
+        VALUES (?, ?, ?, ?, ?);
+      `,
+        [fromVer, toVer, Date.now(), success ? 1 : 0, details || null]
+      );
+    } catch {}
+  }
+
   private migrateSchema(): void {
     if (!this.db) return;
 
+    // Create schema_version table if it doesn't exist
     this.db.run(`
       CREATE TABLE IF NOT EXISTS schema_version (
         version INTEGER PRIMARY KEY
       );
     `);
 
-    this.db.run(`
-      CREATE TABLE IF NOT EXISTS downloads (
-        id TEXT PRIMARY KEY,
-        url TEXT NOT NULL,
-        filename TEXT NOT NULL,
-        destinationDir TEXT NOT NULL,
-        finalPath TEXT NOT NULL,
-        tempPath TEXT NOT NULL,
-        stateFilePath TEXT NOT NULL,
-        status TEXT NOT NULL,
-        totalBytes INTEGER NOT NULL,
-        downloadedBytes INTEGER NOT NULL,
-        progress REAL NOT NULL,
-        speed REAL NOT NULL,
-        avgSpeed REAL NOT NULL,
-        peakSpeed REAL NOT NULL,
-        eta INTEGER NOT NULL,
-        category TEXT NOT NULL,
-        queueId TEXT NOT NULL,
-        priority TEXT NOT NULL,
-        maxConnections INTEGER NOT NULL,
-        activeConnections INTEGER NOT NULL,
-        speedLimitBytesPerSec INTEGER NOT NULL,
-        errorJson TEXT,
-        retryCount INTEGER NOT NULL,
-        maxRetries INTEGER NOT NULL,
-        createdAt INTEGER NOT NULL,
-        startedAt INTEGER,
-        completedAt INTEGER,
-        durationMs INTEGER NOT NULL,
-        securityScanJson TEXT,
-        archiveInfoJson TEXT,
-        serverCapabilitiesJson TEXT,
-        authJson TEXT,
-        proxyJson TEXT,
-        checksumJson TEXT,
-        logsJson TEXT
-      );
-    `);
+    const currentVer = this.getSchemaVersion();
 
-    this.db.run(`
-      CREATE TABLE IF NOT EXISTS segments (
-        downloadId TEXT NOT NULL,
-        segmentId INTEGER NOT NULL,
-        startOffset INTEGER NOT NULL,
-        endOffset INTEGER NOT NULL,
-        downloadedBytes INTEGER NOT NULL,
-        currentOffset INTEGER NOT NULL,
-        status TEXT NOT NULL,
-        connectionId INTEGER NOT NULL,
-        speed REAL NOT NULL,
-        error TEXT,
-        updatedAt INTEGER,
-        PRIMARY KEY (downloadId, segmentId)
-      );
-    `);
+    if (currentVer > 0 && currentVer < AppDatabase.CURRENT_SCHEMA_VERSION) {
+      this.createPreMigrationBackup(currentVer);
+    }
 
-    this.db.run(`
-      CREATE TABLE IF NOT EXISTS queues (
-        id TEXT PRIMARY KEY,
-        name TEXT NOT NULL,
-        priority INTEGER NOT NULL,
-        mode TEXT NOT NULL,
-        maxConcurrentDownloads INTEGER NOT NULL,
-        maxConnectionsPerDownload INTEGER NOT NULL,
-        speedLimitBytesPerSec INTEGER NOT NULL,
-        destinationDir TEXT NOT NULL,
-        status TEXT NOT NULL,
-        scheduleJson TEXT,
-        downloadIdsJson TEXT,
-        createdAt INTEGER NOT NULL
-      );
-    `);
+    try {
+      // Base schema (v1)
+      this.db.run(`
+        CREATE TABLE IF NOT EXISTS downloads (
+          id TEXT PRIMARY KEY,
+          url TEXT NOT NULL,
+          filename TEXT NOT NULL,
+          destinationDir TEXT NOT NULL,
+          finalPath TEXT NOT NULL,
+          tempPath TEXT NOT NULL,
+          stateFilePath TEXT NOT NULL,
+          status TEXT NOT NULL,
+          totalBytes INTEGER NOT NULL,
+          downloadedBytes INTEGER NOT NULL,
+          progress REAL NOT NULL,
+          speed REAL NOT NULL,
+          avgSpeed REAL NOT NULL,
+          peakSpeed REAL NOT NULL,
+          eta INTEGER NOT NULL,
+          category TEXT NOT NULL,
+          queueId TEXT NOT NULL,
+          priority TEXT NOT NULL,
+          maxConnections INTEGER NOT NULL,
+          activeConnections INTEGER NOT NULL,
+          speedLimitBytesPerSec INTEGER NOT NULL,
+          errorJson TEXT,
+          retryCount INTEGER NOT NULL,
+          maxRetries INTEGER NOT NULL,
+          createdAt INTEGER NOT NULL,
+          startedAt INTEGER,
+          completedAt INTEGER,
+          durationMs INTEGER NOT NULL,
+          securityScanJson TEXT,
+          archiveInfoJson TEXT,
+          serverCapabilitiesJson TEXT,
+          authJson TEXT,
+          proxyJson TEXT,
+          checksumJson TEXT,
+          logsJson TEXT
+        );
+      `);
 
-    this.db.run(`
-      CREATE TABLE IF NOT EXISTS categories (
-        id TEXT PRIMARY KEY,
-        name TEXT NOT NULL,
-        icon TEXT NOT NULL,
-        color TEXT NOT NULL,
-        defaultDestination TEXT NOT NULL,
-        extensionsJson TEXT NOT NULL,
-        mimeTypesJson TEXT NOT NULL
-      );
-    `);
+      this.db.run(`
+        CREATE TABLE IF NOT EXISTS segments (
+          downloadId TEXT NOT NULL,
+          segmentId INTEGER NOT NULL,
+          startOffset INTEGER NOT NULL,
+          endOffset INTEGER NOT NULL,
+          downloadedBytes INTEGER NOT NULL,
+          currentOffset INTEGER NOT NULL,
+          status TEXT NOT NULL,
+          connectionId INTEGER NOT NULL,
+          speed REAL NOT NULL,
+          error TEXT,
+          updatedAt INTEGER,
+          PRIMARY KEY (downloadId, segmentId)
+        );
+      `);
 
-    this.db.run(`
-      CREATE TABLE IF NOT EXISTS site_grabber_projects (
-        id TEXT PRIMARY KEY,
-        name TEXT NOT NULL,
-        startUrl TEXT NOT NULL,
-        maxDepth INTEGER NOT NULL,
-        stayOnDomain INTEGER NOT NULL,
-        allowSubdomains INTEGER NOT NULL,
-        filtersJson TEXT NOT NULL,
-        destinationDir TEXT NOT NULL,
-        status TEXT NOT NULL,
-        discoveredUrlsJson TEXT NOT NULL,
-        totalDiscovered INTEGER NOT NULL,
-        totalDownloaded INTEGER NOT NULL,
-        createdAt INTEGER NOT NULL,
-        error TEXT
-      );
-    `);
+      this.db.run(`
+        CREATE TABLE IF NOT EXISTS queues (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          priority INTEGER NOT NULL,
+          mode TEXT NOT NULL,
+          maxConcurrentDownloads INTEGER NOT NULL,
+          maxConnectionsPerDownload INTEGER NOT NULL,
+          speedLimitBytesPerSec INTEGER NOT NULL,
+          destinationDir TEXT NOT NULL,
+          status TEXT NOT NULL,
+          scheduleJson TEXT,
+          downloadIdsJson TEXT,
+          createdAt INTEGER NOT NULL
+        );
+      `);
 
-    this.db.run(`
-      CREATE TABLE IF NOT EXISTS settings (
-        key TEXT PRIMARY KEY,
-        valueJson TEXT NOT NULL,
-        updatedAt INTEGER NOT NULL
-      );
-    `);
+      this.db.run(`
+        CREATE TABLE IF NOT EXISTS categories (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          icon TEXT NOT NULL,
+          color TEXT NOT NULL,
+          defaultDestination TEXT NOT NULL,
+          extensionsJson TEXT NOT NULL,
+          mimeTypesJson TEXT NOT NULL
+        );
+      `);
 
-    this.db.run(`
-      CREATE TABLE IF NOT EXISTS history (
-        id TEXT PRIMARY KEY,
-        downloadId TEXT NOT NULL,
-        filename TEXT NOT NULL,
-        url TEXT NOT NULL,
-        domain TEXT NOT NULL,
-        date INTEGER NOT NULL,
-        durationMs INTEGER NOT NULL,
-        fileSize INTEGER NOT NULL,
-        destinationPath TEXT NOT NULL,
-        status TEXT NOT NULL,
-        avgSpeed REAL NOT NULL,
-        peakSpeed REAL NOT NULL,
-        errorReason TEXT,
-        checksumAlgorithm TEXT,
-        checksumVerified INTEGER,
-        category TEXT NOT NULL,
-        queueName TEXT NOT NULL
-      );
-    `);
+      this.db.run(`
+        CREATE TABLE IF NOT EXISTS site_grabber_projects (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          startUrl TEXT NOT NULL,
+          maxDepth INTEGER NOT NULL,
+          stayOnDomain INTEGER NOT NULL,
+          allowSubdomains INTEGER NOT NULL,
+          filtersJson TEXT NOT NULL,
+          destinationDir TEXT NOT NULL,
+          status TEXT NOT NULL,
+          discoveredUrlsJson TEXT NOT NULL,
+          totalDiscovered INTEGER NOT NULL,
+          totalDownloaded INTEGER NOT NULL,
+          createdAt INTEGER NOT NULL,
+          error TEXT
+        );
+      `);
 
-    this.db.run(`
-      CREATE TABLE IF NOT EXISTS speed_history (
-        downloadId TEXT NOT NULL,
-        timestamp INTEGER NOT NULL,
-        speed REAL NOT NULL
+      this.db.run(`
+        CREATE TABLE IF NOT EXISTS settings (
+          key TEXT PRIMARY KEY,
+          valueJson TEXT NOT NULL,
+          updatedAt INTEGER NOT NULL
+        );
+      `);
+
+      this.db.run(`
+        CREATE TABLE IF NOT EXISTS history (
+          id TEXT PRIMARY KEY,
+          downloadId TEXT NOT NULL,
+          filename TEXT NOT NULL,
+          url TEXT NOT NULL,
+          domain TEXT NOT NULL,
+          date INTEGER NOT NULL,
+          durationMs INTEGER NOT NULL,
+          fileSize INTEGER NOT NULL,
+          destinationPath TEXT NOT NULL,
+          status TEXT NOT NULL,
+          avgSpeed REAL NOT NULL,
+          peakSpeed REAL NOT NULL,
+          errorReason TEXT,
+          checksumAlgorithm TEXT,
+          checksumVerified INTEGER,
+          category TEXT NOT NULL,
+          queueName TEXT NOT NULL
+        );
+      `);
+
+      this.db.run(`
+        CREATE TABLE IF NOT EXISTS speed_history (
+          downloadId TEXT NOT NULL,
+          timestamp INTEGER NOT NULL,
+          speed REAL NOT NULL
+        );
+      `);
+
+      // Migration v2: Ensure all json columns exist in downloads
+      this.ensureColumn('downloads', 'securityScanJson', 'TEXT');
+      this.ensureColumn('downloads', 'archiveInfoJson', 'TEXT');
+      this.ensureColumn('downloads', 'serverCapabilitiesJson', 'TEXT');
+      this.ensureColumn('downloads', 'authJson', 'TEXT');
+      this.ensureColumn('downloads', 'proxyJson', 'TEXT');
+      this.ensureColumn('downloads', 'checksumJson', 'TEXT');
+      this.ensureColumn('downloads', 'logsJson', 'TEXT');
+
+      // Migration v3: Automation rules and snapshots tables
+      this.db.run(`
+        CREATE TABLE IF NOT EXISTS automation_rules (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          enabled INTEGER NOT NULL,
+          conditionsJson TEXT NOT NULL,
+          actionsJson TEXT NOT NULL,
+          createdAt INTEGER NOT NULL
+        );
+      `);
+
+      this.db.run(`
+        CREATE TABLE IF NOT EXISTS snapshots (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          createdAt INTEGER NOT NULL,
+          dataJson TEXT NOT NULL
+        );
+      `);
+
+      // Migration v4: Crash logs, audit logs, and migration history
+      this.db.run(`
+        CREATE TABLE IF NOT EXISTS crash_logs (
+          id TEXT PRIMARY KEY,
+          timestamp INTEGER NOT NULL,
+          appVersion TEXT NOT NULL,
+          platform TEXT NOT NULL,
+          errorCategory TEXT NOT NULL,
+          message TEXT NOT NULL,
+          stack TEXT,
+          contextJson TEXT,
+          diagnosticsJson TEXT
+        );
+      `);
+
+      this.db.run(`
+        CREATE TABLE IF NOT EXISTS audit_logs (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          timestamp INTEGER NOT NULL,
+          action TEXT NOT NULL,
+          detailsJson TEXT
+        );
+      `);
+
+      this.db.run(`
+        CREATE TABLE IF NOT EXISTS migration_history (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          fromVersion INTEGER NOT NULL,
+          toVersion INTEGER NOT NULL,
+          appliedAt INTEGER NOT NULL,
+          success INTEGER NOT NULL,
+          details TEXT
+        );
+      `);
+
+      // Record migration success
+      if (currentVer !== AppDatabase.CURRENT_SCHEMA_VERSION) {
+        this.recordMigration(
+          currentVer,
+          AppDatabase.CURRENT_SCHEMA_VERSION,
+          true,
+          `Upgraded schema from v${currentVer} to v${AppDatabase.CURRENT_SCHEMA_VERSION}`
+        );
+        this.setSchemaVersion(AppDatabase.CURRENT_SCHEMA_VERSION);
+      }
+    } catch (err: any) {
+      this.recordMigration(
+        currentVer,
+        AppDatabase.CURRENT_SCHEMA_VERSION,
+        false,
+        `Migration failed: ${err.message}`
       );
-    `);
+      throw new Error(`Database schema migration failed from v${currentVer} to v${AppDatabase.CURRENT_SCHEMA_VERSION}: ${err.message}`);
+    }
+  }
+
+  private ensureColumn(table: string, column: string, type: string): void {
+    if (!this.db) return;
+    try {
+      const res = this.db.exec(`PRAGMA table_info(${table})`);
+      if (res.length > 0 && res[0].values.length > 0) {
+        const hasColumn = res[0].values.some((col) => col[1] === column);
+        if (!hasColumn) {
+          this.db.run(`ALTER TABLE ${table} ADD COLUMN ${column} ${type};`);
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  public getMigrationHistory(): MigrationRecord[] {
+    if (!this.db) return [];
+    try {
+      const res = this.db.exec('SELECT * FROM migration_history ORDER BY appliedAt DESC');
+      if (res.length === 0) return [];
+      const columns = res[0].columns;
+      return res[0].values.map((val) => {
+        const row: any = {};
+        columns.forEach((c, i) => (row[c] = val[i]));
+        return {
+          id: Number(row.id),
+          fromVersion: Number(row.fromVersion),
+          toVersion: Number(row.toVersion),
+          appliedAt: Number(row.appliedAt),
+          success: row.success === 1,
+          details: row.details || undefined,
+        };
+      });
+    } catch {
+      return [];
+    }
+  }
+
+  // --- Crash Logs CRUD ---
+
+  public saveCrashLog(entry: CrashLogEntry): void {
+    if (!this.db) return;
+    try {
+      this.db.run(
+        `
+        INSERT OR REPLACE INTO crash_logs (
+          id, timestamp, appVersion, platform, errorCategory, message, stack, contextJson, diagnosticsJson
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `,
+        [
+          entry.id,
+          entry.timestamp,
+          entry.appVersion,
+          entry.platform,
+          entry.errorCategory,
+          entry.message,
+          entry.stack || null,
+          entry.activeOperationsState ? JSON.stringify(entry.activeOperationsState) : null,
+          entry.sanitizedDiagnostics ? JSON.stringify(entry.sanitizedDiagnostics) : null,
+        ]
+      );
+      this.markDirty();
+    } catch {}
+  }
+
+  public getCrashLogs(limit = 50): CrashLogEntry[] {
+    if (!this.db) return [];
+    try {
+      const res = this.db.exec(`SELECT * FROM crash_logs ORDER BY timestamp DESC LIMIT ${limit}`);
+      if (res.length === 0) return [];
+      const columns = res[0].columns;
+      return res[0].values.map((val) => {
+        const row: any = {};
+        columns.forEach((c, i) => (row[c] = val[i]));
+        return {
+          id: row.id,
+          timestamp: Number(row.timestamp),
+          appVersion: row.appVersion,
+          platform: row.platform,
+          errorCategory: row.errorCategory,
+          message: row.message,
+          stack: row.stack || undefined,
+          activeOperationsState: row.contextJson ? JSON.parse(row.contextJson) : undefined,
+          sanitizedDiagnostics: row.diagnosticsJson ? JSON.parse(row.diagnosticsJson) : undefined,
+        };
+      });
+    } catch {
+      return [];
+    }
+  }
+
+  public clearCrashLogs(): void {
+    if (!this.db) return;
+    try {
+      this.db.run('DELETE FROM crash_logs');
+      this.markDirty();
+    } catch {}
   }
 
   private seedDefaults(): void {
@@ -448,7 +720,7 @@ export class AppDatabase {
           startTime: '01:00',
           stopTime: '06:30',
           daysOfWeek: [1, 2, 3, 4, 5],
-          onCompleteAction: 'notification',
+          onCompleteAction: 'nothing',
         },
         downloadIds: [],
         createdAt: Date.now(),
@@ -461,6 +733,7 @@ export class AppDatabase {
 
   public saveDownload(item: DownloadItem): void {
     if (!this.db) return;
+
     this.db.run(
       `
       INSERT OR REPLACE INTO downloads (
@@ -501,70 +774,25 @@ export class AppDatabase {
         item.startedAt || null,
         item.completedAt || null,
         item.durationMs,
-        JSON.stringify(item.securityScan),
+        item.securityScan ? JSON.stringify(item.securityScan) : null,
         item.archiveInfo ? JSON.stringify(item.archiveInfo) : null,
         JSON.stringify(item.serverCapabilities),
         item.auth ? JSON.stringify(item.auth) : null,
         item.proxy ? JSON.stringify(item.proxy) : null,
-        JSON.stringify(item.checksum),
+        item.checksum ? JSON.stringify(item.checksum) : null,
         JSON.stringify(item.logs),
       ]
     );
 
-    // Save segments
-    if (item.segments && item.segments.length > 0) {
-      this.db.run('DELETE FROM segments WHERE downloadId = ?', [item.id]);
-      for (const seg of item.segments) {
-        this.db.run(
-          `
-          INSERT INTO segments (
-            downloadId, segmentId, startOffset, endOffset, downloadedBytes,
-            currentOffset, status, connectionId, speed, error, updatedAt
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `,
-          [
-            item.id,
-            seg.id,
-            seg.startOffset,
-            seg.endOffset,
-            seg.downloadedBytes,
-            seg.currentOffset,
-            seg.status,
-            seg.connectionId,
-            seg.speed,
-            seg.error || null,
-            seg.updatedAt || Date.now(),
-          ]
-        );
-      }
-    }
-
-    // Save speed history (bounded in-memory ring buffer — cheap to rewrite).
-    if (item.speedHistory && item.speedHistory.length > 0) {
-      this.db.run('DELETE FROM speed_history WHERE downloadId = ?', [item.id]);
-      for (const point of item.speedHistory) {
-        this.db.run(
-          'INSERT INTO speed_history (downloadId, timestamp, speed) VALUES (?, ?, ?)',
-          [item.id, point.timestamp, point.speed]
-        );
-      }
-    }
-
+    this.saveSegments(item.id, item.segments);
     this.markDirty();
   }
 
   public getDownload(id: string): DownloadItem | null {
     if (!this.db) return null;
-    const stmt = this.db.prepare('SELECT * FROM downloads WHERE id = ?');
-    stmt.bind([id]);
-    if (!stmt.step()) {
-      stmt.free();
-      return null;
-    }
-    const row = stmt.getAsObject();
-    stmt.free();
-
-    return this.mapDownloadRow(row);
+    const res = this.db.exec('SELECT * FROM downloads WHERE id = ?', [id]);
+    if (res.length === 0 || res[0].values.length === 0) return null;
+    return this.hydrateDownloadRow(res[0].columns, res[0].values[0]);
   }
 
   public getAllDownloads(): DownloadItem[] {
@@ -572,57 +800,20 @@ export class AppDatabase {
     const res = this.db.exec('SELECT * FROM downloads ORDER BY createdAt DESC');
     if (res.length === 0) return [];
     const columns = res[0].columns;
-    const items: DownloadItem[] = [];
-    for (const val of res[0].values) {
-      const row: any = {};
-      columns.forEach((col, idx) => {
-        row[col] = val[idx];
-      });
-      items.push(this.mapDownloadRow(row));
-    }
-    return items;
+    return res[0].values.map((row) => this.hydrateDownloadRow(columns, row));
   }
 
-  private mapDownloadRow(row: any): DownloadItem {
-    const segments: SegmentInfo[] = [];
-    if (this.db) {
-      const segRes = this.db.exec('SELECT * FROM segments WHERE downloadId = ? ORDER BY segmentId ASC', [row.id]);
-      if (segRes.length > 0) {
-        const segCols = segRes[0].columns;
-        for (const segVal of segRes[0].values) {
-          const sRow: any = {};
-          segCols.forEach((c, i) => (sRow[c] = segVal[i]));
-          segments.push({
-            id: Number(sRow.segmentId),
-            startOffset: Number(sRow.startOffset),
-            endOffset: Number(sRow.endOffset),
-            downloadedBytes: Number(sRow.downloadedBytes),
-            currentOffset: Number(sRow.currentOffset),
-            status: sRow.status,
-            connectionId: Number(sRow.connectionId),
-            speed: Number(sRow.speed),
-            error: sRow.error || undefined,
-            updatedAt: sRow.updatedAt ? Number(sRow.updatedAt) : undefined,
-          });
-        }
-      }
-    }
+  public deleteDownload(id: string): void {
+    if (!this.db) return;
+    this.db.run('DELETE FROM downloads WHERE id = ?', [id]);
+    this.deleteSegments(id);
+    this.db.run('DELETE FROM speed_history WHERE downloadId = ?', [id]);
+    this.markDirty();
+  }
 
-    const speedHistory: SpeedHistoryPoint[] = [];
-    if (this.db) {
-      const histRes = this.db.exec(
-        'SELECT timestamp, speed FROM speed_history WHERE downloadId = ? ORDER BY timestamp ASC',
-        [row.id]
-      );
-      if (histRes.length > 0) {
-        const cols = histRes[0].columns;
-        for (const hv of histRes[0].values) {
-          const hRow: any = {};
-          cols.forEach((c, i) => (hRow[c] = hv[i]));
-          speedHistory.push({ timestamp: Number(hRow.timestamp), speed: Number(hRow.speed) });
-        }
-      }
-    }
+  private hydrateDownloadRow(columns: string[], values: any[]): DownloadItem {
+    const row: any = {};
+    columns.forEach((c, i) => (row[c] = values[i]));
 
     return {
       id: row.id,
@@ -652,27 +843,111 @@ export class AppDatabase {
       createdAt: Number(row.createdAt),
       startedAt: row.startedAt ? Number(row.startedAt) : undefined,
       completedAt: row.completedAt ? Number(row.completedAt) : undefined,
-      durationMs: Number(row.durationMs || 0),
-      securityScan: row.securityScanJson ? JSON.parse(row.securityScanJson) : { status: 'unsupported' },
+      durationMs: Number(row.durationMs),
+      segments: this.getSegments(row.id),
+      speedHistory: this.getSpeedHistory(row.id),
+      securityScan: row.securityScanJson ? JSON.parse(row.securityScanJson) : undefined,
       archiveInfo: row.archiveInfoJson ? JSON.parse(row.archiveInfoJson) : undefined,
-      serverCapabilities: row.serverCapabilitiesJson
-        ? JSON.parse(row.serverCapabilitiesJson)
-        : { supportsRange: false, redirectChain: [], protocol: 'http', authRequired: false, probedAt: 0 },
+      serverCapabilities: JSON.parse(row.serverCapabilitiesJson || '{}'),
       auth: row.authJson ? JSON.parse(row.authJson) : undefined,
       proxy: row.proxyJson ? JSON.parse(row.proxyJson) : undefined,
-      checksum: row.checksumJson ? JSON.parse(row.checksumJson) : { algorithm: 'sha256', status: 'none' },
-      logs: row.logsJson ? JSON.parse(row.logsJson) : [],
-      segments,
-      speedHistory,
+      checksum: row.checksumJson ? JSON.parse(row.checksumJson) : undefined,
+      logs: JSON.parse(row.logsJson || '[]'),
     };
   }
 
-  public deleteDownload(id: string): void {
-    if (!this.db) return;
-    this.db.run('DELETE FROM downloads WHERE id = ?', [id]);
-    this.db.run('DELETE FROM segments WHERE downloadId = ?', [id]);
-    this.db.run('DELETE FROM speed_history WHERE downloadId = ?', [id]);
+  // --- Segments CRUD ---
+
+  public saveSegments(downloadId: string, segments: SegmentInfo[]): void {
+    if (!this.db || !segments) return;
+    for (const seg of segments) {
+      this.db.run(
+        `
+        INSERT OR REPLACE INTO segments (
+          downloadId, segmentId, startOffset, endOffset, downloadedBytes,
+          currentOffset, status, connectionId, speed, error, updatedAt
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `,
+        [
+          downloadId,
+          seg.id,
+          seg.startOffset,
+          seg.endOffset,
+          seg.downloadedBytes,
+          seg.currentOffset,
+          seg.status,
+          seg.connectionId,
+          seg.speed,
+          seg.error || null,
+          Date.now(),
+        ]
+      );
+    }
     this.markDirty();
+  }
+
+  public getSegments(downloadId: string): SegmentInfo[] {
+    if (!this.db) return [];
+    const res = this.db.exec('SELECT * FROM segments WHERE downloadId = ? ORDER BY segmentId ASC', [downloadId]);
+    if (res.length === 0) return [];
+    const columns = res[0].columns;
+    return res[0].values.map((val) => {
+      const row: any = {};
+      columns.forEach((c, i) => (row[c] = val[i]));
+      return {
+        id: Number(row.segmentId),
+        startOffset: Number(row.startOffset),
+        endOffset: Number(row.endOffset),
+        downloadedBytes: Number(row.downloadedBytes),
+        currentOffset: Number(row.currentOffset),
+        status: row.status,
+        connectionId: Number(row.connectionId),
+        speed: Number(row.speed),
+        error: row.error || undefined,
+      };
+    });
+  }
+
+  public deleteSegments(downloadId: string): void {
+    if (!this.db) return;
+    this.db.run('DELETE FROM segments WHERE downloadId = ?', [downloadId]);
+    this.markDirty();
+  }
+
+  // --- Speed History ---
+
+  public recordSpeedHistory(downloadId: string, speed: number): void {
+    if (!this.db) return;
+    this.db.run(
+      `
+      INSERT INTO speed_history (downloadId, timestamp, speed)
+      VALUES (?, ?, ?)
+    `,
+      [downloadId, Date.now(), speed]
+    );
+    // Keep last 60 points per download
+    this.db.run(
+      `
+      DELETE FROM speed_history WHERE downloadId = ? AND timestamp NOT IN (
+        SELECT timestamp FROM speed_history WHERE downloadId = ? ORDER BY timestamp DESC LIMIT 60
+      )
+    `,
+      [downloadId, downloadId]
+    );
+    this.markDirty();
+  }
+
+  public getSpeedHistory(downloadId: string): SpeedHistoryPoint[] {
+    if (!this.db) return [];
+    const res = this.db.exec(
+      'SELECT timestamp, speed FROM speed_history WHERE downloadId = ? ORDER BY timestamp ASC',
+      [downloadId]
+    );
+    if (res.length === 0) return [];
+    return res[0].values.map((v) => ({
+      timestamp: Number(v[0]),
+      speed: Number(v[1]),
+    }));
   }
 
   // --- Queues CRUD ---

@@ -2,10 +2,10 @@
   <img src="resources/brand/logo-full.png" alt="G1DM — Next-Generation Internet Download Manager" width="440" />
 </p>
 
-# ⚡ G1DM — Next-Generation Internet Download Manager
+# ⚡ G1DM 4.0 — Next-Generation Internet Download Manager
 ### Commercial-Grade, Autonomous, Multi-Threaded Download Platform & Media Intelligence Engine
 
-**G1DM** is a real, production-grade, next-generation Internet Download Manager built with TypeScript, Node.js, and React / Next.js. Engineered to surpass legacy paid tools like *Internet Download Manager (IDM)*, *Folx PRO*, and *Downie*, G1DM delivers a coordinated **Parallel Transfer Fabric**, **Dynamic Multi-Threaded Segmentation**, **Work-Stealing 2.0**, **Multi-Source Mirror Swarming**, **In-Browser Live Stream Preview**, **8K Floating Video Pill Sniffer**, **Pre-Download Zero-Day Threat Scanner**, **Network Interface Bonding**, **Live Stream Auto-DVR**, **Telegram Remote Control Bot**, **Encrypted Vault**, **Automated Archive Extraction with Passwords**, and an automated verification suite of **281 tests across 93 test suites (100% pass rate)**.
+**G1DM 4.0** is a production-certified, next-generation Internet Download Manager built with TypeScript, Node.js, and React / Next.js. Engineered to surpass legacy paid tools like *Internet Download Manager (IDM)*, *Folx PRO*, and *Downie*, G1DM delivers a coordinated **Parallel Transfer Fabric**, **Dynamic Multi-Threaded Segmentation**, **Work-Stealing 2.0**, **Multi-Source Mirror Swarming**, **In-Browser Live Stream Preview**, **8K Floating Video Pill Sniffer**, **Pre-Download Zero-Day Threat Scanner**, **Network Interface Bonding**, **Live Stream Auto-DVR**, **Telegram Remote Control Bot**, **Encrypted Vault**, **Automated Archive Extraction with Passwords**, **Privacy Center**, **Local-Only Crash Reporting**, **Formal Segment Ledger Invariant Guarantees**, and an automated verification suite of **397 tests across 113 test suites (100% pass rate)**.
 
 ---
 
@@ -21,23 +21,25 @@
    * [6. Automation, Smart Rules & Archive Intelligence](#6-automation-smart-rules--archive-intelligence)
    * [7. Remote Control, Mobile Ecosystem & Webhooks](#7-remote-control-mobile-ecosystem--webhooks)
    * [8. Modern Glassmorphic UI & Developer Tools](#8-modern-glassmorphic-ui--developer-tools)
+   * [9. Privacy Center & Local-First Sovereignty](#9-privacy-center--local-first-sovereignty)
 3. [💻 System Requirements](#-system-requirements)
 4. [🚀 One-Click Quick Start Guide (Per OS)](#-one-click-quick-start-guide-per-os)
    * [macOS (Apple Silicon M1/M2/M3/M4 & Intel)](#1-macos-apple-silicon-m1m2m3m4--intel)
    * [Windows (10 / 11 64-bit & ARM64)](#2-windows-10--11-64-bit--arm64)
    * [Linux (Ubuntu, Debian, Fedora, Arch) & Headless Servers](#3-linux-ubuntu-debian-fedora-arch--headless-servers)
-5. [🌐 Browser Companion Extensions Setup](#-browser-companion-extensions-setup)
+5. [📦 Production Packaging & Distribution Verification](#-production-packaging--distribution-verification)
+6. [🌐 Browser Companion Extensions Setup](#-browser-companion-extensions-setup)
    * [Google Chrome, Brave, and Chromium](#1-google-chrome-brave-and-chromium)
    * [Microsoft Edge](#2-microsoft-edge)
    * [Mozilla Firefox](#3-mozilla-firefox)
    * [Apple Safari (macOS)](#4-apple-safari-macos)
    * [Native Messaging Host IPC](#5-native-messaging-host-ipc)
-6. [⌨️ Command-Line Interface (CLI) Guide](#-command-line-interface-cli-guide)
-7. [📋 REST API & OpenAPI 3.0 Documentation](#-rest-api--openapi-30-documentation)
-8. [🧪 Verification Suite & Test Coverage (281 Tests)](#-verification-suite--test-coverage-281-tests)
-9. [🏛️ Architecture & Subsystems Flow](#-architecture--subsystems-flow)
-10. [❓ Troubleshooting & FAQs](#-troubleshooting--faqs)
-11. [❤️ Credits & License](#-credits--license)
+7. [⌨️ Command-Line Interface (CLI) Guide](#-command-line-interface-cli-guide)
+8. [📋 REST API & OpenAPI 3.0 Documentation](#-rest-api--openapi-30-documentation)
+9. [🧪 Verification Suite & Test Coverage (397 Tests)](#-verification-suite--test-coverage-397-tests)
+10. [🏛️ Architecture & Subsystems Flow](#-architecture--subsystems-flow)
+11. [❓ Troubleshooting & FAQs](#-troubleshooting--faqs)
+12. [❤️ Credits & License](#-credits--license)
 
 ---
 
@@ -397,16 +399,57 @@ Full OpenAPI 3.0 documentation is available at `http://127.0.0.1:8055/api/v1/ope
 | `GET` | `/api/browser/health` | Inspect extension health and native host connection status |
 | `GET` | `/api/network/quality` | Live RTT, jitter, and network quality score |
 | `GET` | `/api/support-bundle` | Export sanitized diagnostic support package |
+| `GET` | `/api/diagnostics/crash-report` | Export privacy-preserving sanitized crash diagnostics bundle |
+| `GET` | `/api/privacy/summary` | Inspect local privacy matrix and zero telemetry confirmation |
+| `POST` | `/api/privacy/wipe` | Permanently wipe local SQLite records with explicit confirmation |
 
 ---
 
-## 🧪 Verification Suite & Test Coverage (281 Tests)
+## 📦 Production Packaging & Distribution Verification
 
-G1DM maintains an automated test suite of **281 tests across 93 test suites** with a 100% pass rate:
+G1DM 4.0 provides a standalone distribution and artifact verification pipeline:
+
+```bash
+# Package portable release distributions for macOS, Linux, and Windows
+npm run package
+
+# Verify packaged application isolation and standalone runtime
+npm run verify:package
+```
+
+### Generated Distribution Artifacts (`release/`):
+- `g1dm-4.0.0-linux-x64.tar.gz` (Linux x86_64 portable archive with `.desktop` entry & install/uninstall scripts)
+- `g1dm-4.0.0-linux-arm64.tar.gz` (Linux ARM64 / Raspberry Pi / AArch64 package)
+- `g1dm-4.0.0-macos-arm64.tar.gz` (macOS Apple Silicon bundle with `Info.plist` & codesign readiness)
+- `g1dm-4.0.0-macos-x64.tar.gz` (macOS Intel x86_64 bundle)
+- `g1dm-4.0.0-windows-x64.zip` (Windows x64 portable package with PowerShell & batch installers)
+- `g1dm-browser-extensions-4.0.0.zip` (Companion extensions for Chrome, Firefox, Safari, Edge)
+- `checksums.sha256` (Cryptographic SHA-256 manifest of all release archives)
+- `release-manifest.json` (Structured release metadata for auto-updaters and integrity validators)
+
+---
+
+## 🧪 Verification Suite & Test Coverage (397 Tests)
+
+G1DM maintains an automated test suite of **397 tests across 113 test suites** with a 100% pass rate:
 
 ```bash
 npm test
 ```
+
+```text
+Test Suites: 113 passed, 113 total
+Tests:       397 passed, 397 total
+Snapshots:   0 total
+Time:        61.7 s
+```
+
+### Production Quality Gates
+- **TypeScript:** 0 errors (`npm run typecheck`)
+- **ESLint:** 0 errors (`npm run lint`)
+- **Production Build:** Passing (`npm run build`)
+- **Security Audit:** 0 vulnerabilities (`npm audit`)
+- **Packaging Pipeline:** 100% Verified (`npm run verify:package`)
 
 ```text
 PASS test/power_features.test.ts

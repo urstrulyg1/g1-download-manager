@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Download } from 'lucide-react';
 import { useDownloadEngine } from '../hooks/useDownloadEngine';
 import { Navbar } from '../components/Navbar';
 import { Sidebar, ActiveView } from '../components/Sidebar';
@@ -6,6 +7,7 @@ import { DashboardView } from '../components/DashboardView';
 import { DownloadsView } from '../components/DownloadsView';
 import { DownloadDetailModal } from '../components/DownloadDetailModal';
 import { AddDownloadModal } from '../components/AddDownloadModal';
+import { OnboardingModal } from '../components/OnboardingModal';
 import { QueuesView } from '../components/QueuesView';
 import { SiteGrabberView } from '../components/SiteGrabberView';
 import { BatchLinksView } from '../components/BatchLinksView';
@@ -64,6 +66,7 @@ export default function Home() {
   const [viewMode, setViewMode] = useState<ViewMode>('advanced');
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
   const [addModalInitialUrl, setAddModalInitialUrl] = useState('');
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isActionCenterOpen, setIsActionCenterOpen] = useState(false);
@@ -90,6 +93,73 @@ export default function Home() {
 
   const [clipboardUrl, setClipboardUrl] = useState<string | null>(null);
   const [inboxItems, setInboxItems] = useState<InboxItem[]>([]);
+  const [isWindowDraggingOver, setIsWindowDraggingOver] = useState(false);
+
+  // Global Drag and Drop Handler (Drop URL or Link anywhere)
+  useEffect(() => {
+    let dragCounter = 0;
+
+    const handleDragEnter = (e: DragEvent) => {
+      e.preventDefault();
+      dragCounter++;
+      if (e.dataTransfer && e.dataTransfer.types && e.dataTransfer.types.length > 0) {
+        setIsWindowDraggingOver(true);
+      }
+    };
+
+    const handleDragOver = (e: DragEvent) => {
+      e.preventDefault();
+    };
+
+    const handleDragLeave = (e: DragEvent) => {
+      e.preventDefault();
+      dragCounter--;
+      if (dragCounter <= 0) {
+        dragCounter = 0;
+        setIsWindowDraggingOver(false);
+      }
+    };
+
+    const handleDrop = (e: DragEvent) => {
+      e.preventDefault();
+      dragCounter = 0;
+      setIsWindowDraggingOver(false);
+      if (!e.dataTransfer) return;
+
+      const uri = e.dataTransfer.getData('text/uri-list') || e.dataTransfer.getData('text/plain');
+      if (
+        uri &&
+        (uri.startsWith('http://') ||
+          uri.startsWith('https://') ||
+          uri.startsWith('ftp://') ||
+          uri.startsWith('ftps://'))
+      ) {
+        setAddModalInitialUrl(uri.trim());
+        setIsAddModalOpen(true);
+      }
+    };
+
+    window.addEventListener('dragenter', handleDragEnter);
+    window.addEventListener('dragover', handleDragOver);
+    window.addEventListener('dragleave', handleDragLeave);
+    window.addEventListener('drop', handleDrop);
+
+    return () => {
+      window.removeEventListener('dragenter', handleDragEnter);
+      window.removeEventListener('dragover', handleDragOver);
+      window.removeEventListener('dragleave', handleDragLeave);
+      window.removeEventListener('drop', handleDrop);
+    };
+  }, []);
+
+  // Check first-run onboarding status on initial mount
+  useEffect(() => {
+    try {
+      if (typeof window !== 'undefined' && !localStorage.getItem('g1dm_onboarding_completed')) {
+        setIsOnboardingOpen(true);
+      }
+    } catch {}
+  }, []);
 
   // Count active failures/warnings for Action Center
   const failedCount = downloads.filter((d) => d.status === 'failed').length;
@@ -425,7 +495,34 @@ export default function Home() {
         </div>
       </footer>
 
+      {/* Global Drag & Drop Overlay */}
+      {isWindowDraggingOver && (
+        <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex flex-col items-center justify-center p-8 pointer-events-none animate-in fade-in duration-150">
+          <div className="max-w-md w-full border-2 border-dashed border-blue-400 bg-blue-950/50 rounded-3xl p-8 flex flex-col items-center text-center space-y-4 shadow-2xl">
+            <div className="w-16 h-16 rounded-2xl bg-blue-600/20 text-blue-400 flex items-center justify-center border border-blue-500/30">
+              <Download className="w-8 h-8 animate-bounce" />
+            </div>
+            <div>
+              <h3 className="text-xl font-bold text-white">Drop URL or file here</h3>
+              <p className="text-xs text-blue-200 mt-1">
+                Release link to inspect server capabilities and start download
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Modals & Drawers */}
+      <OnboardingModal
+        isOpen={isOnboardingOpen}
+        onClose={() => setIsOnboardingOpen(false)}
+        settings={settings}
+        onSettingsUpdated={(newSettings) => {
+          setSettings(newSettings);
+          refreshAll();
+        }}
+      />
+
       <AddDownloadModal
         isOpen={isAddModalOpen}
         onClose={() => {

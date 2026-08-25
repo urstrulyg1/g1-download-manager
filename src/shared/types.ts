@@ -165,7 +165,7 @@ export interface DownloadItem {
   activeConnections: number;
   segments: SegmentInfo[];
   speedHistory: SpeedHistoryPoint[];
-  checksum: ChecksumInfo;
+  checksum?: ChecksumInfo;
   serverCapabilities: ServerCapabilities;
   auth?: DownloadAuth;
   proxy?: ProxyConfig;
@@ -177,7 +177,7 @@ export interface DownloadItem {
   startedAt?: number;
   completedAt?: number;
   durationMs: number;
-  securityScan: SecurityScanInfo;
+  securityScan?: SecurityScanInfo;
   safetyWarning?: UrlSafetyScanResult;
   archiveInfo?: ArchiveInfo;
   logs: { timestamp: number; level: 'info' | 'warn' | 'error'; message: string }[];
