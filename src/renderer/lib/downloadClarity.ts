@@ -61,12 +61,8 @@ export function getDownloadClarity(item: DownloadItem | null | undefined): strin
     }
   }
 
-  // 5. Fallback for video category with known stream/large size
-  if (item.category === 'video') {
-    if (item.totalBytes > 250 * 1024 * 1024) return '1080p';
-    if (item.totalBytes > 80 * 1024 * 1024) return '720p';
-    return 'HD';
-  }
-
+  // 5. No fabrication: if the engine, media metadata, format spec, or filename
+  // did not provide a real resolution, report none instead of guessing one
+  // from file size (a byte count is not evidence of a resolution).
   return undefined;
 }

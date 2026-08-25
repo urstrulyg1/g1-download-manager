@@ -11,18 +11,19 @@ export type BottleneckType =
 export interface DownloadExplainabilityReport {
   downloadId: string;
   currentSpeedFormatted: string;
-  serverRatingPct: number;
   connectionProductivity: { active: number; total: number; pct: number };
-  networkHealth: { status: 'Healthy' | 'Moderate' | 'Degraded'; rttMs: number };
-  diskHealth: { status: 'Fast' | 'Normal' | 'Busy'; writeLatencyMs: number };
   primaryBottleneck: BottleneckType;
   bottleneckExplanation: string;
   whyIsSpeed: string;
   whyIsStatus: string;
   whyResumeBehavior: string;
-  whyInterceptionBehavior: string;
 }
 
+/**
+ * Derives plain-English explanations strictly from real, measured DownloadEngine
+ * state (speed, connections, retries, range support). No synthetic telemetry:
+ * RTT, disk latency, and server ratings are only reported when actually measured.
+ */
 export class DownloadExplainability {
   public static analyze(item: DownloadItem, globalSpeedLimit: number = 0): DownloadExplainabilityReport {
     const formatBytes = (b: number) => {
@@ -69,31 +70,19 @@ export class DownloadExplainability {
       ? 'Resumable: Server provides HTTP Range headers. Safe to pause and resume.'
       : 'Non-resumable: Server does not support Range header. Single stream download.';
 
-    const whyInterceptionBehavior = `Resource intercepted based on matching media/archive category rule (${item.category.toUpperCase()}).`;
-
     return {
       downloadId: item.id,
       currentSpeedFormatted: `${formatBytes(item.speed)}/s`,
-      serverRatingPct: item.retryCount === 0 ? 90 : Math.max(30, 90 - item.retryCount * 15),
       connectionProductivity: {
         active: item.activeConnections,
         total: item.maxConnections,
         pct: item.maxConnections > 0 ? Math.round((item.activeConnections / item.maxConnections) * 100) : 100,
-      },
-      networkHealth: {
-        status: item.retryCount > 2 ? 'Degraded' : 'Healthy',
-        rttMs: 32,
-      },
-      diskHealth: {
-        status: 'Fast',
-        writeLatencyMs: 1,
       },
       primaryBottleneck: bottleneck,
       bottleneckExplanation,
       whyIsSpeed,
       whyIsStatus,
       whyResumeBehavior,
-      whyInterceptionBehavior,
     };
   }
 }

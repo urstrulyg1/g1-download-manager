@@ -67,9 +67,13 @@ export const IdmProgressModal: React.FC<IdmProgressModalProps> = ({
 
   const metadata = item ? (item as any).mediaMetadata || {} : {};
   const displayTitle = metadata.title || item?.filename || '';
-  const qualityBadge = getDownloadClarity(item) || metadata.resolution || (item?.filename.match(/(4320p|2160p|1440p|1080p|720p|480p|360p|8K|4K|2K)/i)?.[0]) || 'HD';
-  const codecBadge = metadata.codec || (item?.filename.match(/(HEVC|AV1|VP9|H\.264|AVC|AAC|OPUS|MP3)/i)?.[0]) || 'Video';
-  const containerBadge = (metadata.container || item?.filename.split('.').pop() || 'MP4').toUpperCase();
+  // Badges are rendered only when real metadata is available (media metadata,
+  // filename patterns, or engine-derived clarity). No fabricated defaults:
+  // if the engine has not reported a value, nothing is invented here.
+  const qualityBadge = getDownloadClarity(item) || (metadata as any).resolution || (item?.filename.match(/(4320p|2160p|1440p|1080p|720p|480p|360p|8K|4K|2K)/i)?.[0]);
+  const codecBadge = (metadata as any).codec || (item?.filename.match(/(HEVC|AV1|VP9|H\.264|AVC|AAC|OPUS|MP3)/i)?.[0]);
+  const filenameExtension = item?.filename.includes('.') ? item?.filename.split('.').pop() : undefined;
+  const containerBadge = ((metadata as any).container || filenameExtension || '').toUpperCase() || undefined;
   const thumbnailUrl = item ? (item as any).thumbnailUrl : undefined;
 
   const etaDisplay = isCompleted ? 'Done' : isPaused ? 'Paused' : item && item.speed > 0 ? formatEta(item.eta) : '—';
@@ -231,9 +235,11 @@ export const IdmProgressModal: React.FC<IdmProgressModalProps> = ({
             {thumbnailUrl ? (
               <div className="w-20 h-14 rounded-lg overflow-hidden bg-slate-900 border border-slate-800 shrink-0 relative shadow-md">
                 <img src={thumbnailUrl} alt={displayTitle} className="w-full h-full object-cover" />
-                <div className="absolute bottom-1 right-1 px-1 rounded bg-slate-950/80 text-[9px] font-mono font-bold text-cyan-300">
-                  {qualityBadge}
-                </div>
+                {qualityBadge && (
+                  <div className="absolute bottom-1 right-1 px-1 rounded bg-slate-950/80 text-[9px] font-mono font-bold text-cyan-300">
+                    {qualityBadge}
+                  </div>
+                )}
               </div>
             ) : (
               <div className="w-14 h-14 rounded-xl bg-gradient-to-tr from-blue-500/20 to-cyan-500/20 border border-blue-500/30 text-blue-400 flex items-center justify-center shrink-0">
@@ -246,15 +252,21 @@ export const IdmProgressModal: React.FC<IdmProgressModalProps> = ({
                 {displayTitle}
               </h2>
               <div className="flex flex-wrap items-center gap-1.5 text-xs font-mono">
-                <span className="px-2 py-0.5 rounded-md bg-blue-500/15 border border-blue-500/30 text-blue-300 font-bold text-[10px]">
-                  {qualityBadge}
-                </span>
-                <span className="px-2 py-0.5 rounded-md bg-purple-500/15 border border-purple-500/30 text-purple-300 font-bold text-[10px]">
-                  {codecBadge}
-                </span>
-                <span className="px-2 py-0.5 rounded-md bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 font-bold text-[10px]">
-                  {containerBadge}
-                </span>
+                {qualityBadge && (
+                  <span className="px-2 py-0.5 rounded-md bg-blue-500/15 border border-blue-500/30 text-blue-300 font-bold text-[10px]">
+                    {qualityBadge}
+                  </span>
+                )}
+                {codecBadge && (
+                  <span className="px-2 py-0.5 rounded-md bg-purple-500/15 border border-purple-500/30 text-purple-300 font-bold text-[10px]">
+                    {codecBadge}
+                  </span>
+                )}
+                {containerBadge && (
+                  <span className="px-2 py-0.5 rounded-md bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 font-bold text-[10px]">
+                    {containerBadge}
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -274,7 +286,7 @@ export const IdmProgressModal: React.FC<IdmProgressModalProps> = ({
             </div>
             <div className="p-2.5 rounded-xl bg-slate-950/50 border border-slate-800/80">
               <span className="text-[10px] text-slate-500 uppercase block mb-0.5">File Type</span>
-              <span className="font-bold text-slate-200" data-testid="idm-file-type">{containerBadge}</span>
+              <span className="font-bold text-slate-200" data-testid="idm-file-type">{containerBadge || '—'}</span>
             </div>
           </div>
 
@@ -365,7 +377,7 @@ export const IdmProgressModal: React.FC<IdmProgressModalProps> = ({
             <div className="p-2.5 rounded-xl bg-slate-950/50 border border-slate-800/80">
               <span className="text-[10px] text-slate-500 uppercase block mb-0.5">Connections</span>
               <span className="font-bold text-cyan-400 text-xs">
-                {item.activeConnections || (isDownloading ? 8 : 0)} streams
+                {item.activeConnections || 0} streams
               </span>
             </div>
 
