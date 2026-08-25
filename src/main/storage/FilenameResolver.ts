@@ -1,4 +1,5 @@
 import * as path from 'path';
+import * as mime from 'mime-types';
 import { PathSanitizer } from './PathSanitizer';
 
 /**
@@ -54,13 +55,6 @@ export interface ResolvedFilename {
     | 'fallback';
 }
 
-const VIDEO_EXTS = new Set([
-  'mp4', 'mkv', 'webm', 'mov', 'avi', 'wmv', 'flv', 'm4v', 'ts', '3gp',
-]);
-const AUDIO_EXTS = new Set([
-  'mp3', 'm4a', 'flac', 'wav', 'ogg', 'opus', 'aac', 'wma', 'alac',
-]);
-const GENERIC_FALLBACK_EXTS = new Set(['bin', 'download', 'htm', 'html', 'php', 'asp', 'aspx', '']);
 /**
  * Extensions that indicate a *web page / script* rather than a downloadable
  * artifact. These are never honored as the final extension — for media pages
@@ -108,18 +102,18 @@ export class FilenameResolver {
       return true;
     };
 
-    // 1. User-provided filename. The user is the authority; split into
-    //    stem + ext and prefer their explicit extension when it looks valid.
-    //    If the user supplied a meaningful stem but a generic / missing
-    //    extension, we keep the stem and attach the resolved extension.
+    // 1. User-provided filename. The user is the authority. A caller may
+    // deliberately choose a generic or extensionless name, so unlike inferred
+    // metadata this candidate is never discarded merely because of its shape.
     if (input.userFilename) {
       const user = this.sanitizeFull(input.userFilename);
       if (user) {
         const userRawExt = path.extname(user);
         const userExt = userRawExt.replace(/^\./, '');
         const userStem = this.sanitizeStem(path.basename(user, userRawExt));
-        if (userStem && !this.isGenericStem(userStem)) {
-          const useExt = userExt && !PAGE_EXTS.has(userExt.toLowerCase()) ? userExt : ext;
+        if (userStem) {
+          if (!userExt) return this.buildExtensionless(userStem, 'user');
+          const useExt = !PAGE_EXTS.has(userExt.toLowerCase()) ? userExt : ext;
           return this.build(userStem, useExt, 'user');
         }
       }
@@ -137,8 +131,9 @@ export class FilenameResolver {
         const cdRawExt = path.extname(cd);
         const cdExt = cdRawExt.replace(/^\./, '');
         const cdStem = this.sanitizeStem(path.basename(cd, cdRawExt));
-        if (cdStem && !this.isGenericStem(cdStem)) {
-          const useExt = cdExt && !PAGE_EXTS.has(cdExt.toLowerCase()) ? cdExt : ext;
+        if (cdStem) {
+          if (!cdExt) return this.buildExtensionless(cdStem, 'content_disposition');
+          const useExt = !PAGE_EXTS.has(cdExt.toLowerCase()) ? cdExt : ext;
           return this.build(cdStem, useExt, 'content_disposition');
         }
       }
@@ -157,12 +152,18 @@ export class FilenameResolver {
         const pfRawExt = path.extname(pf);
         const pfExt = pfRawExt.replace(/^\./, '');
         const pfStem = this.sanitizeStem(path.basename(pf, pfRawExt));
-        if (pfStem && !this.isGenericStem(pfStem)) {
+        // A URL basename with a real extension is a meaningful direct-file
+        // signal even when its stem happens to be `video` or `download`.
+        // Generic extensionless page tokens are still ignored below.
+        if (pfStem && (Boolean(pfExt) || !this.isGenericStem(pfStem))) {
           // If the probe filename carries a real extension, honor it
           // (case preserved); otherwise attach the resolved extension.
           if (pfExt && !PAGE_EXTS.has(pfExt.toLowerCase())) {
             return this.build(pfStem, pfExt, 'url');
           }
+          // A meaningful extensionless URL is a valid server filename. Do not
+          // invent `.bin`, `.mp4`, or another suffix merely for display.
+          if (!pfExt) return this.buildExtensionless(pfStem, 'url');
           return this.build(pfStem, ext, 'url');
         }
       }
@@ -229,7 +230,10 @@ export class FilenameResolver {
       if (fromMime) return fromMime;
     }
 
-    return input.isAudio ? 'mp3' : 'mp4';
+    // Never infer a video container for an arbitrary HTTP resource.  `bin`
+    // is an explicit, safe fallback when neither the server nor the URL tells
+    // us the type. Media downloads provide a container or media MIME above.
+    return 'bin';
   }
 
   /** Produce a display label describing where the filename came from. */
@@ -245,6 +249,14 @@ export class FilenameResolver {
   }
 
   // --- internal helpers ----------------------------------------------------
+
+  private static buildExtensionless(
+    stem: string,
+    source: ResolvedFilename['source']
+  ): ResolvedFilename {
+    const safeStem = this.sanitizeStem(stem) || 'download';
+    return { filename: safeStem, stem: safeStem, ext: '', source };
+  }
 
   private static build(
     stem: string,
@@ -275,35 +287,17 @@ export class FilenameResolver {
 
   private static extensionFromMime(mimeType: string): string {
     const base = mimeType.split(';')[0].trim().toLowerCase();
-    if (base.startsWith('video/')) {
-      if (base.includes('webm')) return 'webm';
-      if (base.includes('matroska') || base.includes('x-matroska')) return 'mkv';
-      if (base.includes('quicktime')) return 'mov';
-      if (base.includes('mp2t')) return 'ts';
-      return 'mp4';
-    }
-    if (base.startsWith('audio/')) {
-      if (base.includes('flac')) return 'flac';
-      if (base.includes('ogg')) return 'ogg';
-      if (base.includes('wav')) return 'wav';
-      if (base.includes('aac')) return 'aac';
-      if (base.includes('m4a') || base.includes('mp4')) return 'm4a';
-      if (base.includes('mpeg')) return 'mp3';
-      return 'mp3';
-    }
-    if (base === 'application/x-mpegurl' || base === 'application/vnd.apple.mpegurl') {
-      return 'mp4';
-    }
-    if (base === 'application/dash+xml') {
-      return 'mp4';
-    }
-    if (base === 'application/zip') return 'zip';
-    if (base === 'application/pdf') return 'pdf';
-    if (base === 'image/png') return 'png';
-    if (base === 'image/jpeg') return 'jpg';
-    if (base === 'image/gif') return 'gif';
-    if (base === 'image/webp') return 'webp';
-    return '';
+    if (!base || base === 'application/octet-stream' || base === 'binary/octet-stream') return '';
+
+    // mime-types is intentionally used instead of an allowlist: every MIME
+    // type it recognizes (documents, packages, images, archives and future
+    // types) receives its native extension without making download eligibility
+    // depend on that extension.
+    // mime-db's historical `mpga` label is valid but users and servers
+    // conventionally use `.mp3`; preserve that familiar extension.
+    if (base === 'audio/mpeg') return 'mp3';
+    const resolved = mime.extension(base);
+    return typeof resolved === 'string' ? this.cleanExt(resolved).toLowerCase() : '';
   }
 
   /** Sanitize a full filename candidate (may already contain an extension). */

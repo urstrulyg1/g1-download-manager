@@ -192,7 +192,7 @@ export const IdmProgressModal: React.FC<IdmProgressModalProps> = ({
                 ? 'Download Paused'
                 : isFailed
                 ? 'Download Failed'
-                : 'Downloading Video'}
+                : 'Downloading'}
             </span>
           </div>
 
@@ -236,7 +236,7 @@ export const IdmProgressModal: React.FC<IdmProgressModalProps> = ({
               </div>
             ) : (
               <div className="w-14 h-14 rounded-xl bg-gradient-to-tr from-blue-500/20 to-cyan-500/20 border border-blue-500/30 text-blue-400 flex items-center justify-center shrink-0">
-                {item.category === 'audio' ? <FileAudio className="w-7 h-7" /> : <FileVideo className="w-7 h-7" />}
+                {item.category === 'audio' ? <FileAudio className="w-7 h-7" /> : item.category === 'video' ? <FileVideo className="w-7 h-7" /> : <HardDrive className="w-7 h-7" />}
               </div>
             )}
 
@@ -306,7 +306,7 @@ export const IdmProgressModal: React.FC<IdmProgressModalProps> = ({
           <div className="w-full bg-slate-950 rounded-xl p-1 border border-slate-800 shadow-inner">
             <div className="h-3 w-full bg-slate-900 rounded-lg overflow-hidden relative" role="progressbar" aria-label="Download progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.max(0, Math.min(100, item.progress || 0))}>
               <div
-                className={`h-full transition-all duration-200 rounded-lg ${
+                className={`h-full transition-all duration-200 motion-reduce:transition-none rounded-lg ${
                   isCompleted
                     ? 'bg-gradient-to-r from-emerald-500 to-teal-400'
                     : isFailed
@@ -314,9 +314,9 @@ export const IdmProgressModal: React.FC<IdmProgressModalProps> = ({
                     : isPaused
                     ? 'bg-amber-500'
                     : isMerging
-                    ? 'bg-gradient-to-r from-purple-500 via-pink-500 to-cyan-400 animate-pulse'
+                    ? 'bg-gradient-to-r from-purple-500 via-pink-500 to-cyan-400 animate-pulse motion-reduce:animate-none'
                     : isVerifying
-                    ? 'bg-gradient-to-r from-amber-500 to-orange-500 animate-pulse'
+                    ? 'bg-gradient-to-r from-amber-500 to-orange-500 animate-pulse motion-reduce:animate-none'
                     : 'bg-gradient-to-r from-blue-600 via-cyan-500 to-indigo-500'
                 }`}
                 style={{
@@ -374,6 +374,11 @@ export const IdmProgressModal: React.FC<IdmProgressModalProps> = ({
                 {item.avgSpeed > 0 ? `${formatBytes(item.avgSpeed)}/s` : '—'}
               </span>
             </div>
+          </div>
+
+          <div className="p-2.5 rounded-xl bg-slate-950/40 border border-slate-800/60 flex items-center gap-2 text-xs font-mono text-slate-400 truncate" data-testid="idm-source">
+            <ExternalLink className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+            <span className="truncate" title={item.url}>Source: {item.url}</span>
           </div>
 
           {/* Destination Path */}

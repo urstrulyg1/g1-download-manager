@@ -14,11 +14,11 @@ describe('Browser Integration & Interception Rules', () => {
 
     const zipResult = engine.evaluate('https://example.com/download/archive.zip', 'archive.zip');
     expect(zipResult.shouldIntercept).toBe(true);
-    expect(zipResult.reason).toContain('*.zip -> G1DM');
+    expect(zipResult.reason).toContain('Universal G1DM routing');
 
     const imgResult = engine.evaluate('https://example.com/images/avatar.jpg', 'avatar.jpg');
-    expect(imgResult.shouldIntercept).toBe(false);
-    expect(imgResult.reason).toContain('Browser');
+    expect(imgResult.shouldIntercept).toBe(true);
+    expect(imgResult.reason).toContain('DownloadEngine');
   });
 
   it('should support dynamic rule updates', () => {
@@ -36,5 +36,6 @@ describe('Browser Integration & Interception Rules', () => {
 
     const isoResult = engine.evaluate('https://releases.ubuntu.com/ubuntu.iso', 'ubuntu.iso');
     expect(isoResult.shouldIntercept).toBe(true);
+    expect(isoResult.reason).toContain('Universal G1DM routing');
   });
 });

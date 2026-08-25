@@ -45,15 +45,16 @@ describe('Browser Companion Security Audit & Input Hardening', () => {
     // Archive should intercept
     const zipDecision = engine.evaluate('https://example.com/archive.zip', 'archive.zip');
     expect(zipDecision.shouldIntercept).toBe(true);
-    expect(zipDecision.matchedRule?.id).toBe('rule_archives');
+    expect(zipDecision.matchedRule).toBeUndefined();
+    expect(zipDecision.reason).toContain('Universal G1DM routing');
 
     // Executable should intercept
     const exeDecision = engine.evaluate('https://example.com/installer.exe', 'installer.exe');
     expect(exeDecision.shouldIntercept).toBe(true);
-    expect(exeDecision.matchedRule?.id).toBe('rule_programs');
+    expect(exeDecision.matchedRule).toBeUndefined();
 
     // Small image should let browser handle
     const imgDecision = engine.evaluate('https://example.com/photo.jpg', 'photo.jpg');
-    expect(imgDecision.shouldIntercept).toBe(false);
+    expect(imgDecision.shouldIntercept).toBe(true);
   });
 });

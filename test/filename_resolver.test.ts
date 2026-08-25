@@ -70,7 +70,7 @@ describe('FilenameResolver — priority chain & safety', () => {
         probeFilename: 'watch',
         mimeType: 'text/html',
       });
-      expect(r.filename).toMatch(/^download\.mp4$/);
+      expect(r.filename).toMatch(/^download\.html$/);
       expect(r.source).toBe('fallback');
     });
   });
@@ -115,11 +115,11 @@ describe('FilenameResolver — priority chain & safety', () => {
       expect(mp3.ext).toBe('mp3');
     });
 
-    it('defaults audio to mp3 and video to mp4', () => {
+    it('uses a neutral fallback rather than assuming every unknown resource is media', () => {
       const audio = FilenameResolver.resolve({ url: 'https://x/y', isAudio: true, probeFilename: 'y' });
-      expect(audio.ext).toBe('mp3');
-      const video = FilenameResolver.resolve({ url: 'https://x/y', probeFilename: 'y' });
-      expect(video.ext).toBe('mp4');
+      expect(audio.ext).toBe('');
+      const unknown = FilenameResolver.resolve({ url: 'https://x/y', probeFilename: 'y' });
+      expect(unknown.ext).toBe('');
     });
 
     it('keeps a real extension from the URL filename', () => {
@@ -146,15 +146,15 @@ describe('FilenameResolver — priority chain & safety', () => {
       }
     });
 
-    it('overrides a generic user filename with the media title', () => {
+    it('honors even a generic user filename over inferred metadata', () => {
       const r = FilenameResolver.resolve({
         url: 'https://youtube.com/watch?v=1',
         userFilename: 'watch',
         mediaTitle: 'Real Title',
         mediaContainer: 'mp4',
       });
-      expect(r.filename).toBe('Real Title.mp4');
-      expect(r.source).toBe('media_title');
+      expect(r.filename).toBe('watch');
+      expect(r.source).toBe('user');
     });
   });
 
@@ -221,7 +221,7 @@ describe('FilenameResolver — priority chain & safety', () => {
       const r = FilenameResolver.resolve({ url: 'https://example.com/' });
       expect(r.filename).toBeTruthy();
       expect(r.source).toBe('fallback');
-      expect(r.filename).toMatch(/\.(mp4|bin)$/);
+      expect(r.filename).toMatch(/\.bin$/);
     });
 
     it('never returns an empty filename', () => {

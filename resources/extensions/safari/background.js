@@ -2,14 +2,6 @@
 const G1DM_PORT = 8055;
 const G1DM_API_BASE = `http://127.0.0.1:${G1DM_PORT}/api`;
 
-const DEFAULT_EXTENSIONS = [
-  'zip', 'rar', '7z', 'tar', 'gz', 'bz2', 'xz', 'iso', 'dmg', 'tgz',
-  'exe', 'msi', 'deb', 'rpm', 'apk', 'appimage', 'pkg', 'bin',
-  'mp4', 'mkv', 'avi', 'mov', 'wmv', 'webm', 'flv', 'm4v', 'ts', 'm3u8',
-  'mp3', 'wav', 'flac', 'aac', 'ogg', 'm4a', 'opus',
-  'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'
-];
-
 browser.runtime.onInstalled.addListener(() => {
   browser.storage.local.get(['interceptionEnabled', 'interceptExtensions', 'excludeDomains'], (data) => {
     if (data.interceptionEnabled === undefined) {
@@ -82,42 +74,9 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
   }
 });
 
-// Download Interception Engine
-chrome.downloads.onCreated.addListener(async (downloadItem) => {
-  const data = await chrome.storage.local.get(['interceptionEnabled', 'interceptExtensions', 'excludeDomains']);
-  // Automatic interception is disabled by default to prevent unwanted downloads
-  if (!data.interceptionEnabled) return;
-
-  const url = downloadItem.url;
-  if (!url || url.startsWith('blob:') || url.startsWith('data:') || url.startsWith('chrome-extension:')) {
-    return;
-  }
-
-  try {
-    const parsed = new URL(url);
-    const domain = parsed.hostname.toLowerCase();
-
-    // Check domain exclusions
-    if (data.excludeDomains && data.excludeDomains.some((d) => domain.includes(d.toLowerCase()))) {
-      return;
-    }
-
-    // Check extension rules. The browser may report a full native path here;
-    // extract a safe basename. The G1DM engine re-runs its full filename
-    // resolution pipeline, so a generic/empty name never locks in a bad name.
-    const filename = sanitizeInterceptFilename(downloadItem.filename || parsed.pathname);
-    const ext = filename.split('.').pop()?.toLowerCase() || '';
-    const exts = data.interceptExtensions || DEFAULT_EXTENSIONS;
-
-    if (exts.includes(ext)) {
-      // Cancel browser download and forward to G1DM
-      chrome.downloads.cancel(downloadItem.id);
-      sendToG1DM(url, filename);
-    }
-  } catch (err) {
-    console.warn('Interception check error:', err);
-  }
-});
+// Browser downloads are intentionally not intercepted after creation.
+// Context-menu/content-script actions submit URLs to G1DM before a browser
+// download is started; G1DM's DownloadEngine owns the transfer.
 
 // Messages from content scripts / popup
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -135,22 +94,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true; // async
   }
 });
-
-// Strip directory components / illegal characters from a browser-reported
-// filename. Multi-byte (Unicode) titles are preserved. The G1DM daemon
-// re-sanitizes and resolves the final name, so this is defense-in-depth.
-function sanitizeInterceptFilename(rawName) {
-  if (!rawName) return '';
-  let name = String(rawName);
-  const parts = name.split(/[\\/]/);
-  name = parts[parts.length - 1] || name;
-  name = name.replace(/[\\/:*?"<>|\u0000-\u001f]/g, '_').trim();
-  name = name.replace(/\.{2,}/g, '_');
-  if (!name || name === '.' || name === '..' || /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(\.|$)/i.test(name)) {
-    return '';
-  }
-  return name;
-}
 
 async function sendToG1DM(url, filename, category, formatSpec, container) {
   // First attempt: Native Messaging Host if configured

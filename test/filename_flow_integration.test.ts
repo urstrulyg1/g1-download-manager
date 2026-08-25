@@ -186,7 +186,7 @@ describe('Filename resolution flow (end-to-end)', () => {
       destinationDir: testDir,
       startImmediately: false,
     });
-    expect(item.filename).toBe('My Awesome Video.mp4');
+    expect(item.filename).toBe('My Awesome Video.html');
     expect(['media_title', 'page_title']).toContain((item as any).filenameSource);
   });
 
@@ -199,7 +199,7 @@ describe('Filename resolution flow (end-to-end)', () => {
     // Generic basename ("no-metadata") is treated as a URL filename only if
     // meaningful; here it is meaningful so it keeps it. Confirm it never
     // becomes empty / undefined / a traversal path.
-    expect(item.filename).toMatch(/\.bin$|\.mp4$/);
+    expect(item.filename).toBe('no-metadata');
     expect(item.filename).not.toContain('/');
     expect(item.filename.length).toBeGreaterThan(0);
   });
