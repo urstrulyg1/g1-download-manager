@@ -57,9 +57,16 @@ export class MediaStreamDownloader extends EventEmitter {
     const ytDlpBin = BinaryLocator.getYtDlpPath();
     const ffmpegDir = BinaryLocator.getFfmpegDir();
 
-    const outputTemplate = path.join(this.item.destinationDir, `${this.item.filename}.tmp.%(ext)s`);
+    // IMPORTANT: build the yt-dlp output template from the filename STEM only.
+    // yt-dlp appends the actual container extension via %(ext)s itself. If we
+    // included our own extension here we would end up with ".mp4.tmp.mp4"
+    // intermediate files and, after finalization, ".mp4.mp4" output files.
+    const existingExt = path.extname(this.item.filename).replace(/^\./, '');
+    const stem = path.basename(this.item.filename, existingExt ? `.${existingExt}` : '') || this.item.filename;
+    const safeStem = PathSanitizer.sanitizeFilename(stem);
+    const outputTemplate = path.join(this.item.destinationDir, `${safeStem}.tmp.%(ext)s`);
     const formatSpec = (this.item as any).mediaFormatSpec || 'bestvideo+bestaudio/best';
-    const targetExt = path.extname(this.item.filename).replace('.', '').toLowerCase() || 'mp4';
+    const targetExt = existingExt.toLowerCase() || 'mp4';
 
     const args: string[] = [
       '--no-warnings',
@@ -249,8 +256,13 @@ export class MediaStreamDownloader extends EventEmitter {
     (this.item as any).statusMessage = 'Verifying container integrity & playability...';
     this.emitProgressThrottled(true);
 
-    // Look for matching output files in destination directory
-    const basePrefix = `${this.item.filename}.tmp.`;
+    // Look for matching output files in destination directory.
+    // The yt-dlp template is "<stem>.tmp.<ext>" (stem has no extension), so
+    // match on the stem prefix to robustly handle whatever container yt-dlp
+    // produced (mp4, webm, mkv, m4a, mp3, ...).
+    const itemExt = path.extname(this.item.filename).replace(/^\./, '');
+    const itemStem = path.basename(this.item.filename, itemExt ? `.${itemExt}` : '') || this.item.filename;
+    const basePrefix = `${itemStem}.tmp.`;
     const files = fs.readdirSync(this.item.destinationDir);
     const matchedFiles = files.filter((f) => f.startsWith(basePrefix) && !f.endsWith('.part') && !f.endsWith('.ytdl'));
 
@@ -262,9 +274,8 @@ export class MediaStreamDownloader extends EventEmitter {
       if (fs.existsSync(this.item.finalPath)) {
         candidatePath = this.item.finalPath;
       } else {
-        // Find any file created recently matching filename base
-        const sanitizedBase = path.basename(this.item.filename, path.extname(this.item.filename));
-        const matchedLoose = files.find((f) => f.includes(sanitizedBase) && !f.endsWith('.part') && !f.endsWith('.ytdl'));
+        // Find any file created recently matching filename stem
+        const matchedLoose = files.find((f) => f.includes(itemStem) && !f.endsWith('.part') && !f.endsWith('.ytdl'));
         if (matchedLoose) {
           candidatePath = path.join(this.item.destinationDir, matchedLoose);
         }
@@ -283,12 +294,12 @@ export class MediaStreamDownloader extends EventEmitter {
       throw new Error(`Media validation failed: Output size is only ${stat.size} bytes (invalid/error payload).`);
     }
 
-    // 2. Atomic move to target finalPath
-    const candidateExt = path.extname(candidatePath);
-    const finalExt = path.extname(this.item.finalPath) || candidateExt;
-    const finalPathWithExt = this.item.finalPath.endsWith(finalExt)
-      ? this.item.finalPath
-      : `${path.join(this.item.destinationDir, path.basename(this.item.filename, path.extname(this.item.filename)))}${candidateExt}`;
+    // 2. Atomic move to target finalPath. Use the actual container extension
+    //    yt-dlp produced, but keep the resolved stem — never duplicate the
+    //    extension (no "<name>.mp4.mp4").
+    const candidateExt = path.extname(candidatePath).replace(/^\./, '');
+    const finalExt = candidateExt || itemExt;
+    const finalPathWithExt = path.join(this.item.destinationDir, `${itemStem}.${finalExt}`);
 
     if (candidatePath !== finalPathWithExt) {
       if (fs.existsSync(finalPathWithExt)) {
@@ -398,9 +409,10 @@ export class MediaStreamDownloader extends EventEmitter {
     // Clean up partial temporary files on cancellation
     try {
       const files = fs.readdirSync(this.item.destinationDir);
-      const prefix = `${this.item.filename}.tmp.`;
+      const cancelExt = path.extname(this.item.filename).replace(/^\./, '');
+      const cancelStem = path.basename(this.item.filename, cancelExt ? `.${cancelExt}` : '') || this.item.filename;
       for (const f of files) {
-        if (f.startsWith(prefix) || f.startsWith(this.item.filename)) {
+        if (f.startsWith(`${cancelStem}.tmp.`) || f.startsWith(`${cancelStem}.`)) {
           if (f.endsWith('.part') || f.endsWith('.ytdl') || f.includes('.tmp.')) {
             try { fs.unlinkSync(path.join(this.item.destinationDir, f)); } catch {}
           }

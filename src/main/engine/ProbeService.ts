@@ -17,6 +17,12 @@ export interface ProbeResult {
   mimeType: string;
   size: number;
   safetyWarning?: UrlSafetyScanResult;
+  /** Raw Content-Disposition header value (if the server provided one). */
+  contentDispositionFilename?: string;
+  /** Filename explicitly parsed from the final URL. */
+  urlFilename?: string;
+  /** Final URL after following redirects. */
+  finalUrl?: string;
 }
 
 export class ProbeService {
@@ -345,12 +351,13 @@ export class ProbeService {
     }
 
     const contentType = finalHeaders['content-type'] ? finalHeaders['content-type'].split(';')[0].trim() : undefined;
-    const contentDisposition = finalHeaders['content-disposition'];
+    const contentDisposition = Array.isArray(finalHeaders['content-disposition'])
+      ? finalHeaders['content-disposition'][0]
+      : finalHeaders['content-disposition'];
 
-    let filename = this.extractFilenameFromHeaders(contentDisposition);
-    if (!filename) {
-      filename = this.extractFilenameFromUrl(currentUrl, contentType);
-    }
+    const contentDispositionFilename = this.extractFilenameFromHeaders(contentDisposition);
+    const urlFilename = this.extractFilenameFromUrl(currentUrl, contentType);
+    let filename = contentDispositionFilename || urlFilename;
 
     const mimeType = contentType || (mime.lookup(filename) as string) || 'application/octet-stream';
     const category = this.categorizeFile(filename, mimeType);
@@ -359,6 +366,9 @@ export class ProbeService {
 
     return {
       filename,
+      contentDispositionFilename: contentDispositionFilename || undefined,
+      urlFilename,
+      finalUrl: currentUrl,
       suggestedCategory: category,
       mimeType,
       size: totalSize > 0 ? totalSize : -1,
