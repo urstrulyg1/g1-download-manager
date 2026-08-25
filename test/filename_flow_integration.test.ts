@@ -186,7 +186,7 @@ describe('Filename resolution flow (end-to-end)', () => {
       destinationDir: testDir,
       startImmediately: false,
     });
-    expect(item.filename).toBe('My Awesome Video.mp4');
+    expect(item.filename).toBe('My Awesome Video.html');
     expect(['media_title', 'page_title']).toContain((item as any).filenameSource);
   });
 

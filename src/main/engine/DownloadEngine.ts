@@ -288,9 +288,18 @@ export class DownloadEngine extends EventEmitter {
         `Skipped: "${filename}" already exists in ${destDir} (file collision action is set to "skip").`
       );
     }
+    // Filename resolution is defense in depth: ensure every file the engine
+    // creates remains below the configured destination, including sidecars.
+    if (!PathSanitizer.isPathInsideDirectory(finalPath, destDir)) {
+      throw new Error('Resolved filename is outside the configured download directory.');
+    }
     const resolvedFilename = path.basename(finalPath);
     const tempPath = `${finalPath}.part`;
     const stateFilePath = `${finalPath}.g1dm`;
+    if (!PathSanitizer.isPathInsideDirectory(tempPath, destDir) ||
+        !PathSanitizer.isPathInsideDirectory(stateFilePath, destDir)) {
+      throw new Error('Download temporary path is outside the configured download directory.');
+    }
 
     const id = `dl_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 
@@ -375,7 +384,10 @@ export class DownloadEngine extends EventEmitter {
       (params as any).formatSpec ||
       (params as any).mediaFormatSpec ||
       (mediaAnalysis?.recommendedQuality as any)?.formatSpec ||
-      (isStreamPlatform ? 'bestvideo+bestaudio/best' : undefined);
+      // Only route to yt-dlp when an explicit format was requested or its
+      // analysis found a downloadable media format. HTML/unknown URLs that
+      // fail metadata extraction stay on the ordinary streaming HTTP engine.
+      undefined;
     (item as any).filenameSource = resolved.source;
     (item as any).mediaMetadata = {
       title: mediaAnalysis?.title || resolved.stem,
@@ -426,7 +438,10 @@ export class DownloadEngine extends EventEmitter {
     action: 'rename' | 'overwrite' | 'skip' | 'ask'
   ): string | null {
     const originalPath = path.join(dir, filename);
-    if (!fs.existsSync(originalPath) || action === 'overwrite') {
+    const reserved = Array.from(this.downloads.values()).some((item) =>
+      item.finalPath === originalPath && item.status !== 'completed' && item.status !== 'cancelled'
+    );
+    if ((!fs.existsSync(originalPath) && !reserved) || action === 'overwrite') {
       return originalPath;
     }
 
@@ -441,7 +456,9 @@ export class DownloadEngine extends EventEmitter {
     let counter = 1;
     let newPath = path.join(dir, `${base} (${counter})${ext}`);
 
-    while (fs.existsSync(newPath)) {
+    while (fs.existsSync(newPath) || Array.from(this.downloads.values()).some((item) =>
+      item.finalPath === newPath && item.status !== 'completed' && item.status !== 'cancelled'
+    )) {
       counter++;
       newPath = path.join(dir, `${base} (${counter})${ext}`);
     }
@@ -486,14 +503,14 @@ export class DownloadEngine extends EventEmitter {
 
     let worker: HttpDownloader | Http2Downloader | FtpDownloader | HlsDownloader | MediaStreamDownloader;
     const protocol = item.serverCapabilities.protocol;
+    // Direct HTTP(S) is the default for every resource, including unknown
+    // extensions and extensionless endpoints. The media worker is reserved
+    // for an explicit yt-dlp format (or a previously resolved media stream),
+    // so a failed HTML/media metadata probe can never turn an ordinary file
+    // download into a yt-dlp requirement.
     const isStreamPlatform =
       (protocol as string) === 'media_stream' ||
-      Boolean((item as any).mediaFormatSpec) ||
-      looksLikeStreamingMediaSource(
-        item.url,
-        { filename: item.filename, mimeType: item.serverCapabilities.contentType },
-        Boolean((item as any).mediaFormatSpec)
-      );
+      Boolean((item as any).mediaFormatSpec);
 
     if (isStreamPlatform) {
       worker = new MediaStreamDownloader(workerItem);
