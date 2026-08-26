@@ -3,88 +3,126 @@ const G1DM_PORT = 8055;
 const G1DM_API_BASE = `http://127.0.0.1:${G1DM_PORT}/api`;
 const DEFAULT_EXTENSIONS = ['zip', 'exe', 'iso', 'dmg', 'tar', 'gz', 'mp4', 'mkv', 'mp3', 'pdf', '7z', 'rar', 'msi', 'apk', 'deb', 'rpm'];
 
-browser.runtime.onInstalled.addListener(() => {
-  browser.storage.local.get(['interceptionEnabled', 'interceptExtensions', 'excludeDomains'], (data) => {
-    if (data.interceptionEnabled === undefined) {
-      browser.storage.local.set({
-        interceptionEnabled: false,
-        interceptExtensions: DEFAULT_EXTENSIONS,
-        excludeDomains: [],
-      });
+const getApi = () => (typeof browser !== 'undefined' ? browser : chrome);
+
+const extApi = getApi();
+
+extApi.runtime.onInstalled.addListener(() => {
+  if (extApi.storage && extApi.storage.local) {
+    extApi.storage.local.get(['interceptionEnabled', 'interceptExtensions', 'excludeDomains'], (data) => {
+      if (extApi.runtime.lastError) return;
+      if (data.interceptionEnabled === undefined) {
+        extApi.storage.local.set({
+          interceptionEnabled: false,
+          interceptExtensions: DEFAULT_EXTENSIONS,
+          excludeDomains: [],
+        });
+      }
+    });
+  }
+
+  const menuApi = extApi.contextMenus || (typeof chrome !== 'undefined' ? chrome.contextMenus : null);
+  if (menuApi) {
+    if (menuApi.removeAll) {
+      menuApi.removeAll(() => createMenus(menuApi));
+    } else {
+      createMenus(menuApi);
     }
-  });
-
-  // Create context menus
-  chrome.contextMenus.create({
-    id: 'g1dm-download-link',
-    title: 'Download with G1DM',
-    contexts: ['link', 'image', 'video', 'audio'],
-  });
-
-  chrome.contextMenus.create({
-    id: 'g1dm-download-page-links',
-    title: 'Download all links on page with G1DM',
-    contexts: ['page'],
-  });
-
-  chrome.contextMenus.create({
-    id: 'g1dm-open-manager',
-    title: 'Open G1DM Download Manager',
-    contexts: ['action'],
-  });
+  }
 });
 
+function createMenus(menuApi) {
+  try {
+    menuApi.create({
+      id: 'g1dm-download-link',
+      title: 'Download with G1DM',
+      contexts: ['link', 'image', 'video', 'audio'],
+    }, () => { if (extApi.runtime?.lastError) {} });
+
+    menuApi.create({
+      id: 'g1dm-download-page-links',
+      title: 'Download all links on page with G1DM',
+      contexts: ['page'],
+    }, () => { if (extApi.runtime?.lastError) {} });
+
+    menuApi.create({
+      id: 'g1dm-open-manager',
+      title: 'Open G1DM Download Manager',
+      contexts: ['action'],
+    }, () => { if (extApi.runtime?.lastError) {} });
+  } catch {}
+}
+
 function openOrFocusG1DMTab(url) {
-  const runtimeTabs = (typeof browser !== 'undefined' && browser.tabs) ? browser.tabs : chrome.tabs;
-  runtimeTabs.query({}, (tabs) => {
+  const tabsApi = extApi.tabs || (typeof chrome !== 'undefined' ? chrome.tabs : null);
+  if (!tabsApi) return;
+
+  tabsApi.query({}, (tabs) => {
+    if (extApi.runtime?.lastError) return;
     const targetBase = `http://127.0.0.1:${G1DM_PORT}`;
     const targetHost = `http://localhost:${G1DM_PORT}`;
     const existing = tabs?.find((t) => t.url && (t.url.startsWith(targetBase) || t.url.startsWith(targetHost)));
     if (existing && existing.id) {
-      runtimeTabs.update(existing.id, { url: url || existing.url, active: true });
-      if (existing.windowId) {
-        chrome.windows.update(existing.windowId, { focused: true });
+      tabsApi.update(existing.id, { url: url || existing.url, active: true }, () => {
+        if (extApi.runtime?.lastError) {}
+      });
+      if (existing.windowId && extApi.windows?.update) {
+        extApi.windows.update(existing.windowId, { focused: true }, () => {
+          if (extApi.runtime?.lastError) {}
+        });
       }
-      if (runtimeTabs.reload) runtimeTabs.reload(existing.id);
+      if (tabsApi.reload) tabsApi.reload(existing.id);
     } else {
-      runtimeTabs.create({ url: url || targetBase });
+      tabsApi.create({ url: url || targetBase }, () => {
+        if (extApi.runtime?.lastError) {}
+      });
     }
   });
 }
 
 // Context menu click listener
-browser.contextMenus.onClicked.addListener((info, tab) => {
-  if (info.menuItemId === 'g1dm-download-link') {
-    const targetUrl = info.linkUrl || info.srcUrl;
-    if (targetUrl) {
-      if (tab && tab.id) {
-        browser.tabs.sendMessage(
-          tab.id,
-          { type: 'SHOW_DOWNLOAD_MODAL', url: targetUrl }
-        ).catch(() => {
-          if (browser.tabs && browser.tabs.executeScript) {
-            browser.tabs.executeScript(tab.id, { file: 'content.js', allFrames: true })
-              .then(() => browser.tabs.sendMessage(tab.id, { type: 'SHOW_DOWNLOAD_MODAL', url: targetUrl }))
-              .catch(() => {});
-          }
-        });
+const menuApi = extApi.contextMenus || (typeof chrome !== 'undefined' ? chrome.contextMenus : null);
+if (menuApi && menuApi.onClicked) {
+  menuApi.onClicked.addListener((info, tab) => {
+    if (info.menuItemId === 'g1dm-download-link') {
+      const targetUrl = info.linkUrl || info.srcUrl;
+      if (targetUrl && tab && tab.id) {
+        const tabsApi = extApi.tabs || (typeof chrome !== 'undefined' ? chrome.tabs : null);
+        if (tabsApi) {
+          tabsApi.sendMessage(
+            tab.id,
+            { type: 'SHOW_DOWNLOAD_MODAL', url: targetUrl },
+            (response) => {
+              const err = extApi.runtime?.lastError;
+              if (err || !response?.success) {
+                if (tabsApi.executeScript) {
+                  tabsApi.executeScript(tab.id, { file: 'content.js', allFrames: true })
+                    .then(() => {
+                      tabsApi.sendMessage(tab.id, { type: 'SHOW_DOWNLOAD_MODAL', url: targetUrl }, () => {
+                        if (extApi.runtime?.lastError) {}
+                      });
+                    })
+                    .catch(() => {});
+                }
+              }
+            }
+          );
+        }
       }
+    } else if (info.menuItemId === 'g1dm-download-page-links') {
+      if (tab && tab.url) {
+        openOrFocusG1DMTab(`http://127.0.0.1:${G1DM_PORT}/#batch?url=${encodeURIComponent(tab.url)}`);
+      }
+    } else if (info.menuItemId === 'g1dm-open-manager') {
+      openOrFocusG1DMTab(`http://127.0.0.1:${G1DM_PORT}`);
     }
-  } else if (info.menuItemId === 'g1dm-download-page-links') {
-    if (tab && tab.url) {
-      openOrFocusG1DMTab(`http://127.0.0.1:${G1DM_PORT}/#batch?url=${encodeURIComponent(tab.url)}`);
-    }
-  } else if (info.menuItemId === 'g1dm-open-manager') {
-    openOrFocusG1DMTab(`http://127.0.0.1:${G1DM_PORT}`);
-  }
-});
-
-// Browser downloads are intentionally not intercepted after creation.
-// Context-menu/content-script actions submit URLs to G1DM before a browser
-// download is started; G1DM's DownloadEngine owns the transfer.
+  });
+}
 
 // Messages from content scripts / popup
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+extApi.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (!message || !message.type) return;
+
   if (message.type === 'DOWNLOAD_URL') {
     const container = message.container || message.format || 'mp4';
     const formatSpec = message.formatSpec || message.mediaFormatSpec;
@@ -106,17 +144,26 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }).catch((err) => {
       sendResponse({ success: false, error: err.message });
     });
-    return true; // async response
+    return true;
   } else if (message.type === 'PROBE_URL') {
-    probeUrl(message.url).then(sendResponse);
-    return true; // async
+    probeUrl(message.url).then((res) => {
+      sendResponse(res || { error: 'Probe failed' });
+    }).catch((err) => {
+      sendResponse({ error: err.message });
+    });
+    return true;
   } else if (message.type === 'SECURE_DETECT') {
-    secureDetectMedia(message.url).then(sendResponse);
-    return true; // async
+    secureDetectMedia(message.url).then((res) => {
+      sendResponse(res || { error: 'Secure detect failed' });
+    }).catch((err) => {
+      sendResponse({ error: err.message });
+    });
+    return true;
   } else if (message.type === 'OPEN_G1DM_STUDIO') {
     const target = message.url ? `http://127.0.0.1:${G1DM_PORT}/#media?url=${encodeURIComponent(message.url)}` : `http://127.0.0.1:${G1DM_PORT}/#media`;
     openOrFocusG1DMTab(target);
     sendResponse({ success: true });
+    return true;
   } else if (message.type === 'GET_DOWNLOAD_PROGRESS') {
     fetch(`${G1DM_API_BASE}/downloads/${message.id}`)
       .then((r) => r.json())
@@ -160,8 +207,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       .catch((err) => sendResponse({ success: false, error: err.message }));
     return true;
   } else if (message.type === 'TEST_CONNECTION') {
-    testG1DMConnection().then(sendResponse);
-    return true; // async
+    testG1DMConnection().then((res) => {
+      sendResponse(res);
+    }).catch((err) => {
+      sendResponse({ success: false, error: err.message });
+    });
+    return true;
   }
 });
 
@@ -176,7 +227,7 @@ async function secureDetectMedia(url) {
       return await res.json();
     }
   } catch (err) {
-    console.warn('[G1DM Companion] Secure detect request failed:', err);
+    console.warn('[G1DM Firefox Companion] Secure detect request failed:', err);
   }
   return { error: 'Secure detect failed' };
 }
@@ -192,7 +243,7 @@ async function probeUrl(url) {
       return await res.json();
     }
   } catch (err) {
-    console.warn('[G1DM Companion] Probe request failed:', err);
+    console.warn('[G1DM Firefox Companion] Probe request failed:', err);
   }
   return { error: 'Probe failed' };
 }
@@ -210,7 +261,6 @@ async function sendToG1DM(payloadOrUrl, filename, category, formatSpec, containe
         startImmediately,
       };
 
-  // Primary attempt: Direct HTTP to core daemon
   try {
     const res = await fetch(`${G1DM_API_BASE}/downloads`, {
       method: 'POST',
@@ -218,22 +268,19 @@ async function sendToG1DM(payloadOrUrl, filename, category, formatSpec, containe
       body: JSON.stringify(payload),
     });
     if (res.ok) {
-      const json = await res.json();
-      console.log('[G1DM Companion] Successfully enqueued download:', json);
-      return json;
+      return await res.json();
     }
   } catch (err) {
-    console.warn('[G1DM Companion] HTTP fetch failed, trying Native Messaging Host...', err);
+    console.warn('[G1DM Firefox Companion] HTTP fetch failed, trying Native Host...', err);
   }
 
-  // Secondary attempt: Native Messaging Host
   try {
     const nativeRes = await new Promise((resolve, reject) => {
-      chrome.runtime.sendNativeMessage(
+      extApi.runtime.sendNativeMessage(
         'com.g1dm.native_host',
         { command: 'add', ...payload },
         (res) => {
-          if (chrome.runtime.lastError) reject(chrome.runtime.lastError);
+          if (extApi.runtime.lastError) reject(extApi.runtime.lastError);
           else resolve(res);
         }
       );
@@ -242,7 +289,7 @@ async function sendToG1DM(payloadOrUrl, filename, category, formatSpec, containe
       return nativeRes.result;
     }
   } catch (nativeErr) {
-    console.warn('[G1DM Companion] Native host also failed:', nativeErr);
+    console.warn('[G1DM Firefox Companion] Native host failed:', nativeErr);
   }
 
   throw new Error('Could not connect to G1DM core engine.');

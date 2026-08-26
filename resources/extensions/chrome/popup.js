@@ -5,76 +5,137 @@ document.addEventListener('DOMContentLoaded', async () => {
   const openAppBtn = document.getElementById('openAppBtn');
   const downloadCurrentBtn = document.getElementById('downloadCurrentBtn');
 
-  // Load saved interception state
-  chrome.storage.local.get(['interceptionEnabled'], (data) => {
-    if (data.interceptionEnabled !== undefined) {
-      interceptToggle.checked = data.interceptionEnabled;
-    }
-  });
+  const getStorage = () => {
+    try {
+      if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) return chrome.storage.local;
+      if (typeof browser !== 'undefined' && browser.storage && browser.storage.local) return browser.storage.local;
+    } catch {}
+    return null;
+  };
 
-  interceptToggle.addEventListener('change', () => {
-    chrome.storage.local.set({ interceptionEnabled: interceptToggle.checked });
-  });
+  const storage = getStorage();
+  if (storage) {
+    storage.get(['interceptionEnabled'], (data) => {
+      if (chrome?.runtime?.lastError) return;
+      if (data && data.interceptionEnabled !== undefined && interceptToggle) {
+        interceptToggle.checked = data.interceptionEnabled;
+      }
+    });
+
+    if (interceptToggle) {
+      interceptToggle.addEventListener('change', () => {
+        storage.set({ interceptionEnabled: interceptToggle.checked });
+      });
+    }
+  }
 
   if (downloadCurrentBtn) {
     downloadCurrentBtn.addEventListener('click', async () => {
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-      if (tab && tab.id) {
-        chrome.tabs.sendMessage(
-          tab.id,
-          {
-            type: 'SHOW_DOWNLOAD_MODAL',
-            url: tab.url
-          },
-          (res) => {
-            if (chrome.runtime.lastError || !res?.success) {
-              if (chrome.scripting && chrome.scripting.executeScript) {
-                chrome.scripting.executeScript({
-                  target: { tabId: tab.id, allFrames: true },
-                  files: ['content.js']
-                }, () => {
-                  chrome.tabs.sendMessage(tab.id, { type: 'SHOW_DOWNLOAD_MODAL', url: tab.url });
-                });
+      try {
+        const tabsApi = (typeof chrome !== 'undefined' && chrome.tabs) ? chrome.tabs : (typeof browser !== 'undefined' && browser.tabs) ? browser.tabs : null;
+        if (!tabsApi) return;
+
+        const [tab] = await tabsApi.query({ active: true, currentWindow: true });
+        if (tab && tab.id) {
+          tabsApi.sendMessage(
+            tab.id,
+            {
+              type: 'SHOW_DOWNLOAD_MODAL',
+              url: tab.url
+            },
+            (res) => {
+              const err = chrome?.runtime?.lastError || browser?.runtime?.lastError;
+              if (err || !res?.success) {
+                if (chrome.scripting && chrome.scripting.executeScript) {
+                  chrome.scripting.executeScript({
+                    target: { tabId: tab.id, allFrames: true },
+                    files: ['content.js']
+                  }, () => {
+                    if (chrome.runtime?.lastError) return;
+                    tabsApi.sendMessage(tab.id, { type: 'SHOW_DOWNLOAD_MODAL', url: tab.url }, () => {
+                      if (chrome.runtime?.lastError) {}
+                    });
+                  });
+                }
               }
             }
-          }
-        );
-        window.close();
+          );
+          window.close();
+        }
+      } catch (err) {
+        console.warn('[G1DM Popup] Download current tab failed:', err);
       }
     });
   }
 
-  openAppBtn.addEventListener('click', () => {
-    chrome.tabs.query({}, (tabs) => {
-      const existing = tabs?.find((t) => t.url && (t.url.startsWith('http://127.0.0.1:8055') || t.url.startsWith('http://localhost:8055')));
-      if (existing && existing.id) {
-        chrome.tabs.update(existing.id, { active: true });
-        if (existing.windowId) {
-          chrome.windows.update(existing.windowId, { focused: true });
-        }
-        chrome.tabs.reload(existing.id);
-      } else {
-        chrome.tabs.create({ url: 'http://127.0.0.1:8055' });
-      }
-      window.close();
-    });
-  });
+  if (openAppBtn) {
+    openAppBtn.addEventListener('click', () => {
+      const tabsApi = (typeof chrome !== 'undefined' && chrome.tabs) ? chrome.tabs : (typeof browser !== 'undefined' && browser.tabs) ? browser.tabs : null;
+      if (!tabsApi) return;
 
-  // Query engine health
-  chrome.runtime.sendMessage({ type: 'TEST_CONNECTION' }, (res) => {
-    if (res && res.success) {
+      tabsApi.query({}, (tabs) => {
+        const existing = tabs?.find((t) => t.url && (t.url.startsWith('http://127.0.0.1:8055') || t.url.startsWith('http://localhost:8055')));
+        if (existing && existing.id) {
+          tabsApi.update(existing.id, { active: true });
+          if (existing.windowId && chrome?.windows?.update) {
+            chrome.windows.update(existing.windowId, { focused: true });
+          }
+          if (tabsApi.reload) tabsApi.reload(existing.id);
+        } else {
+          tabsApi.create({ url: 'http://127.0.0.1:8055' });
+        }
+        window.close();
+      });
+    });
+  }
+
+  const updateStatusUI = (metrics) => {
+    if (daemonStatus) {
       daemonStatus.innerText = 'Connected';
       daemonStatus.className = 'status-badge status-online';
-
-      const speedBytes = res.metrics?.network?.activeDownloadSpeed || 0;
+    }
+    if (currentSpeed) {
+      const speedBytes = metrics?.network?.activeDownloadSpeed || 0;
       if (speedBytes > 1024 * 1024) {
         currentSpeed.innerText = `${(speedBytes / 1024 / 1024).toFixed(2)} MB/s`;
       } else {
         currentSpeed.innerText = `${(speedBytes / 1024).toFixed(1)} KB/s`;
       }
-    } else {
+    }
+  };
+
+  const setOfflineUI = () => {
+    if (daemonStatus) {
       daemonStatus.innerText = 'Offline';
       daemonStatus.className = 'status-badge status-offline';
     }
-  });
+    if (currentSpeed) {
+      currentSpeed.innerText = '0 KB/s';
+    }
+  };
+
+  const checkDirectHttpMetrics = () => {
+    fetch('http://127.0.0.1:8055/api/metrics')
+      .then((r) => r.json())
+      .then((metrics) => updateStatusUI(metrics))
+      .catch(() => setOfflineUI());
+  };
+
+  // Query engine health
+  try {
+    const runtime = (typeof chrome !== 'undefined' && chrome.runtime?.id) ? chrome.runtime : (typeof browser !== 'undefined' && browser.runtime?.id) ? browser.runtime : null;
+    if (runtime && runtime.sendMessage) {
+      runtime.sendMessage({ type: 'TEST_CONNECTION' }, (res) => {
+        if (runtime.lastError || !res?.success) {
+          checkDirectHttpMetrics();
+        } else {
+          updateStatusUI(res.metrics);
+        }
+      });
+    } else {
+      checkDirectHttpMetrics();
+    }
+  } catch {
+    checkDirectHttpMetrics();
+  }
 });

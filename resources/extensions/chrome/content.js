@@ -7,21 +7,153 @@
     return;
   }
 
-  if (window.__G1DM_CONTENT_SCRIPT_INITIALIZED__) return;
-  window.__G1DM_CONTENT_SCRIPT_INITIALIZED__ = true;
+  // ── Context Validity & Lifetime Management ───────────────────────────────
+  function isExtensionContextValid() {
+    try {
+      if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.id) {
+        return true;
+      }
+      if (typeof browser !== 'undefined' && browser.runtime && browser.runtime.id) {
+        return true;
+      }
+    } catch {}
+    return false;
+  }
 
+  function getRuntimeApi() {
+    try {
+      if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.id) {
+        return chrome.runtime;
+      }
+      if (typeof browser !== 'undefined' && browser.runtime && browser.runtime.id) {
+        return browser.runtime;
+      }
+    } catch {}
+    return null;
+  }
+
+  let isCleanedUp = false;
+  let domObserver = null;
+  let mainIntervalId = null;
   const detectedMediaUrls = new Set();
   const videoOverlays = new Map(); // Map<HTMLVideoElement, OverlayInfo>
   let currentFilter = 'ALL';
 
-  // Load saved user format preference if available
-  if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
-    chrome.storage.local.get(['preferredVideoFormat'], (data) => {
-      if (data.preferredVideoFormat) {
-        currentFilter = data.preferredVideoFormat;
+  function cleanupOrphanedContentScript() {
+    if (isCleanedUp) return;
+    isCleanedUp = true;
+
+    if (domObserver) {
+      try { domObserver.disconnect(); } catch {}
+      domObserver = null;
+    }
+    if (mainIntervalId) {
+      try { clearInterval(mainIntervalId); } catch {}
+      mainIntervalId = null;
+    }
+    try {
+      for (const [video, info] of videoOverlays.entries()) {
+        if (info && info.overlay && info.overlay.parentNode) {
+          info.overlay.remove();
+        }
       }
-    });
+      videoOverlays.clear();
+    } catch {}
+    try {
+      const modal = document.getElementById('g1dm-file-info-modal-root');
+      if (modal) modal.remove();
+      const prog = document.getElementById('g1dm-progress-overlay');
+      if (prog) prog.remove();
+      const pill = document.getElementById('g1dm-progress-pill');
+      if (pill) pill.remove();
+      const toast = document.getElementById('g1dm-toast-root');
+      if (toast) toast.remove();
+    } catch {}
+    window.__G1DM_CONTENT_SCRIPT_INITIALIZED__ = false;
   }
+
+  // Safe wrapper for chrome.runtime.sendMessage / browser.runtime.sendMessage
+  function safeSendMessage(message, callback, fallback) {
+    if (!isExtensionContextValid()) {
+      cleanupOrphanedContentScript();
+      if (typeof fallback === 'function') {
+        try { fallback(new Error('Extension context invalidated')); } catch {}
+      }
+      return;
+    }
+
+    const runtime = getRuntimeApi();
+    if (!runtime || !runtime.sendMessage) {
+      if (typeof fallback === 'function') {
+        try { fallback(new Error('Runtime not available')); } catch {}
+      }
+      return;
+    }
+
+    try {
+      runtime.sendMessage(message, (response) => {
+        const err = runtime.lastError;
+        if (err) {
+          const errMsg = err.message || '';
+          if (errMsg.includes('context invalidated') || errMsg.includes('Receiving end does not exist') || errMsg.includes('Could not establish connection')) {
+            cleanupOrphanedContentScript();
+          }
+          if (typeof fallback === 'function') {
+            try { fallback(err); } catch {}
+            return;
+          }
+        }
+        if (typeof callback === 'function') {
+          try { callback(response); } catch (cbErr) {
+            console.warn('[G1DM] Callback execution error:', cbErr);
+          }
+        }
+      });
+    } catch (err) {
+      if (err && err.message && err.message.includes('context invalidated')) {
+        cleanupOrphanedContentScript();
+      }
+      if (typeof fallback === 'function') {
+        try { fallback(err); } catch {}
+      }
+    }
+  }
+
+  function safeGetURL(path) {
+    if (!isExtensionContextValid()) return null;
+    try {
+      const runtime = getRuntimeApi();
+      if (runtime && runtime.getURL) {
+        return runtime.getURL(path);
+      }
+    } catch {}
+    return null;
+  }
+
+  function safeGetStorage(keys, callback) {
+    if (!isExtensionContextValid()) return;
+    try {
+      const storage = (typeof chrome !== 'undefined' && chrome.storage && chrome.runtime?.id) ? chrome.storage.local :
+                      (typeof browser !== 'undefined' && browser.storage && browser.runtime?.id) ? browser.storage.local : null;
+      if (storage && storage.get) {
+        storage.get(keys, (data) => {
+          const runtime = getRuntimeApi();
+          if (runtime && runtime.lastError) return;
+          if (callback && data) callback(data);
+        });
+      }
+    } catch {}
+  }
+
+  if (window.__G1DM_CONTENT_SCRIPT_INITIALIZED__) return;
+  window.__G1DM_CONTENT_SCRIPT_INITIALIZED__ = true;
+
+  // Load saved user format preference if available
+  safeGetStorage(['preferredVideoFormat'], (data) => {
+    if (data && data.preferredVideoFormat) {
+      currentFilter = data.preferredVideoFormat;
+    }
+  });
 
   // Filter Categories
   const FILTER_TABS = [
@@ -151,9 +283,7 @@
           }
         }
       }
-    } catch {
-      // Ignore sandboxed errors
-    }
+    } catch {}
   }
 
   function cleanPageTitle(raw) {
@@ -162,14 +292,12 @@
   }
 
   function getPageVideoTitle() {
-    // 1. YouTube specific title elements in DOM
     const ytTitleEl = document.querySelector('ytd-watch-metadata #title h1, #title.ytd-watch-metadata h1, h1.ytd-watch-metadata, #title h1 yt-formatted-string, #video-title');
     const ytText = ytTitleEl?.innerText?.trim() || ytTitleEl?.textContent?.trim();
     if (ytText && ytText.length > 0 && ytText.toLowerCase() !== 'youtube') {
       return cleanPageTitle(ytText).replace(/[/\\?%*:|"<>]/g, '-').slice(0, 150);
     }
 
-    // 2. Meta tags
     const ogTitle = document.querySelector('meta[property="og:title"]')?.getAttribute('content')?.trim();
     if (ogTitle && ogTitle.length > 0 && ogTitle.toLowerCase() !== 'youtube') {
       return cleanPageTitle(ogTitle).replace(/[/\\?%*:|"<>]/g, '-').slice(0, 150);
@@ -180,7 +308,6 @@
       return cleanPageTitle(metaTitle).replace(/[/\\?%*:|"<>]/g, '-').slice(0, 150);
     }
 
-    // 3. Document / H1 title
     const h1 = document.querySelector('h1')?.innerText?.trim();
     if (h1 && h1.length > 0 && h1.toLowerCase() !== 'youtube') {
       return cleanPageTitle(h1).replace(/[/\\?%*:|"<>]/g, '-').slice(0, 150);
@@ -227,7 +354,7 @@
 
   function estimateFileSize(durationSec, height, codec, isAudio) {
     const isDefault = !durationSec || durationSec <= 0 || !isFinite(durationSec);
-    const dur = isDefault ? 600 : durationSec; // 10m default reference
+    const dur = isDefault ? 600 : durationSec;
 
     let bps = 4000000;
     if (isAudio) {
@@ -258,17 +385,14 @@
     if (!/youtube\.com|youtu\.be/i.test(window.location.hostname)) return;
     if (document.getElementById('g1dm-main-bridge')) return;
     try {
-      const script = document.createElement('script');
-      script.id = 'g1dm-main-bridge';
-      if (typeof chrome !== 'undefined' && chrome.runtime?.getURL) {
-        script.src = chrome.runtime.getURL('yt-bridge.js');
-      } else if (typeof browser !== 'undefined' && browser.runtime?.getURL) {
-        script.src = browser.runtime.getURL('yt-bridge.js');
-      }
-      if (script.src) {
+      const bridgeUrl = safeGetURL('yt-bridge.js');
+      if (bridgeUrl) {
+        const script = document.createElement('script');
+        script.id = 'g1dm-main-bridge';
+        script.src = bridgeUrl;
         (document.head || document.documentElement).appendChild(script);
       }
-    } catch (e) {}
+    } catch {}
   }
 
   let probedMaxResolution = 0;
@@ -293,13 +417,7 @@
       }
     };
 
-    if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
-      chrome.runtime.sendMessage({ type: 'SECURE_DETECT', url: pageUrl }, (response) => {
-        if (!chrome.runtime.lastError && response) {
-          handleData(response);
-        }
-      });
-    } else {
+    const directHttpFallback = () => {
       fetch('http://127.0.0.1:8055/api/media/secure-detect', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -308,7 +426,19 @@
         .then(res => res.json())
         .then(handleData)
         .catch(() => {});
-    }
+    };
+
+    safeSendMessage(
+      { type: 'SECURE_DETECT', url: pageUrl },
+      (response) => {
+        if (response && !response.error) {
+          handleData(response);
+        } else {
+          directHttpFallback();
+        }
+      },
+      directHttpFallback
+    );
   }
 
   function detectMaxAvailableResolution(video) {
@@ -388,7 +518,6 @@
 
     // 2. Video Resolution & Container & Codec Combinations (Capped at true max available resolution)
     for (const res of RESOLUTION_TIERS) {
-      // Exclude tiers higher than the video's true available maximum resolution
       if (res.height > maxAvailableHeight) {
         continue;
       }
@@ -527,7 +656,7 @@
 
     overlay.appendChild(pill);
     overlay.appendChild(dropdown);
-    document.body.appendChild(overlay);
+    (document.fullscreenElement || document.body || document.documentElement).appendChild(overlay);
 
     let isDropdownOpen = false;
     let hideTimeout = null;
@@ -707,10 +836,13 @@
 
       // Footer actions
       dropdown.querySelector('#g1dm-open-studio')?.addEventListener('click', () => {
-        chrome.runtime.sendMessage({
-          type: 'OPEN_G1DM_STUDIO',
-          url: window.location.href
-        });
+        safeSendMessage(
+          { type: 'OPEN_G1DM_STUDIO', url: window.location.href },
+          () => {},
+          () => {
+            window.open(`http://127.0.0.1:8055/#media?url=${encodeURIComponent(window.location.href)}`, '_blank');
+          }
+        );
         closeDropdown();
       });
 
@@ -1023,7 +1155,6 @@
     updateCategoryIcon(catSelect.value);
     catSelect.addEventListener('change', () => updateCategoryIcon(catSelect.value));
 
-    // Live probe via background service worker (bypasses webpage CSP / CORS)
     const handleProbeResult = (data) => {
       if (data && !data.error) {
         if (data.filename && (!filename || filename === 'download.bin' || filename.startsWith('watch.') || filename.startsWith('video.'))) {
@@ -1052,13 +1183,28 @@
       }
     };
 
-    if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
-      chrome.runtime.sendMessage({ type: 'PROBE_URL', url }, (data) => {
+    const directProbeFallback = () => {
+      fetch('http://127.0.0.1:8055/api/probe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url })
+      })
+        .then(res => res.json())
+        .then(handleProbeResult)
+        .catch(() => {});
+    };
+
+    safeSendMessage(
+      { type: 'PROBE_URL', url },
+      (data) => {
         if (data && !data.error) {
           handleProbeResult(data);
+        } else {
+          directProbeFallback();
         }
-      });
-    }
+      },
+      directProbeFallback
+    );
 
     const closeModal = () => {
       root.style.opacity = '0';
@@ -1126,21 +1272,18 @@
           .catch((err) => onError(err.message));
       };
 
-      if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
-        chrome.runtime.sendMessage({
-          type: 'DOWNLOAD_URL',
-          ...payload
-        }, (res) => {
-          if (chrome.runtime.lastError || (res && res.success === false)) {
-            console.warn('[G1DM Extension] Service worker message failed, trying direct HTTP fallback:', chrome.runtime.lastError?.message || res?.error);
-            sendViaFetch();
-          } else {
+      safeSendMessage(
+        { type: 'DOWNLOAD_URL', ...payload },
+        (res) => {
+          if (res && res.success !== false) {
             onSuccess(res?.result);
+          } else {
+            console.warn('[G1DM Extension] Service worker message failed, trying direct HTTP fallback:', res?.error);
+            sendViaFetch();
           }
-        });
-      } else {
-        sendViaFetch();
-      }
+        },
+        sendViaFetch
+      );
     };
 
     dialog.querySelector('#g1dm-btn-start').addEventListener('click', () => submit(true));
@@ -1495,40 +1638,49 @@
       if (!downloadId) return;
       const isCurrentlyPaused = item.status === 'paused';
       const actionType = isCurrentlyPaused ? 'RESUME_DOWNLOAD' : 'PAUSE_DOWNLOAD';
-      if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
-        chrome.runtime.sendMessage({ type: actionType, id: downloadId });
-      } else {
-        fetch(`http://127.0.0.1:8055/api/downloads/${downloadId}/${isCurrentlyPaused ? 'resume' : 'pause'}`, { method: 'POST' }).catch(() => {});
-      }
+      const fallbackEndpoint = isCurrentlyPaused ? 'resume' : 'pause';
+      safeSendMessage(
+        { type: actionType, id: downloadId },
+        () => {},
+        () => {
+          fetch(`http://127.0.0.1:8055/api/downloads/${downloadId}/${fallbackEndpoint}`, { method: 'POST' }).catch(() => {});
+        }
+      );
     });
 
     cancelBtn.addEventListener('click', () => {
       if (downloadId) {
-        if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
-          chrome.runtime.sendMessage({ type: 'CANCEL_DOWNLOAD', id: downloadId });
-        } else {
-          fetch(`http://127.0.0.1:8055/api/downloads/${downloadId}/cancel`, { method: 'POST' }).catch(() => {});
-        }
+        safeSendMessage(
+          { type: 'CANCEL_DOWNLOAD', id: downloadId },
+          () => {},
+          () => {
+            fetch(`http://127.0.0.1:8055/api/downloads/${downloadId}/cancel`, { method: 'POST' }).catch(() => {});
+          }
+        );
       }
       closeProgress();
     });
 
     openFileBtn.addEventListener('click', () => {
       if (!downloadId) return;
-      if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
-        chrome.runtime.sendMessage({ type: 'OPEN_DOWNLOAD_FILE', id: downloadId });
-      } else {
-        fetch(`http://127.0.0.1:8055/api/downloads/${downloadId}/open-file`, { method: 'POST' }).catch(() => {});
-      }
+      safeSendMessage(
+        { type: 'OPEN_DOWNLOAD_FILE', id: downloadId },
+        () => {},
+        () => {
+          fetch(`http://127.0.0.1:8055/api/downloads/${downloadId}/open-file`, { method: 'POST' }).catch(() => {});
+        }
+      );
     });
 
     openFolderBtn.addEventListener('click', () => {
       if (!downloadId) return;
-      if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
-        chrome.runtime.sendMessage({ type: 'OPEN_DOWNLOAD_FOLDER', id: downloadId });
-      } else {
-        fetch(`http://127.0.0.1:8055/api/downloads/${downloadId}/open-folder`, { method: 'POST' }).catch(() => {});
-      }
+      safeSendMessage(
+        { type: 'OPEN_DOWNLOAD_FOLDER', id: downloadId },
+        () => {},
+        () => {
+          fetch(`http://127.0.0.1:8055/api/downloads/${downloadId}/open-folder`, { method: 'POST' }).catch(() => {});
+        }
+      );
     });
 
     // Update UI from live item data
@@ -1671,37 +1823,48 @@
     const poll = () => {
       if (!downloadId) {
         // Look up newest download if ID not yet known
-        if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
-          chrome.runtime.sendMessage({ type: 'TEST_CONNECTION' }, (res) => {
-            fetch('http://127.0.0.1:8055/api/downloads')
-              .then((r) => r.json())
-              .then((list) => {
-                if (Array.isArray(list) && list.length > 0) {
-                  const match = list.find((d) => d.url === submitPayload.url) || list[0];
-                  if (match) {
-                    downloadId = match.id;
-                    updateUI(match);
-                  }
+        const lookupDirectHttp = () => {
+          fetch('http://127.0.0.1:8055/api/downloads')
+            .then((r) => r.json())
+            .then((list) => {
+              if (Array.isArray(list) && list.length > 0) {
+                const match = list.find((d) => d.url === submitPayload.url) || list[0];
+                if (match) {
+                  downloadId = match.id;
+                  updateUI(match);
                 }
-              })
-              .catch(() => {});
-          });
-        }
+              }
+            })
+            .catch(() => {});
+        };
+
+        safeSendMessage(
+          { type: 'TEST_CONNECTION' },
+          (res) => { lookupDirectHttp(); },
+          lookupDirectHttp
+        );
         return;
       }
 
-      if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
-        chrome.runtime.sendMessage({ type: 'GET_DOWNLOAD_PROGRESS', id: downloadId }, (res) => {
+      safeSendMessage(
+        { type: 'GET_DOWNLOAD_PROGRESS', id: downloadId },
+        (res) => {
           if (res?.success && res.data) {
             updateUI(res.data);
+          } else {
+            fetch(`http://127.0.0.1:8055/api/downloads/${downloadId}`)
+              .then((r) => r.json())
+              .then(updateUI)
+              .catch(() => {});
           }
-        });
-      } else {
-        fetch(`http://127.0.0.1:8055/api/downloads/${downloadId}`)
-          .then((r) => r.json())
-          .then(updateUI)
-          .catch(() => {});
-      }
+        },
+        () => {
+          fetch(`http://127.0.0.1:8055/api/downloads/${downloadId}`)
+            .then((r) => r.json())
+            .then(updateUI)
+            .catch(() => {});
+        }
+      );
     };
 
     pollInterval = setInterval(poll, 350);
@@ -1756,14 +1919,20 @@
   }
 
   // Runtime message listener for background actions
-  if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
-    chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-      if (message.type === 'SHOW_DOWNLOAD_MODAL') {
-        showDownloadFileInfoModal(message);
-        sendResponse({ success: true });
-      }
-    });
-  }
+  const msgListener = (message, sender, sendResponse) => {
+    if (message?.type === 'SHOW_DOWNLOAD_MODAL') {
+      showDownloadFileInfoModal(message);
+      if (typeof sendResponse === 'function') sendResponse({ success: true });
+    }
+  };
+
+  try {
+    if (typeof browser !== 'undefined' && browser.runtime?.onMessage) {
+      browser.runtime.onMessage.addListener(msgListener);
+    } else if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
+      chrome.runtime.onMessage.addListener(msgListener);
+    }
+  } catch {}
 
   // Inject CSS keyframes
   const styleEl = document.createElement('style');
@@ -1810,7 +1979,7 @@
       margin-right: 5px;
     }
   `;
-  document.head?.appendChild(styleEl);
+  (document.head || document.documentElement)?.appendChild(styleEl);
 
   // Initialize
   injectMainWorldBridge();
@@ -1819,14 +1988,25 @@
   snifferMediaRequests();
 
   // Polling sniffer and mutation observer
-  const observer = new MutationObserver(() => {
+  domObserver = new MutationObserver(() => {
+    if (!isExtensionContextValid()) {
+      cleanupOrphanedContentScript();
+      return;
+    }
     injectMainWorldBridge();
     fetchBackendMediaAnalysis(window.location.href);
     scanForVideos();
   });
-  observer.observe(document.documentElement || document.body, { childList: true, subtree: true });
 
-  setInterval(() => {
+  try {
+    domObserver.observe(document.documentElement || document.body, { childList: true, subtree: true });
+  } catch {}
+
+  mainIntervalId = setInterval(() => {
+    if (!isExtensionContextValid()) {
+      cleanupOrphanedContentScript();
+      return;
+    }
     injectMainWorldBridge();
     snifferMediaRequests();
     scanForVideos();
