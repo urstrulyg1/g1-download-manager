@@ -188,6 +188,12 @@ export interface DownloadItem {
   resolution?: string;
   mediaFormatSpec?: string;
   thumbnailUrl?: string;
+  /**
+   * Where the download was initiated from.
+   * 'browser-extension' → triggered by the companion extension content script.
+   * 'app'              → triggered from within the G1DM app UI (clipboard, drag-drop, etc.).
+   */
+  source?: 'browser-extension' | 'app' | string;
   mediaMetadata?: {
     title?: string;
     resolution?: string;

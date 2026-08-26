@@ -133,6 +133,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       qualityLabel: message.qualityLabel,
       clarity: message.clarity,
       resolution: message.resolution,
+      thumbnailUrl: message.thumbnailUrl,
+      source: 'browser-extension',
       startImmediately: message.startImmediately !== false
     }).then((result) => {
       logToCore('info', `Download accepted by core engine: "${message.filename || message.url}"`);

@@ -450,6 +450,7 @@ export class DownloadEngine extends EventEmitter {
     const clarity = explicitClarity || mediaAnalysis?.recommendedQuality?.resolutionLabel;
 
     (item as any).thumbnailUrl = mediaAnalysis?.thumbnailUrl || (params as any).thumbnailUrl;
+    (item as any).source = (params as any).source || 'app';
     (item as any).qualityLabel = clarity;
     (item as any).clarity = clarity;
     (item as any).resolution = clarity;
