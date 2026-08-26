@@ -1094,19 +1094,22 @@
       if (startBtn) startBtn.disabled = true;
       if (laterBtn) laterBtn.disabled = true;
 
+      closeModal();
+      let activeProgressInstance = null;
+      if (startImmediately) {
+        activeProgressInstance = showInPageProgressModal(payload, payload);
+      } else {
+        showDownloadToast('✓ Queued in G1DM', finalName);
+      }
+
       const onSuccess = (createdItem) => {
-        closeModal();
-        if (startImmediately) {
-          showInPageProgressModal(createdItem || payload, payload);
-        } else {
-          showDownloadToast('✓ Queued in G1DM', finalName);
+        if (createdItem && activeProgressInstance?.updateItem) {
+          activeProgressInstance.updateItem(createdItem);
         }
       };
 
       const onError = (errMsg) => {
         console.warn('[G1DM Extension] Submission notification:', errMsg);
-        closeModal();
-        showDownloadToast(startImmediately ? '✓ Download Started' : '✓ Queued in G1DM', finalName);
       };
 
       if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
@@ -1664,6 +1667,11 @@
 
     pollInterval = setInterval(poll, 350);
     poll();
+
+    return {
+      updateItem: (data) => updateUI(data),
+      close: closeProgress,
+    };
   }
 
   function showDownloadToast(status, filename) {

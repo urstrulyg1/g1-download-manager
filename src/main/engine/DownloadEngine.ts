@@ -298,7 +298,7 @@ export class DownloadEngine extends EventEmitter {
       ) || hasExplicitFormatSpec;
 
     let mediaAnalysis: any = null;
-    if (isStreamPlatform) {
+    if (isStreamPlatform && !hasExplicitFormatSpec && !params.filename) {
       try {
         mediaAnalysis = await SecureMediaDetector.analyze(params.url, 15000);
       } catch {}
@@ -497,7 +497,9 @@ export class DownloadEngine extends EventEmitter {
     if (startOk) {
       const activeCount = Array.from(this.downloads.values()).filter((d) => d.status === 'downloading').length;
       if (activeCount < settings.downloads.maxConcurrentDownloads) {
-        await this.startDownload(id);
+        this.startDownload(id).catch((err) => {
+          console.error(`[DownloadEngine] Background start error for ${id}:`, err);
+        });
       }
     }
 
