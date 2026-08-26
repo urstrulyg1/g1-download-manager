@@ -94,7 +94,7 @@ export class ProbeService {
 
     if (videoExts.includes(ext) || (mimeType && mimeType.startsWith('video/'))) return 'video';
     if (audioExts.includes(ext) || (mimeType && mimeType.startsWith('audio/'))) return 'audio';
-    if (docExts.includes(ext) || (mimeType && (mimeType.startsWith('text/') || mimeType.includes('pdf') || mimeType.includes('document') || mimeType.includes('sheet') || mimeType.includes('presentation')))) return 'document';
+    if (docExts.includes(ext) || (mimeType && (mimeType.includes('pdf') || mimeType.includes('document') || mimeType.includes('sheet') || mimeType.includes('presentation') || (mimeType.startsWith('text/') && !mimeType.includes('html'))))) return 'document';
     if (imageExts.includes(ext) || (mimeType && mimeType.startsWith('image/'))) return 'image';
     if (archiveExts.includes(ext) || (mimeType && (mimeType.includes('zip') || mimeType.includes('tar') || mimeType.includes('compressed') || mimeType.includes('archive')))) return 'archive';
     if (progExts.includes(ext)) return 'program';

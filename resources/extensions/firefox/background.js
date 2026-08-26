@@ -81,14 +81,20 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'DOWNLOAD_URL') {
     const container = message.container || message.format || 'mp4';
     const formatSpec = message.formatSpec || message.mediaFormatSpec;
-    sendToG1DM(
-      message.url,
-      message.filename,
-      message.category,
+    sendToG1DM({
+      url: message.url,
+      filename: message.filename,
+      category: message.category,
       formatSpec,
+      mediaFormatSpec: formatSpec,
       container,
-      message.startImmediately !== false
-    ).then((result) => {
+      codec: message.codec,
+      height: message.height,
+      qualityLabel: message.qualityLabel,
+      clarity: message.clarity,
+      resolution: message.resolution,
+      startImmediately: message.startImmediately !== false
+    }).then((result) => {
       sendResponse({ success: true, result });
     }).catch((err) => {
       sendResponse({ success: false, error: err.message });
@@ -142,15 +148,18 @@ async function probeUrl(url) {
   return { error: 'Probe failed' };
 }
 
-async function sendToG1DM(url, filename, category, formatSpec, container, startImmediately = true) {
-  const payload = {
-    url,
-    filename,
-    category,
-    formatSpec,
-    container,
-    startImmediately,
-  };
+async function sendToG1DM(payloadOrUrl, filename, category, formatSpec, container, startImmediately = true) {
+  const payload = typeof payloadOrUrl === 'object' && payloadOrUrl !== null
+    ? { startImmediately: true, ...payloadOrUrl }
+    : {
+        url: payloadOrUrl,
+        filename,
+        category,
+        formatSpec,
+        mediaFormatSpec: formatSpec,
+        container,
+        startImmediately,
+      };
 
   // Primary attempt: Direct HTTP to core daemon
   try {

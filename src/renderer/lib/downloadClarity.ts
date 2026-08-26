@@ -17,9 +17,16 @@ export function getDownloadClarity(item: DownloadItem | null | undefined): strin
     anyItem.mediaMetadata?.resolution;
   if (explicit && typeof explicit === 'string' && explicit.trim()) {
     const clean = explicit.trim();
-    // Normalize e.g. "1080p (Full HD)" -> "1080p"
-    const match = clean.match(/^(8K|4K|2K|4320p|2880p|2160p|1440p|1080p|720p|480p|360p|240p|144p|FHD|UHD|HD)/i);
-    if (match) return match[1].toUpperCase().replace('P', 'p');
+    // Normalize e.g. "4K HEVC" -> "4K", "2160p" -> "4K", "1080p (Full HD)" -> "1080p"
+    const match = clean.match(/\b(8K|4K|2K|4320p|2880p|2160p|1440p|1080p|720p|480p|360p|240p|144p|FHD|UHD|HD)\b/i) || clean.match(/^(8K|4K|2K|4320p|2880p|2160p|1440p|1080p|720p|480p|360p|240p|144p|FHD|UHD|HD)/i);
+    if (match) {
+      const tag = match[1].toUpperCase();
+      if (tag === '2160P' || tag === 'UHD') return '4K';
+      if (tag === '4320P' || tag === 'FUHD') return '8K';
+      if (tag === '1440P' || tag === 'QHD') return '1440p';
+      if (tag === '1080P' || tag === 'FHD') return '1080p';
+      return tag.replace('P', 'p');
+    }
     return clean;
   }
 

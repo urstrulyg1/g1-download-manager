@@ -1029,9 +1029,12 @@
         if (data.filename && (!filename || filename === 'download.bin' || filename.startsWith('watch.') || filename.startsWith('video.'))) {
           filenameInput.value = data.filename;
         }
-        if (data.suggestedCategory && data.suggestedCategory !== 'other') {
+        if (data.suggestedCategory && data.suggestedCategory !== 'other' && data.suggestedCategory !== 'document') {
           catSelect.value = data.suggestedCategory;
           updateCategoryIcon(data.suggestedCategory);
+        } else if (category === 'video' || category === 'audio') {
+          catSelect.value = category;
+          updateCategoryIcon(category);
         }
         if (data.size && data.size > 0) {
           filesizeLabel.innerText = formatBytes(data.size);
@@ -1067,14 +1070,23 @@
     const submit = (startImmediately) => {
       const finalUrl = urlInput.value.trim() || url;
       const finalName = filenameInput.value.trim() || filename;
-      const finalCat = catSelect.value || category;
+      let finalCat = catSelect.value || category;
+      if (finalCat === 'document' && (params.category === 'video' || params.category === 'audio' || /\.(mp4|mkv|webm|mov|mp3|flac|wav|m4a|aac)$/i.test(finalName))) {
+        finalCat = params.category || (/\.(mp3|flac|wav|m4a|aac)$/i.test(finalName) ? 'audio' : 'video');
+      }
 
       const payload = {
         url: finalUrl,
         filename: finalName,
         category: finalCat,
-        formatSpec: formatSpec,
-        container: container,
+        formatSpec: params.formatSpec || params.mediaFormatSpec || formatSpec,
+        mediaFormatSpec: params.formatSpec || params.mediaFormatSpec || formatSpec,
+        container: params.container || container,
+        codec: params.codec,
+        height: params.height,
+        qualityLabel: params.qualityLabel || (params.height ? `${params.height}p` : undefined),
+        clarity: params.clarity || params.qualityLabel || (params.height ? `${params.height}p` : undefined),
+        resolution: params.resolution,
         startImmediately: startImmediately
       };
 

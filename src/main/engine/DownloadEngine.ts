@@ -266,7 +266,12 @@ export class DownloadEngine extends EventEmitter {
       size: probe.size > 0 ? probe.size : undefined,
     });
 
-    const category = params.category || ruleMatch.category || probe.suggestedCategory || 'other';
+    let category = params.category || ruleMatch.category || probe.suggestedCategory || 'other';
+    if ((category === 'other' || category === 'document') && /\.(mp4|mkv|webm|mov|avi|flv|ts|m4v)$/i.test(params.filename || probe.filename)) {
+      category = 'video';
+    } else if ((category === 'other' || category === 'document') && /\.(mp3|flac|wav|m4a|aac|ogg|opus)$/i.test(params.filename || probe.filename)) {
+      category = 'audio';
+    }
     const priority = params.priority || ruleMatch.priority || 'normal';
 
     // Queues are created lazily, driven by real user actions only: a fresh
@@ -419,12 +424,29 @@ export class DownloadEngine extends EventEmitter {
       ],
     };
 
-    const clarity =
+    let explicitClarity =
       (params as any).qualityLabel ||
       (params as any).clarity ||
       (params as any).resolution ||
-      ((params as any).height ? `${(params as any).height}p` : undefined) ||
-      mediaAnalysis?.recommendedQuality?.resolutionLabel;
+      ((params as any).height ? `${(params as any).height}p` : undefined);
+
+    const explicitFormat = (params as any).formatSpec || (params as any).mediaFormatSpec;
+    if (!explicitClarity && explicitFormat && typeof explicitFormat === 'string') {
+      const hMatch = explicitFormat.match(/height[<=~]*(\d+)/i) || explicitFormat.match(/(\d{3,4})p/i);
+      if (hMatch && hMatch[1]) {
+        const h = parseInt(hMatch[1], 10);
+        if (h >= 3840) explicitClarity = '8K';
+        else if (h >= 2160) explicitClarity = '4K';
+        else if (h >= 1440) explicitClarity = '1440p';
+        else if (h >= 1080) explicitClarity = '1080p';
+        else if (h >= 720) explicitClarity = '720p';
+        else if (h >= 480) explicitClarity = '480p';
+        else if (h >= 360) explicitClarity = '360p';
+        else explicitClarity = `${h}p`;
+      }
+    }
+
+    const clarity = explicitClarity || mediaAnalysis?.recommendedQuality?.resolutionLabel;
 
     (item as any).thumbnailUrl = mediaAnalysis?.thumbnailUrl || (params as any).thumbnailUrl;
     (item as any).qualityLabel = clarity;
