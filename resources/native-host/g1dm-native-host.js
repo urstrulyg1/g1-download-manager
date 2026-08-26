@@ -8,7 +8,7 @@
 const http = require('http');
 
 const PORT = parseInt(process.env.PORT || '8055', 10);
-const API_BASE = `http://127.0.0.1:${PORT}/api/v1`;
+const API_BASE = `http://127.0.0.1:${PORT}/api`;
 const MAX_MESSAGE_SIZE = 1024 * 1024; // 1 MB boundary
 
 function sendNativeMessage(msg) {

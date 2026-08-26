@@ -76,8 +76,22 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'DOWNLOAD_URL') {
     const container = message.container || message.format || 'mp4';
     const formatSpec = message.formatSpec || message.mediaFormatSpec;
-    sendToG1DM(message.url, message.filename, message.category, formatSpec, container);
-    sendResponse({ success: true });
+    sendToG1DM(
+      message.url,
+      message.filename,
+      message.category,
+      formatSpec,
+      container,
+      message.startImmediately !== false
+    ).then((result) => {
+      sendResponse({ success: true, result });
+    }).catch((err) => {
+      sendResponse({ success: false, error: err.message });
+    });
+    return true; // async response
+  } else if (message.type === 'PROBE_URL') {
+    probeUrl(message.url).then(sendResponse);
+    return true; // async
   } else if (message.type === 'OPEN_G1DM_STUDIO') {
     const target = message.url ? `http://127.0.0.1:${G1DM_PORT}/#media?url=${encodeURIComponent(message.url)}` : `http://127.0.0.1:${G1DM_PORT}/#media`;
     openOrFocusG1DMTab(target);
@@ -88,42 +102,68 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 });
 
-async function sendToG1DM(url, filename, category, formatSpec, container) {
-  // First attempt: Native Messaging Host if configured
+async function probeUrl(url) {
+  try {
+    const res = await fetch(`${G1DM_API_BASE}/probe`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url }),
+    });
+    if (res.ok) {
+      return await res.json();
+    }
+  } catch (err) {
+    console.warn('[G1DM Companion] Probe request failed:', err);
+  }
+  return { error: 'Probe failed' };
+}
+
+async function sendToG1DM(url, filename, category, formatSpec, container, startImmediately = true) {
+  const payload = {
+    url,
+    filename,
+    category,
+    formatSpec,
+    container,
+    startImmediately,
+  };
+
+  // Primary attempt: Direct HTTP to core daemon from service worker (fast & reliable)
+  try {
+    const res = await fetch(`${G1DM_API_BASE}/downloads`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (res.ok) {
+      const json = await res.json();
+      console.log('[G1DM Companion] Successfully enqueued download:', json);
+      return json;
+    }
+  } catch (err) {
+    console.warn('[G1DM Companion] HTTP fetch failed, trying Native Messaging Host...', err);
+  }
+
+  // Secondary attempt: Native Messaging Host
   try {
     const nativeRes = await new Promise((resolve, reject) => {
       chrome.runtime.sendNativeMessage(
         'com.g1dm.native_host',
-        { command: 'add', url, filename, category, formatSpec, container },
+        { command: 'add', ...payload },
         (res) => {
           if (chrome.runtime.lastError) reject(chrome.runtime.lastError);
           else resolve(res);
         }
       );
     });
-    if (nativeRes && nativeRes.success) return;
-  } catch {
-    // Fallback to local HTTP loopback API
+    if (nativeRes && nativeRes.success) {
+      return nativeRes.result;
+    }
+  } catch (nativeErr) {
+    console.warn('[G1DM Companion] Native host also failed:', nativeErr);
   }
 
-  try {
-    const res = await fetch(`${G1DM_API_BASE}/downloads`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        url,
-        filename,
-        category,
-        formatSpec,
-        container,
-        startImmediately: true,
-      }),
-    });
-    const json = await res.json();
-    console.log('[G1DM Companion] Enqueued download:', json);
-  } catch (err) {
-    console.warn('[G1DM Companion] Core daemon unreachable at', G1DM_API_BASE, err);
-  }
+  throw new Error('Could not connect to G1DM core engine.');
 }
 
 async function testG1DMConnection() {

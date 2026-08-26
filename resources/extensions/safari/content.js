@@ -1043,41 +1043,40 @@
     updateCategoryIcon(catSelect.value);
     catSelect.addEventListener('change', () => updateCategoryIcon(catSelect.value));
 
-    // Live probe via backend API
-    fetch('http://127.0.0.1:8055/api/probe', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url })
-    })
-      .then(res => res.json())
-      .then(data => {
-        if (data && !data.error) {
-          if (data.filename && (!filename || filename === 'download.bin' || filename.startsWith('watch.') || filename.startsWith('video.'))) {
-            filenameInput.value = data.filename;
-          }
-          if (data.suggestedCategory && data.suggestedCategory !== 'other') {
-            catSelect.value = data.suggestedCategory;
-            updateCategoryIcon(data.suggestedCategory);
-          }
-          if (data.size && data.size > 0) {
-            filesizeLabel.innerText = formatBytes(data.size);
-          } else {
-            filesizeLabel.innerText = 'Dynamic Stream';
-          }
-          if (data.capabilities) {
-            resumableLabel.innerText = data.capabilities.supportsRange
-              ? '✓ Multi-Threaded Turbo Resumable'
-              : 'Single-Stream Download';
-          }
-          if (data.safetyWarning && data.safetyWarning.isSafe) {
-            safetyBadge.style.display = 'block';
-          }
+    // Live probe via background service worker (bypasses webpage CSP / CORS)
+    const handleProbeResult = (data) => {
+      if (data && !data.error) {
+        if (data.filename && (!filename || filename === 'download.bin' || filename.startsWith('watch.') || filename.startsWith('video.'))) {
+          filenameInput.value = data.filename;
         }
-      })
-      .catch(() => {
-        filesizeLabel.innerText = 'Direct Download';
-        resumableLabel.innerText = 'Connected to Core Engine';
+        if (data.suggestedCategory && data.suggestedCategory !== 'other') {
+          catSelect.value = data.suggestedCategory;
+          updateCategoryIcon(data.suggestedCategory);
+        }
+        if (data.size && data.size > 0) {
+          filesizeLabel.innerText = formatBytes(data.size);
+        } else {
+          filesizeLabel.innerText = 'Dynamic Stream';
+        }
+        if (data.capabilities) {
+          resumableLabel.innerText = data.capabilities.supportsRange
+            ? '✓ Multi-Threaded Turbo Resumable'
+            : 'Single-Stream Download';
+        }
+        if (data.safetyWarning && data.safetyWarning.isSafe) {
+          safetyBadge.style.display = 'block';
+        }
+      }
+    };
+
+    const runtimeApi = (typeof browser !== 'undefined' && browser.runtime) ? browser.runtime : (typeof chrome !== 'undefined' ? chrome.runtime : null);
+    if (runtimeApi && runtimeApi.sendMessage) {
+      runtimeApi.sendMessage({ type: 'PROBE_URL', url }, (data) => {
+        if (data && !data.error) {
+          handleProbeResult(data);
+        }
       });
+    }
 
     const closeModal = () => {
       root.style.opacity = '0';
@@ -1099,31 +1098,29 @@
         startImmediately: startImmediately
       };
 
-      fetch('http://127.0.0.1:8055/api/downloads', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      })
-        .then(res => res.json())
-        .then(() => {
-          closeModal();
-          showDownloadToast(startImmediately ? '✓ Download Started' : '✓ Queued in G1DM', finalName);
-        })
-        .catch(() => {
-          if (typeof browser !== 'undefined' && browser.runtime?.sendMessage) {
-            browser.runtime.sendMessage({
-              type: 'DOWNLOAD_URL',
-              ...payload
-            });
-          } else if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
-            chrome.runtime.sendMessage({
-              type: 'DOWNLOAD_URL',
-              ...payload
-            });
-          }
+      if (runtimeApi && runtimeApi.sendMessage) {
+        runtimeApi.sendMessage({
+          type: 'DOWNLOAD_URL',
+          ...payload
+        }, () => {
           closeModal();
           showDownloadToast(startImmediately ? '✓ Download Started' : '✓ Queued in G1DM', finalName);
         });
+      } else {
+        fetch('http://127.0.0.1:8055/api/downloads', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        })
+          .then(() => {
+            closeModal();
+            showDownloadToast(startImmediately ? '✓ Download Started' : '✓ Queued in G1DM', finalName);
+          })
+          .catch(() => {
+            closeModal();
+            showDownloadToast(startImmediately ? '✓ Download Started' : '✓ Queued in G1DM', finalName);
+          });
+      }
     };
 
     dialog.querySelector('#g1dm-btn-start').addEventListener('click', () => submit(true));
