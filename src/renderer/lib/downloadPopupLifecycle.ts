@@ -16,6 +16,6 @@ export function chooseDownloadPopup(
   const completed = downloads.find((item) => item.status === 'completed' && minimized.has(item.id));
   if (completed) return { openId: completed.id, restoreCompletedId: completed.id };
   if (currentId) return { openId: currentId };
-  const active = downloads.find((item) => ['downloading', 'paused'].includes(item.status) && !minimized.has(item.id) && !dismissed.has(item.id));
+  const active = downloads.find((item) => item.status === 'downloading' && !minimized.has(item.id) && !dismissed.has(item.id));
   return { openId: active?.id || null };
 }

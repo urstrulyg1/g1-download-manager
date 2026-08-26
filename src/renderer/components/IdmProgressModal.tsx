@@ -150,6 +150,7 @@ export const IdmProgressModal: React.FC<IdmProgressModalProps> = ({
 
   const handleCancel = () => {
     api.cancelDownload(item.id);
+    onClose();
   };
 
   const handleRetry = () => {

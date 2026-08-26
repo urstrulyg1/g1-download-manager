@@ -30,6 +30,7 @@ import { DownloadItem, DownloadQueue, CategoryRule } from '../../shared/types';
 import { Language, translations } from '../lib/i18n';
 import { api } from '../lib/api';
 import { MediaPreviewModal } from './MediaPreviewModal';
+import { DeleteConfirmModal } from './DeleteConfirmModal';
 import { getDownloadClarity } from '../lib/downloadClarity';
 
 interface DownloadsViewProps {
@@ -76,6 +77,8 @@ const DownloadsViewComponent: React.FC<DownloadsViewProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [previewItem, setPreviewItem] = useState<DownloadItem | null>(null);
+  const [itemToDelete, setItemToDelete] = useState<DownloadItem | null>(null);
+  const [isBatchDeleteModalOpen, setIsBatchDeleteModalOpen] = useState(false);
   const [sortBy, setSortBy] = useState<'createdAt' | 'filename' | 'size' | 'progress' | 'speed'>('createdAt');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -394,18 +397,11 @@ const DownloadsViewComponent: React.FC<DownloadsViewProps> = ({
               <span>Pause</span>
             </button>
             <button
-              onClick={() => handleBatchDelete(false)}
-              className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium flex items-center gap-1 border border-slate-700"
-            >
-              <Trash2 className="w-3 h-3 text-rose-400" />
-              <span>Remove Records</span>
-            </button>
-            <button
-              onClick={() => handleBatchDelete(true)}
-              className="px-2.5 py-1 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs font-medium flex items-center gap-1 shadow-sm"
+              onClick={() => setIsBatchDeleteModalOpen(true)}
+              className="px-2.5 py-1 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs font-medium flex items-center gap-1 shadow-sm active:scale-95 transition-all"
             >
               <Trash2 className="w-3 h-3" />
-              <span>Delete Files</span>
+              <span>Delete ({selectedIds.size})</span>
             </button>
           </div>
         </div>
@@ -811,14 +807,13 @@ const DownloadsViewComponent: React.FC<DownloadsViewProps> = ({
                           </button>
 
                           <button
-                            onClick={async (e) => {
+                            onClick={(e) => {
                               e.stopPropagation();
-                              await api.deleteDownload(item.id, false).catch(console.error);
-                              if (onRefresh) onRefresh();
+                              setItemToDelete(item);
                             }}
                             className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-950 text-slate-400 hover:text-rose-400 active:scale-95 transition-all shadow-sm"
-                            title="Remove download record from manager"
-                            aria-label="Remove download record"
+                            title="Delete download"
+                            aria-label="Delete download"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
@@ -877,6 +872,33 @@ const DownloadsViewComponent: React.FC<DownloadsViewProps> = ({
         item={previewItem}
         isOpen={!!previewItem}
         onClose={() => setPreviewItem(null)}
+      />
+
+      {/* Single Item Delete Confirmation Dialog */}
+      <DeleteConfirmModal
+        isOpen={!!itemToDelete}
+        item={itemToDelete}
+        onConfirm={async (deleteFile) => {
+          if (itemToDelete) {
+            const id = itemToDelete.id;
+            setItemToDelete(null);
+            await api.deleteDownload(id, deleteFile).catch(console.error);
+            if (onRefresh) onRefresh();
+          }
+        }}
+        onClose={() => setItemToDelete(null)}
+      />
+
+      {/* Batch Delete Confirmation Dialog */}
+      <DeleteConfirmModal
+        isOpen={isBatchDeleteModalOpen && selectedIds.size > 0}
+        item={null}
+        items={downloads.filter((d) => selectedIds.has(d.id))}
+        onConfirm={async (deleteFile) => {
+          setIsBatchDeleteModalOpen(false);
+          await handleBatchDelete(deleteFile);
+        }}
+        onClose={() => setIsBatchDeleteModalOpen(false)}
       />
     </div>
   );

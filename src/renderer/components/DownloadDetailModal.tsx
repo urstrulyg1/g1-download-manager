@@ -28,6 +28,7 @@ import { DownloadItem, SegmentInfo, ChecksumInfo, ArchiveInfo, SecurityScanInfo 
 import { DownloadIntelligence, DownloadHealthReport } from '../../main/engine/DownloadIntelligence';
 import { api } from '../lib/api';
 import { getDownloadClarity } from '../lib/downloadClarity';
+import { DeleteConfirmModal } from './DeleteConfirmModal';
 
 interface DownloadDetailModalProps {
   item: DownloadItem | null;
@@ -45,6 +46,7 @@ export const DownloadDetailModal: React.FC<DownloadDetailModalProps> = ({ item, 
   const [selectedAlgo, setSelectedAlgo] = useState<'sha256' | 'sha512' | 'md5'>('sha256');
   const [isVerifying, setIsVerifying] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [archiveLoading, setArchiveLoading] = useState(false);
   const [archiveData, setArchiveData] = useState<ArchiveInfo | null>(item.archiveInfo || null);
 
@@ -187,14 +189,9 @@ export const DownloadDetailModal: React.FC<DownloadDetailModalProps> = ({ item, 
             </button>
 
             <button
-              onClick={async () => {
-                if (confirm(`Remove download record for "${item.filename}"?`)) {
-                  await api.deleteDownload(item.id, false);
-                  onClose();
-                }
-              }}
+              onClick={() => setIsDeleteModalOpen(true)}
               className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-950 text-slate-400 hover:text-rose-400 active:scale-95 transition-all shadow-sm"
-              title="Remove download record"
+              title="Delete download"
             >
               <Trash2 className="w-4 h-4" />
             </button>
@@ -729,6 +726,18 @@ export const DownloadDetailModal: React.FC<DownloadDetailModalProps> = ({ item, 
           )}
         </div>
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      <DeleteConfirmModal
+        isOpen={isDeleteModalOpen}
+        item={item}
+        onConfirm={async (deleteFile) => {
+          setIsDeleteModalOpen(false);
+          await api.deleteDownload(item.id, deleteFile).catch(console.error);
+          onClose();
+        }}
+        onClose={() => setIsDeleteModalOpen(false)}
+      />
     </div>
   );
 };

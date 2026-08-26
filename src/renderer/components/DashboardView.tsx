@@ -27,6 +27,7 @@ import { Language, translations } from '../lib/i18n';
 import { ActiveView } from './Sidebar';
 import { api } from '../lib/api';
 import { getDownloadClarity } from '../lib/downloadClarity';
+import { DeleteConfirmModal } from './DeleteConfirmModal';
 
 interface DashboardViewProps {
   downloads: DownloadItem[];
@@ -49,6 +50,7 @@ const DashboardViewComponent: React.FC<DashboardViewProps> = ({
 }) => {
   const t = translations[lang] || translations.en;
   const [speedHistory, setSpeedHistory] = useState<number[]>(() => new Array(40).fill(0));
+  const [itemToDelete, setItemToDelete] = useState<DownloadItem | null>(null);
 
   const formatBytes = (bytes: number) => {
     if (bytes <= 0) return '0 B';
@@ -456,9 +458,12 @@ const DashboardViewComponent: React.FC<DashboardViewProps> = ({
                     ) : null}
 
                     <button
-                      onClick={() => api.deleteDownload(item.id, false)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setItemToDelete(item);
+                      }}
                       className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-950 text-slate-400 hover:text-rose-400 shadow-sm transition-all duration-200 active:scale-95"
-                      title="Remove record"
+                      title="Delete download"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
@@ -469,6 +474,19 @@ const DashboardViewComponent: React.FC<DashboardViewProps> = ({
           </div>
         )}
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      <DeleteConfirmModal
+        isOpen={!!itemToDelete}
+        item={itemToDelete}
+        onConfirm={async (deleteFile) => {
+          if (itemToDelete) {
+            await api.deleteDownload(itemToDelete.id, deleteFile).catch(console.error);
+            setItemToDelete(null);
+          }
+        }}
+        onClose={() => setItemToDelete(null)}
+      />
     </div>
   );
 };

@@ -19,6 +19,6 @@ describe('download popup lifecycle policy', () => {
   });
 
   it('selects only one active popup while allowing multiple downloads in the minimized center', () => {
-    expect(chooseDownloadPopup([item('a', 'downloading'), item('b', 'paused')], null, new Set(['a']), new Set()).openId).toBe('b');
+    expect(chooseDownloadPopup([item('a', 'downloading'), item('b', 'downloading')], null, new Set(['a']), new Set()).openId).toBe('b');
   });
 });

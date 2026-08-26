@@ -896,6 +896,24 @@ export class DownloadEngine extends EventEmitter {
         if (item.tempPath && fs.existsSync(item.tempPath)) fs.unlinkSync(item.tempPath);
         if (item.stateFilePath && fs.existsSync(item.stateFilePath)) fs.unlinkSync(item.stateFilePath);
         if (item.finalPath && fs.existsSync(item.finalPath)) fs.unlinkSync(item.finalPath);
+        
+        // Delete any related .part or .g1dm.part files
+        if (item.finalPath) {
+          const finalPart = `${item.finalPath}.part`;
+          if (fs.existsSync(finalPart)) fs.unlinkSync(finalPart);
+          const finalG1dm = `${item.finalPath}.g1dm.part`;
+          if (fs.existsSync(finalG1dm)) fs.unlinkSync(finalG1dm);
+        }
+
+        // Fallback: check destinationDir + filename
+        if (item.destinationDir && item.filename) {
+          const fallbackPath = path.join(item.destinationDir, item.filename);
+          if (fs.existsSync(fallbackPath)) fs.unlinkSync(fallbackPath);
+          const partFallback = `${fallbackPath}.part`;
+          if (fs.existsSync(partFallback)) fs.unlinkSync(partFallback);
+          const g1dmFallback = `${fallbackPath}.g1dm.part`;
+          if (fs.existsSync(g1dmFallback)) fs.unlinkSync(g1dmFallback);
+        }
       } catch (err) {
         console.error('Error unlinking files during deleteDownload:', err);
       }
