@@ -1,5 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import * as os from 'os';
 import { execFile } from 'child_process';
 import { EventEmitter } from 'events';
 import {
@@ -887,7 +888,17 @@ export class DownloadEngine extends EventEmitter {
   }
 
   public deleteDownload(id: string, deleteFile: boolean = false): void {
+    const worker = this.activeWorkers.get(id);
+    if (worker) {
+      try {
+        if (typeof (worker as any).cancel === 'function') (worker as any).cancel();
+        if (typeof (worker as any).pause === 'function') (worker as any).pause();
+        if (typeof (worker as any).abort === 'function') (worker as any).abort();
+      } catch {}
+      this.activeWorkers.delete(id);
+    }
     this.pauseDownload(id);
+
     let item = this.downloads.get(id);
     if (!item) {
       item = this.db.getDownload(id) || undefined;
@@ -895,29 +906,83 @@ export class DownloadEngine extends EventEmitter {
 
     if (item && deleteFile) {
       try {
-        if (item.tempPath && fs.existsSync(item.tempPath)) fs.unlinkSync(item.tempPath);
-        if (item.stateFilePath && fs.existsSync(item.stateFilePath)) fs.unlinkSync(item.stateFilePath);
-        if (item.finalPath && fs.existsSync(item.finalPath)) fs.unlinkSync(item.finalPath);
-        
-        // Delete any related .part or .g1dm.part files
-        if (item.finalPath) {
-          const finalPart = `${item.finalPath}.part`;
-          if (fs.existsSync(finalPart)) fs.unlinkSync(finalPart);
-          const finalG1dm = `${item.finalPath}.g1dm.part`;
-          if (fs.existsSync(finalG1dm)) fs.unlinkSync(finalG1dm);
+        const candidatePaths = new Set<string>();
+
+        const addCandidate = (p?: string) => {
+          if (!p) return;
+          try {
+            let normalized = p;
+            if (normalized.startsWith('~/') || normalized === '~') {
+              const homedir = os.homedir();
+              normalized = path.join(homedir, normalized.slice(1));
+            }
+            normalized = path.resolve(normalized);
+            candidatePaths.add(normalized);
+            candidatePaths.add(`${normalized}.part`);
+            candidatePaths.add(`${normalized}.g1dm`);
+            candidatePaths.add(`${normalized}.g1dm.part`);
+            candidatePaths.add(`${normalized}.ytdl`);
+            candidatePaths.add(`${normalized}.temp`);
+          } catch {}
+        };
+
+        addCandidate(item.finalPath);
+        addCandidate(item.tempPath);
+        addCandidate(item.stateFilePath);
+
+        // Candidate directories to scan for related stems
+        const candidateDirs = new Set<string>();
+        if (item.destinationDir) candidateDirs.add(item.destinationDir);
+        if (item.finalPath) candidateDirs.add(path.dirname(item.finalPath));
+        if (item.tempPath) candidateDirs.add(path.dirname(item.tempPath));
+
+        const rawStem = path.parse(item.filename || (item.finalPath ? path.basename(item.finalPath) : '')).name;
+        const cleanStem = rawStem.replace(/\s*\(\d+\)$/, '').replace(/_\d+$/, '').trim();
+
+        for (let dir of candidateDirs) {
+          if (!dir) continue;
+          if (dir.startsWith('~/') || dir === '~') {
+            dir = path.join(os.homedir(), dir.slice(1));
+          }
+          dir = path.resolve(dir);
+
+          if (fs.existsSync(dir)) {
+            // Direct filename
+            if (item.filename) {
+              addCandidate(path.join(dir, item.filename));
+            }
+
+            // Loose matching for stems (handles container conversions and yt-dlp intermediate chunks)
+            const stemsToMatch = [rawStem, cleanStem].filter((s) => s && s.length > 1);
+            try {
+              const dirEntries = fs.readdirSync(dir);
+              for (const entry of dirEntries) {
+                if (
+                  entry === item.filename ||
+                  stemsToMatch.some((s) => entry === s || entry.startsWith(s))
+                ) {
+                  addCandidate(path.join(dir, entry));
+                }
+              }
+            } catch {}
+          }
         }
 
-        // Fallback: check destinationDir + filename
-        if (item.destinationDir && item.filename) {
-          const fallbackPath = path.join(item.destinationDir, item.filename);
-          if (fs.existsSync(fallbackPath)) fs.unlinkSync(fallbackPath);
-          const partFallback = `${fallbackPath}.part`;
-          if (fs.existsSync(partFallback)) fs.unlinkSync(partFallback);
-          const g1dmFallback = `${fallbackPath}.g1dm.part`;
-          if (fs.existsSync(g1dmFallback)) fs.unlinkSync(g1dmFallback);
+        // Unlink all resolved files
+        for (const filePath of candidatePaths) {
+          try {
+            if (fs.existsSync(filePath)) {
+              const stat = fs.lstatSync(filePath);
+              if (stat.isFile() || stat.isSymbolicLink()) {
+                fs.unlinkSync(filePath);
+              }
+            }
+          } catch (err) {
+            console.error(`[DownloadEngine] Error removing file: ${filePath}`, err);
+          }
         }
       } catch (err) {
-        console.error('Error unlinking files during deleteDownload:', err);
+        console.error('[DownloadEngine] Error during disk deletion in deleteDownload:', err);
       }
     }
 

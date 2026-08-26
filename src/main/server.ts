@@ -422,7 +422,7 @@ export async function createUnifiedServer(port: number = 8055) {
   });
 
   app.delete('/api/downloads/:id', (req, res) => {
-    const deleteFile = req.query.deleteFile === 'true';
+    const deleteFile = req.query.deleteFile === 'true' || req.query.deleteFile === '1' || (req.body && req.body.deleteFile === true);
     engine.deleteDownload(req.params.id, deleteFile);
     res.json({ success: true });
   });

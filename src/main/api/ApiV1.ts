@@ -67,7 +67,7 @@ export function createApiV1Router(engine: DownloadEngine, db: AppDatabase): Rout
   });
 
   router.delete('/downloads/:id', (req, res) => {
-    const deleteFile = req.query.deleteFile === 'true';
+    const deleteFile = req.query.deleteFile === 'true' || req.query.deleteFile === '1' || (req.body && req.body.deleteFile === true);
     engine.deleteDownload(req.params.id, deleteFile);
     res.json({ success: true });
   });
