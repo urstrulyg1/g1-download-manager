@@ -98,7 +98,7 @@ export const IdmProgressModal: React.FC<IdmProgressModalProps> = ({
   );
 
   useEffect(() => {
-    if (!item) return;
+    if (!item?.id) return;
     previouslyFocusedRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const root = dialogRef.current;
     root?.focus();
@@ -108,9 +108,11 @@ export const IdmProgressModal: React.FC<IdmProgressModalProps> = ({
     }, 16);
     return () => {
       window.clearTimeout(timer);
-      previouslyFocusedRef.current?.focus?.();
+      try {
+        previouslyFocusedRef.current?.focus?.();
+      } catch {}
     };
-  }, [item, focusableElements]);
+  }, [item?.id, focusableElements]);
 
   if (!item) return null;
 

@@ -323,9 +323,14 @@ fi
 
 # Graceful shutdown handler
 _SHUTDOWN_DONE=0
+TAIL_PID=""
+
 _do_shutdown() {
     [ "$_SHUTDOWN_DONE" -eq 1 ] && return
     _SHUTDOWN_DONE=1
+    if [ -n "${TAIL_PID:-}" ]; then
+        kill "$TAIL_PID" 2>/dev/null || true
+    fi
     echo ""
     echo -e "  ${YELLOW}${BOLD}🛑  Gracefully shutting down G1DM Core Engine (PID ${SERVER_PID})...${RESET}"
     kill -TERM "$SERVER_PID" 2>/dev/null || true
@@ -399,7 +404,12 @@ fi
 echo -e "  ${DARK_GRAY}───────────────────────────────────────────────────────────────────────────────${RESET}"
 echo -e "  ${YELLOW}${BOLD}💡  PRO-TIP:${RESET} ${GRAY}Press ${WHITE}${BOLD}Ctrl + C${RESET} ${GRAY}to stop the daemon safely.${RESET}"
 echo ""
+echo -e "  ${AQUA}${BOLD}📜  LIVE APPLICATION LOGS${RESET} ${GRAY}(streaming in real time)${RESET}"
+echo -e "  ${DARK_GRAY}───────────────────────────────────────────────────────────────────────────────${RESET}"
 
-# Restore cursor and wait for daemon
+# Restore cursor and stream logs in real time
 cleanup
+tail -n 20 -f "$LOG_FILE" &
+TAIL_PID=$!
+
 wait "$SERVER_PID" 2>/dev/null || true

@@ -38,7 +38,7 @@ interface DashboardViewProps {
   onSelectDownload: (item: DownloadItem) => void;
 }
 
-export const DashboardView: React.FC<DashboardViewProps> = ({
+const DashboardViewComponent: React.FC<DashboardViewProps> = ({
   downloads,
   metrics,
   categories,
@@ -48,7 +48,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onSelectDownload,
 }) => {
   const t = translations[lang] || translations.en;
-  const [speedHistory, setSpeedHistory] = useState<number[]>(new Array(40).fill(0));
+  const [speedHistory, setSpeedHistory] = useState<number[]>(() => new Array(40).fill(0));
 
   const formatBytes = (bytes: number) => {
     if (bytes <= 0) return '0 B';
@@ -59,41 +59,49 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   };
 
   // Aggregate stats
-  const activeDownloads = downloads.filter((d) => d.status === 'downloading');
-  const queuedDownloads = downloads.filter((d) => d.status === 'queued');
-  const completedDownloads = downloads.filter((d) => d.status === 'completed');
-  const pausedDownloads = downloads.filter((d) => d.status === 'paused');
-  const failedDownloads = downloads.filter((d) => d.status === 'failed');
+  const activeDownloads = React.useMemo(() => downloads.filter((d) => d.status === 'downloading'), [downloads]);
+  const queuedDownloads = React.useMemo(() => downloads.filter((d) => d.status === 'queued'), [downloads]);
+  const completedDownloads = React.useMemo(() => downloads.filter((d) => d.status === 'completed'), [downloads]);
+  const pausedDownloads = React.useMemo(() => downloads.filter((d) => d.status === 'paused'), [downloads]);
+  const failedDownloads = React.useMemo(() => downloads.filter((d) => d.status === 'failed'), [downloads]);
 
-  const currentSpeed = activeDownloads.reduce((sum, d) => sum + d.speed, 0);
-  const totalDownloadedBytes = downloads.reduce((sum, d) => sum + d.downloadedBytes, 0);
-  const totalConnections = activeDownloads.reduce((sum, d) => sum + d.activeConnections, 0);
+  const currentSpeed = React.useMemo(() => activeDownloads.reduce((sum, d) => sum + (d.speed || 0), 0), [activeDownloads]);
+  const totalDownloadedBytes = React.useMemo(() => downloads.reduce((sum, d) => sum + (d.downloadedBytes || 0), 0), [downloads]);
+  const totalConnections = React.useMemo(() => activeDownloads.reduce((sum, d) => sum + (d.activeConnections || 0), 0), [activeDownloads]);
 
-  // Update rolling speed graph
+  // Update rolling speed graph (throttled to avoid redundant renders)
   useEffect(() => {
-    setSpeedHistory((prev) => [...prev.slice(1), currentSpeed]);
+    const timer = setTimeout(() => {
+      setSpeedHistory((prev) => [...prev.slice(1), currentSpeed]);
+    }, 200);
+    return () => clearTimeout(timer);
   }, [currentSpeed]);
 
-  const maxSpeed = Math.max(...speedHistory, 1024 * 1024); // at least 1MB scale
+  const maxSpeed = React.useMemo(() => Math.max(...speedHistory, 1024 * 1024), [speedHistory]); // at least 1MB scale
 
   // SVG Chart path calculation
   const chartHeight = 120;
   const chartWidth = 600;
-  const points = speedHistory.map((val, idx) => {
-    const x = (idx / (speedHistory.length - 1)) * chartWidth;
-    const y = chartHeight - (val / maxSpeed) * (chartHeight - 20) - 10;
-    return `${x},${y}`;
-  });
 
-  const svgPath = points.length > 0 ? `M ${points.join(' L ')}` : '';
-  const areaPath =
-    points.length > 0 ? `M 0,${chartHeight} L ${points.join(' L ')} L ${chartWidth},${chartHeight} Z` : '';
+  const { svgPath, areaPath } = React.useMemo(() => {
+    const points = speedHistory.map((val, idx) => {
+      const x = (idx / (speedHistory.length - 1)) * chartWidth;
+      const y = chartHeight - (val / maxSpeed) * (chartHeight - 20) - 10;
+      return `${x},${y}`;
+    });
+    const sPath = points.length > 0 ? `M ${points.join(' L ')}` : '';
+    const aPath = points.length > 0 ? `M 0,${chartHeight} L ${points.join(' L ')} L ${chartWidth},${chartHeight} Z` : '';
+    return { svgPath: sPath, areaPath: aPath };
+  }, [speedHistory, maxSpeed]);
 
   // Category distribution
-  const categoryBytes: Record<string, number> = {};
-  for (const item of downloads) {
-    categoryBytes[item.category] = (categoryBytes[item.category] || 0) + item.downloadedBytes;
-  }
+  const categoryBytes = React.useMemo(() => {
+    const acc: Record<string, number> = {};
+    for (const item of downloads) {
+      acc[item.category] = (acc[item.category] || 0) + item.downloadedBytes;
+    }
+    return acc;
+  }, [downloads]);
 
   return (
     <div className="p-6 pt-10 pb-12 space-y-6 max-w-7xl mx-auto w-full">
@@ -464,3 +472,5 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     </div>
   );
 };
+
+export const DashboardView = React.memo(DashboardViewComponent);

@@ -45,6 +45,7 @@ import { chooseDownloadPopup } from '../lib/downloadPopupLifecycle';
 export default function Home() {
   const {
     downloads,
+    setDownloads,
     queues,
     categories,
     settings,
@@ -73,12 +74,40 @@ export default function Home() {
   const [isActionCenterOpen, setIsActionCenterOpen] = useState(false);
   const [selectedDownload, setSelectedDownload] = useState<DownloadItem | null>(null);
   const [activeIdmDownloadId, setActiveIdmDownloadId] = useState<string | null>(null);
+  const [cachedActiveItem, setCachedActiveItem] = useState<DownloadItem | null>(null);
   // Presentation-only lifecycle. Download state itself remains exclusively in
   // useDownloadEngine / the server WebSocket stream.
   const [minimizedDownloadIds, setMinimizedDownloadIds] = useState<Set<string>>(() => new Set());
   const [dismissedDownloadIds, setDismissedDownloadIds] = useState<Set<string>>(() => new Set());
   const [isRetryingFailed, setIsRetryingFailed] = useState(false);
   const [retryFailedError, setRetryFailedError] = useState<string | null>(null);
+
+  const handleOpenDownloadPopup = React.useCallback((itemOrId: DownloadItem | string) => {
+    const id = typeof itemOrId === 'string' ? itemOrId : itemOrId.id;
+    if (typeof itemOrId !== 'string') {
+      setCachedActiveItem(itemOrId);
+      setDownloads((previous) => {
+        const idx = previous.findIndex((d) => d.id === id);
+        if (idx === -1) return [itemOrId, ...previous];
+        const updated = [...previous];
+        updated[idx] = itemOrId;
+        return updated;
+      });
+    }
+    setMinimizedDownloadIds((previous) => {
+      if (!previous.has(id)) return previous;
+      const next = new Set(previous);
+      next.delete(id);
+      return next;
+    });
+    setDismissedDownloadIds((previous) => {
+      if (!previous.has(id)) return previous;
+      const next = new Set(previous);
+      next.delete(id);
+      return next;
+    });
+    setActiveIdmDownloadId(id);
+  }, [setDownloads]);
 
   const retryAllFailed = async () => {
     if (isRetryingFailed) return;
@@ -111,6 +140,14 @@ export default function Home() {
     }
     if (!activeIdmDownloadId && popupDecision.openId) setActiveIdmDownloadId(popupDecision.openId);
   }, [downloads, activeIdmDownloadId, minimizedDownloadIds, dismissedDownloadIds]);
+
+  // Keep cached active item synchronized with live download state
+  useEffect(() => {
+    if (activeIdmDownloadId) {
+      const match = downloads.find((d) => d.id === activeIdmDownloadId);
+      if (match) setCachedActiveItem(match);
+    }
+  }, [downloads, activeIdmDownloadId]);
 
   const [clipboardUrl, setClipboardUrl] = useState<string | null>(null);
   const [inboxItems, setInboxItems] = useState<InboxItem[]>([]);
@@ -407,7 +444,7 @@ export default function Home() {
               onQueueFilterChange={setQueueFilter}
               lang={lang}
               onSelectDownload={(item) => setSelectedDownload(item)}
-              onOpenIdmProgress={(item) => setActiveIdmDownloadId(item.id)}
+              onOpenIdmProgress={handleOpenDownloadPopup}
               onRefresh={refreshAll}
             />
           )}
@@ -478,7 +515,7 @@ export default function Home() {
             <MediaDetectorView
               lang={lang}
               onDownloadAdded={refreshAll}
-              onDownloadStarted={(item) => setActiveIdmDownloadId(item.id)}
+              onDownloadStarted={handleOpenDownloadPopup}
             />
           )}
 
@@ -554,7 +591,7 @@ export default function Home() {
         categories={categories}
         defaultDownloadDir={settings?.general.defaultDownloadDir || '/home/user/Downloads'}
         initialUrl={addModalInitialUrl}
-        onDownloadStarted={(item) => setActiveIdmDownloadId(item.id)}
+        onDownloadStarted={handleOpenDownloadPopup}
       />
 
       <DownloadDetailModal
@@ -563,10 +600,11 @@ export default function Home() {
       />
 
       <IdmProgressModal
-        item={downloads.find((d) => d.id === activeIdmDownloadId) || null}
+        item={downloads.find((d) => d.id === activeIdmDownloadId) || (cachedActiveItem?.id === activeIdmDownloadId ? cachedActiveItem : null)}
         onClose={() => {
           if (activeIdmDownloadId) setDismissedDownloadIds((previous) => new Set(previous).add(activeIdmDownloadId));
           setActiveIdmDownloadId(null);
+          setCachedActiveItem(null);
         }}
         onMinimize={() => {
           if (activeIdmDownloadId) setMinimizedDownloadIds((previous) => new Set(previous).add(activeIdmDownloadId));
@@ -616,7 +654,7 @@ export default function Home() {
         onDownloadNow={async (u) => {
           setClipboardUrl(null);
           const item = await api.addDownload({ url: u, startImmediately: true });
-          if (item) setActiveIdmDownloadId(item.id);
+          if (item) handleOpenDownloadPopup(item);
         }}
         onAddToQueue={async (u) => {
           setClipboardUrl(null);

@@ -86,7 +86,6 @@ body {
   color: var(--foreground);
   font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   overflow: hidden;
-  transition: background-color 0.25s ease, color 0.25s ease;
 }
 
 #__next {
@@ -97,7 +96,6 @@ body {
 .theme-app {
   background-color: var(--background);
   color: var(--foreground);
-  transition: background-color 0.25s ease, color 0.25s ease;
 }
 
 .theme-surface {
@@ -613,11 +611,11 @@ html[data-theme] .theme-overlay {
 
 /* Ultra-Smooth Button Transitions & Click Feedback */
 button {
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease;
 }
 
 button:active {
-  transform: scale(0.96);
+  transform: scale(0.97);
 }
 
 /* Smooth Fade & Slide In */
@@ -633,7 +631,8 @@ button:active {
 }
 
 .animate-fade-in-up {
-  animation: fadeInSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: fadeInSlideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: transform, opacity;
 }
 
 /* Shimmering Progress Bar */
@@ -655,6 +654,7 @@ button:active {
   );
   background-size: 200% 100%;
   animation: shimmer 2.5s infinite linear;
+  will-change: background-position;
 }
 
 @keyframes pulse-slow {
@@ -674,11 +674,14 @@ button:active {
 
 /* Hardware-Accelerated Progress & Segment Transitions */
 .smooth-progress-bar {
-  transition: width 200ms cubic-bezier(0.16, 1, 0.3, 1);
+  transition: width 150ms cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: width;
+  transform: translateZ(0);
 }
 
 .segment-cell {
-  transition: background-color 200ms ease, border-color 200ms ease, transform 150ms ease;
+  transition: background-color 150ms ease, border-color 150ms ease, transform 100ms ease;
+  transform: translateZ(0);
 }
 
 .segment-cell:hover {

@@ -66,7 +66,7 @@ interface SidebarProps {
   lang: Language;
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({
+const SidebarComponent: React.FC<SidebarProps> = ({
   activeView,
   onViewChange,
   statusFilter,
@@ -83,19 +83,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   const t = translations[lang] || translations.en;
 
-  const counts = {
+  const counts = React.useMemo(() => ({
     all: downloads.length,
     downloading: downloads.filter((d) => d.status === 'downloading').length,
     queued: downloads.filter((d) => d.status === 'queued').length,
     completed: downloads.filter((d) => d.status === 'completed').length,
     paused: downloads.filter((d) => d.status === 'paused').length,
     failed: downloads.filter((d) => d.status === 'failed').length,
-  };
+  }), [downloads]);
 
-  const catCounts: Record<string, number> = {};
-  for (const item of downloads) {
-    catCounts[item.category] = (catCounts[item.category] || 0) + 1;
-  }
+  const catCounts = React.useMemo(() => {
+    const acc: Record<string, number> = {};
+    for (const item of downloads) {
+      acc[item.category] = (acc[item.category] || 0) + 1;
+    }
+    return acc;
+  }, [downloads]);
 
   const formatBytes = (bytes: number) => {
     if (bytes <= 0) return '0 B';
@@ -535,3 +538,5 @@ export const Sidebar: React.FC<SidebarProps> = ({
     </aside>
   );
 };
+
+export const Sidebar = React.memo(SidebarComponent);

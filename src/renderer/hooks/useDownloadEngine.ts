@@ -271,6 +271,7 @@ export function useDownloadEngine() {
 
   return {
     downloads,
+    setDownloads,
     queues,
     categories,
     settings,

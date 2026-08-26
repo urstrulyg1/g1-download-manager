@@ -46,7 +46,7 @@ interface NavbarProps {
   onToggleActionCenter: () => void;
 }
 
-export const Navbar: React.FC<NavbarProps> = ({
+const NavbarComponent: React.FC<NavbarProps> = ({
   lang,
   onLanguageChange,
   theme,
@@ -334,3 +334,5 @@ export const Navbar: React.FC<NavbarProps> = ({
     </header>
   );
 };
+
+export const Navbar = React.memo(NavbarComponent);

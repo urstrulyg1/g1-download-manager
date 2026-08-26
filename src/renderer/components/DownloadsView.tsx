@@ -48,7 +48,16 @@ interface DownloadsViewProps {
   onRefresh?: () => void;
 }
 
-export const DownloadsView: React.FC<DownloadsViewProps> = ({
+function getDomainFromUrl(urlStr: string): string {
+  if (!urlStr) return '';
+  try {
+    return new URL(urlStr).hostname;
+  } catch {
+    return urlStr;
+  }
+}
+
+const DownloadsViewComponent: React.FC<DownloadsViewProps> = ({
   downloads,
   queues,
   categories,
@@ -612,7 +621,7 @@ export const DownloadsView: React.FC<DownloadsViewProps> = ({
                           >
                             {item.priority || 'normal'}
                           </button>
-                          <span className="truncate">{new URL(item.url).hostname}</span>
+                          <span className="truncate">{getDomainFromUrl(item.url)}</span>
                         </div>
                       </td>
 
@@ -872,3 +881,5 @@ export const DownloadsView: React.FC<DownloadsViewProps> = ({
     </div>
   );
 };
+
+export const DownloadsView = React.memo(DownloadsViewComponent);
