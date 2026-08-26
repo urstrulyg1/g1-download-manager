@@ -58,12 +58,14 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
           { type: 'SHOW_DOWNLOAD_MODAL', url: targetUrl },
           (response) => {
             if (chrome.runtime.lastError || !response?.success) {
-              openOrFocusG1DMTab(`http://127.0.0.1:${G1DM_PORT}/#add?url=${encodeURIComponent(targetUrl)}`);
+              if (chrome.tabs && chrome.tabs.executeScript) {
+                chrome.tabs.executeScript(tab.id, { file: 'content.js', allFrames: true }, () => {
+                  chrome.tabs.sendMessage(tab.id, { type: 'SHOW_DOWNLOAD_MODAL', url: targetUrl });
+                });
+              }
             }
           }
         );
-      } else {
-        openOrFocusG1DMTab(`http://127.0.0.1:${G1DM_PORT}/#add?url=${encodeURIComponent(targetUrl)}`);
       }
     }
   } else if (info.menuItemId === 'g1dm-download-page-links') {

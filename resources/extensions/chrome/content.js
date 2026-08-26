@@ -1103,12 +1103,6 @@
         console.warn('[G1DM Extension] Submission notification:', errMsg);
         closeModal();
         showDownloadToast(startImmediately ? '✓ Download Started' : '✓ Queued in G1DM', finalName);
-        if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
-          chrome.runtime.sendMessage({
-            type: 'OPEN_G1DM_STUDIO',
-            url: finalUrl
-          });
-        }
       };
 
       if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {

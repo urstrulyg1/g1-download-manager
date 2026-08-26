@@ -25,13 +25,17 @@ document.addEventListener('DOMContentLoaded', async () => {
           {
             type: 'SHOW_DOWNLOAD_MODAL',
             url: tab.url
-            // Only the real, user-captured URL is sent. Filename and category
-            // are resolved from the actual resource (URL path, probe, server
-            // headers) — never fabricated from the page title.
           },
           (res) => {
             if (chrome.runtime.lastError || !res?.success) {
-              chrome.tabs.create({ url: `http://127.0.0.1:8055/#add?url=${encodeURIComponent(tab.url)}` });
+              if (chrome.scripting && chrome.scripting.executeScript) {
+                chrome.scripting.executeScript({
+                  target: { tabId: tab.id, allFrames: true },
+                  files: ['content.js']
+                }, () => {
+                  chrome.tabs.sendMessage(tab.id, { type: 'SHOW_DOWNLOAD_MODAL', url: tab.url });
+                });
+              }
             }
           }
         );

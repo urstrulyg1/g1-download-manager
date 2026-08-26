@@ -62,13 +62,18 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
           { type: 'SHOW_DOWNLOAD_MODAL', url: targetUrl },
           (response) => {
             if (chrome.runtime.lastError || !response?.success) {
-              // Fallback to desktop Web UI if content script cannot execute on restricted URL
-              openOrFocusG1DMTab(`http://127.0.0.1:${G1DM_PORT}/#add?url=${encodeURIComponent(targetUrl)}`);
+              // Inject content script into the active page so the Download File Info modal opens directly on the page
+              if (chrome.scripting && chrome.scripting.executeScript) {
+                chrome.scripting.executeScript({
+                  target: { tabId: tab.id, allFrames: true },
+                  files: ['content.js']
+                }, () => {
+                  chrome.tabs.sendMessage(tab.id, { type: 'SHOW_DOWNLOAD_MODAL', url: targetUrl });
+                });
+              }
             }
           }
         );
-      } else {
-        openOrFocusG1DMTab(`http://127.0.0.1:${G1DM_PORT}/#add?url=${encodeURIComponent(targetUrl)}`);
       }
     }
   } else if (info.menuItemId === 'g1dm-download-page-links') {

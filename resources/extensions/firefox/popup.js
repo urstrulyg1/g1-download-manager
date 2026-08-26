@@ -18,20 +18,20 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   if (downloadCurrentBtn) {
     downloadCurrentBtn.addEventListener('click', async () => {
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      const runtimeTabs = (typeof browser !== 'undefined' && browser.tabs) ? browser.tabs : chrome.tabs;
+      const [tab] = await runtimeTabs.query({ active: true, currentWindow: true });
       if (tab && tab.id) {
-        chrome.tabs.sendMessage(
+        runtimeTabs.sendMessage(
           tab.id,
           {
             type: 'SHOW_DOWNLOAD_MODAL',
             url: tab.url
-            // Only the real, user-captured URL is sent. Filename and category
-            // are resolved from the actual resource (URL path, probe, server
-            // headers) — never fabricated from the page title.
           },
           (res) => {
-            if (chrome.runtime.lastError || !res?.success) {
-              chrome.tabs.create({ url: `http://127.0.0.1:8055/#add?url=${encodeURIComponent(tab.url)}` });
+            if (runtimeTabs.executeScript) {
+              runtimeTabs.executeScript(tab.id, { file: 'content.js', allFrames: true })
+                .then(() => runtimeTabs.sendMessage(tab.id, { type: 'SHOW_DOWNLOAD_MODAL', url: tab.url }))
+                .catch(() => {});
             }
           }
         );
