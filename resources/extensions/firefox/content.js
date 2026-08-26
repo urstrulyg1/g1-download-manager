@@ -1113,18 +1113,7 @@
         console.warn('[G1DM Extension] Submission notification:', errMsg);
       };
 
-      if (runtimeApi && runtimeApi.sendMessage) {
-        runtimeApi.sendMessage({
-          type: 'DOWNLOAD_URL',
-          ...payload
-        }, (res) => {
-          if (chrome.runtime.lastError || (res && res.success === false)) {
-            onError(res?.error || chrome.runtime.lastError?.message);
-          } else {
-            onSuccess(res?.result);
-          }
-        });
-      } else {
+      const sendViaFetch = () => {
         fetch('http://127.0.0.1:8055/api/downloads', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -1136,6 +1125,22 @@
           })
           .then((createdItem) => onSuccess(createdItem))
           .catch((err) => onError(err.message));
+      };
+
+      if (runtimeApi && runtimeApi.sendMessage) {
+        runtimeApi.sendMessage({
+          type: 'DOWNLOAD_URL',
+          ...payload
+        }, (res) => {
+          if (chrome.runtime.lastError || (res && res.success === false)) {
+            console.warn('[G1DM Extension] Extension message failed, falling back to direct API fetch:', chrome.runtime.lastError?.message || res?.error);
+            sendViaFetch();
+          } else {
+            onSuccess(res?.result);
+          }
+        });
+      } else {
+        sendViaFetch();
       }
     };
 
