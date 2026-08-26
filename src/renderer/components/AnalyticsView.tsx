@@ -1,19 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   BarChart3,
-  TrendingUp,
   Globe,
   Radio,
-  Zap,
-  CheckCircle2,
-  AlertTriangle,
   Download,
-  Calendar,
   Layers,
+  Tag,
 } from 'lucide-react';
 import { DownloadItem, SystemMetrics } from '../../shared/types';
 import { Language, translations } from '../lib/i18n';
 import { Button } from './ui/Button';
+import { formatBytes } from '../lib/formatters';
 
 interface AnalyticsViewProps {
   downloads: DownloadItem[];
@@ -24,14 +21,6 @@ interface AnalyticsViewProps {
 export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ downloads, metrics, lang }) => {
   const t = translations[lang] || translations.en;
   const [timeRange, setTimeRange] = useState<'24h' | '7d' | '30d' | 'all'>('7d');
-
-  const formatBytes = (bytes: number) => {
-    if (bytes <= 0) return '0 B';
-    const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return `${(bytes / Math.pow(k, i)).toFixed(2)} ${sizes[i]}`;
-  };
 
   // Filter downloads to the selected time window
   const filteredDownloads = React.useMemo(() => {
@@ -58,6 +47,16 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ downloads, metrics
     protocolsCount[p] = (protocolsCount[p] || 0) + 1;
   });
 
+  // Category Distribution
+  const categoryCount: Record<string, { count: number; bytes: number }> = {};
+  filteredDownloads.forEach((d) => {
+    const cat = d.category || 'other';
+    if (!categoryCount[cat]) categoryCount[cat] = { count: 0, bytes: 0 };
+    categoryCount[cat].count++;
+    categoryCount[cat].bytes += d.downloadedBytes;
+  });
+  const topCategories = Object.entries(categoryCount).sort((a, b) => b[1].bytes - a[1].bytes);
+
   // Domain Distribution
   const domainCount: Record<string, { count: number; bytes: number }> = {};
   filteredDownloads.forEach((d) => {
@@ -74,6 +73,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ downloads, metrics
     .slice(0, 5);
 
   const handleExportCsv = () => {
+    const quote = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`;
     const rows = [
       ['ID', 'Filename', 'URL', 'Category', 'DownloadedBytes', 'TotalBytes', 'Status', 'AvgSpeed', 'CreatedAt'],
       ...filteredDownloads.map((d) => [
@@ -88,7 +88,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ downloads, metrics
         new Date(d.createdAt).toISOString(),
       ]),
     ];
-    const csvContent = 'data:text/csv;charset=utf-8,' + rows.map((e) => e.join(',')).join('\n');
+    const csvContent = 'data:text/csv;charset=utf-8,' + rows.map((e) => e.map(quote).join(',')).join('\n');
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
@@ -173,7 +173,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ downloads, metrics
 
           <div className="space-y-3 text-xs font-mono">
             {Object.entries(protocolsCount).map(([proto, count]) => {
-              const pct = Math.round((count / (downloads.length || 1)) * 100);
+              const pct = Math.round((count / (filteredDownloads.length || 1)) * 100);
               return (
                 <div key={proto} className="space-y-1">
                   <div className="flex justify-between text-slate-300 font-bold">
@@ -214,6 +214,38 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ downloads, metrics
               ))
             )}
           </div>
+        </div>
+      </div>
+
+      {/* Category Distribution */}
+      <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 shadow-xl space-y-4">
+        <h3 className="text-sm font-bold text-white flex items-center gap-2">
+          <Tag className="w-4 h-4 text-purple-400" />
+          <span>Category Distribution</span>
+        </h3>
+
+        <div className="space-y-3 text-xs font-mono">
+          {topCategories.length === 0 ? (
+            <div className="py-6 text-center text-slate-500">No category data yet.</div>
+          ) : (
+            topCategories.map(([cat, data]) => {
+              const pct = Math.round((data.bytes / (totalBytes || 1)) * 100);
+              return (
+                <div key={cat} className="space-y-1">
+                  <div className="flex justify-between text-slate-300 font-bold capitalize">
+                    <span>{cat}</span>
+                    <span>{data.count} file{data.count === 1 ? '' : 's'} — {formatBytes(data.bytes)}</span>
+                  </div>
+                  <div className="h-2 w-full bg-slate-950 rounded-full overflow-hidden border border-slate-800">
+                    <div
+                      className="h-full bg-gradient-to-r from-purple-500 to-pink-400 rounded-full"
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                </div>
+              );
+            })
+          )}
         </div>
       </div>
     </div>

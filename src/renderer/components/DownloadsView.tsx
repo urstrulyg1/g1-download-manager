@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import {
   Download,
   Search,
@@ -29,6 +29,7 @@ import {
 import { DownloadItem, DownloadQueue, CategoryRule } from '../../shared/types';
 import { Language, translations } from '../lib/i18n';
 import { api } from '../lib/api';
+import { formatBytes, formatEta } from '../lib/formatters';
 import { MediaPreviewModal } from './MediaPreviewModal';
 import { DeleteConfirmModal } from './DeleteConfirmModal';
 import { getDownloadClarity } from '../lib/downloadClarity';
@@ -76,7 +77,9 @@ const DownloadsViewComponent: React.FC<DownloadsViewProps> = ({
   onRefresh,
 }) => {
   const t = translations[lang] || translations.en;
+  const [searchQueryRaw, setSearchQueryRaw] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [previewItem, setPreviewItem] = useState<DownloadItem | null>(null);
   const [itemToDelete, setItemToDelete] = useState<DownloadItem | null>(null);
@@ -86,6 +89,7 @@ const DownloadsViewComponent: React.FC<DownloadsViewProps> = ({
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   const [dropError, setDropError] = useState<string | null>(null);
+  const dropErrorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -107,28 +111,29 @@ const DownloadsViewComponent: React.FC<DownloadsViewProps> = ({
         await api.addDownload({ url: text.trim(), startImmediately: true });
         if (onRefresh) onRefresh();
       } catch (err: any) {
-        setDropError(err?.message || 'Failed to add the dropped URL.');
+        const msg = err?.message || 'Failed to add the dropped URL.';
+        setDropError(msg);
+        // Auto-dismiss the drop error banner after 5 seconds
+        if (dropErrorTimerRef.current) clearTimeout(dropErrorTimerRef.current);
+        dropErrorTimerRef.current = setTimeout(() => setDropError(null), 5000);
       }
     }
   };
 
-  const formatBytes = (bytes: number) => {
-    if (bytes <= 0) return '0 B';
-    const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return `${(bytes / Math.pow(k, i)).toFixed(2)} ${sizes[i]}`;
-  };
+  // Debounced search: update the query 150ms after the user stops typing
+  const handleSearchChange = useCallback((value: string) => {
+    setSearchQueryRaw(value);
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    searchDebounceRef.current = setTimeout(() => setSearchQuery(value), 150);
+  }, []);
 
-  const formatEta = (seconds: number) => {
-    if (!seconds || seconds <= 0 || !isFinite(seconds)) return '—';
-    const hrs = Math.floor(seconds / 3600);
-    const mins = Math.floor((seconds % 3600) / 60);
-    const secs = Math.floor(seconds % 60);
-    if (hrs > 0) return `${hrs}h ${String(mins).padStart(2, '0')}m`;
-    if (mins > 0) return `${String(mins).padStart(2, '0')}m ${String(secs).padStart(2, '0')}s`;
-    return `${secs}s`;
-  };
+  // Clean up timers on unmount
+  useEffect(() => {
+    return () => {
+      if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+      if (dropErrorTimerRef.current) clearTimeout(dropErrorTimerRef.current);
+    };
+  }, []);
 
   const [pageSize, setPageSize] = useState<number>(50);
   const [currentPage, setCurrentPage] = useState<number>(1);
@@ -264,14 +269,14 @@ const DownloadsViewComponent: React.FC<DownloadsViewProps> = ({
           <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
           <input
             type="text"
-            placeholder={t.searchPlaceholder}
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder={t.searchPlaceholder}
+              value={searchQueryRaw}
+              onChange={(e) => handleSearchChange(e.target.value)}
             className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-4 py-2 text-xs text-slate-200 focus:outline-none focus:border-blue-500 transition-colors"
           />
-          {searchQuery && (
+          {searchQueryRaw && (
             <button
-              onClick={() => setSearchQuery('')}
+              onClick={() => { setSearchQueryRaw(''); setSearchQuery(''); }}
               className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 text-xs font-bold"
             >
               ✕

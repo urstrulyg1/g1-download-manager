@@ -1,13 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import {
   AlertOctagon,
-  ShieldCheck,
   RotateCcw,
   CheckCircle2,
-  Clock,
-  Radio,
-  Layers,
-  ArrowRight,
+  Filter,
 } from 'lucide-react';
 import { IncidentRecord } from '../../main/diagnostics/ErrorIncidentEngine';
 import { Badge } from './ui/Badge';
@@ -17,6 +13,7 @@ export const IncidentsView: React.FC<{ lang: Language }> = ({ lang }) => {
   const t = translations[lang] || translations.en;
   const [incidents, setIncidents] = useState<IncidentRecord[]>([]);
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'RESOLVED' | 'UNRESOLVED'>('ALL');
 
   const fetchIncidents = async () => {
     setFetchError(null);
@@ -35,29 +32,55 @@ export const IncidentsView: React.FC<{ lang: Language }> = ({ lang }) => {
 
   useEffect(() => {
     fetchIncidents();
+    // Auto-refresh every 10 seconds
+    const interval = setInterval(fetchIncidents, 10_000);
+    return () => clearInterval(interval);
   }, []);
+
+  const filteredIncidents = incidents.filter((inc) => {
+    if (statusFilter === 'ALL') return true;
+    if (statusFilter === 'RESOLVED') return inc.recoveryStatus === 'RESOLVED';
+    return inc.recoveryStatus !== 'RESOLVED';
+  });
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto overflow-y-auto h-[calc(100vh-4rem)]">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold text-white flex items-center gap-2">
             <AlertOctagon className="w-5 h-5 text-rose-400" />
             <span>Incident Console & Failure Correlation</span>
           </h1>
           <p className="text-xs text-slate-400 mt-0.5">
-            Clustered multi-socket failures, network transitions, and automatic recovery timeline
+            Clustered multi-socket failures, network transitions, and automatic recovery timeline — auto-refreshes every 10s
           </p>
         </div>
 
-        <button
-          onClick={fetchIncidents}
-          className="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5"
-        >
-          <RotateCcw className="w-3.5 h-3.5" />
-          <span>Refresh Console</span>
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Status filter */}
+          <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-800 text-[11px] font-semibold">
+            {(['ALL', 'RESOLVED', 'UNRESOLVED'] as const).map((f) => (
+              <button
+                key={f}
+                onClick={() => setStatusFilter(f)}
+                className={`px-3 py-1 rounded-lg capitalize transition-colors ${
+                  statusFilter === f ? 'bg-rose-600 text-white font-bold' : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                {f}
+              </button>
+            ))}
+          </div>
+
+          <button
+            onClick={fetchIncidents}
+            className="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            <span>Refresh</span>
+          </button>
+        </div>
       </div>
 
       {fetchError && (
@@ -69,14 +92,16 @@ export const IncidentsView: React.FC<{ lang: Language }> = ({ lang }) => {
 
       {/* Incidents List */}
       <div className="space-y-3">
-        {incidents.length === 0 ? (
+        {filteredIncidents.length === 0 ? (
           <div className="p-12 text-center bg-slate-900/60 rounded-2xl border border-slate-800 text-slate-500 text-xs space-y-2">
             <CheckCircle2 className="w-10 h-10 mx-auto text-emerald-400" />
-            <div className="font-semibold text-slate-300">Zero active or unresolved incidents</div>
+            <div className="font-semibold text-slate-300">
+              {statusFilter === 'ALL' ? 'Zero active or unresolved incidents' : `No ${statusFilter.toLowerCase()} incidents`}
+            </div>
             <div className="text-[11px] text-slate-500">All downloads and network interfaces are running smoothly.</div>
           </div>
         ) : (
-          incidents.map((inc) => (
+          filteredIncidents.map((inc) => (
             <div
               key={inc.incidentId}
               className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 shadow-xl space-y-3"

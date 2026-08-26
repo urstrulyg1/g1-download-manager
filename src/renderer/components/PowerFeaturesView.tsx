@@ -2,20 +2,19 @@ import React, { useState } from 'react';
 import {
   Zap,
   Radio,
-  Scissors,
   Layers,
   Globe,
   Wifi,
   Lock,
   Cloud,
   Bot,
-  Terminal,
   FolderArchive,
   CheckCircle2,
   Play,
   Key,
-  ShieldAlert,
   Loader2,
+  FolderCog,
+  Link2,
 } from 'lucide-react';
 import { Language, translations } from '../lib/i18n';
 
@@ -23,13 +22,17 @@ export const PowerFeaturesView: React.FC<{ lang: Language }> = ({ lang }) => {
   const t = translations[lang] || translations.en;
   const [activeTab, setActiveTab] = useState<'media' | 'network' | 'automation' | 'cloud' | 'vault' | 'bot'>('media');
 
-  // Media state
+  // Media state — separate loading flags per action
   const [playlistUrl, setPlaylistUrl] = useState('');
+  const [playlistLoading, setPlaylistLoading] = useState(false);
   const [playlistResult, setPlaylistResult] = useState<any>(null);
   const [playlistError, setPlaylistError] = useState<string | null>(null);
+  const [enqueueLoading, setEnqueueLoading] = useState(false);
+
   const [dvrStreamUrl, setDvrStreamUrl] = useState('');
   const [dvrTitle, setDvrTitle] = useState('');
   const [dvrDurationSec, setDvrDurationSec] = useState(300);
+  const [dvrLoading, setDvrLoading] = useState(false);
   const [dvrSuccess, setDvrSuccess] = useState<string | null>(null);
   const [dvrError, setDvrError] = useState<string | null>(null);
 
@@ -37,6 +40,7 @@ export const PowerFeaturesView: React.FC<{ lang: Language }> = ({ lang }) => {
   const [magnetUri, setMagnetUri] = useState('');
   const [magnetResult, setMagnetResult] = useState<any>(null);
   const [magnetError, setMagnetError] = useState<string | null>(null);
+  const [magnetLoading, setMagnetLoading] = useState(false);
   const [pingThreshold, setPingThreshold] = useState(80);
   const [latencySenseActive, setLatencySenseActive] = useState(true);
 
@@ -44,22 +48,31 @@ export const PowerFeaturesView: React.FC<{ lang: Language }> = ({ lang }) => {
   const [unrestrictUrl, setUnrestrictUrl] = useState('');
   const [unrestrictResult, setUnrestrictResult] = useState<any>(null);
   const [unrestrictError, setUnrestrictError] = useState<string | null>(null);
+  const [unrestrictLoading, setUnrestrictLoading] = useState(false);
+
+  // Automation state
+  const [webhookUrl, setWebhookUrl] = useState('');
+  const [webhookEvent, setWebhookEvent] = useState('DOWNLOAD_COMPLETED');
+  const [webhookLoading, setWebhookLoading] = useState(false);
+  const [webhookSuccess, setWebhookSuccess] = useState<string | null>(null);
+  const [webhookError, setWebhookError] = useState<string | null>(null);
+  const [autoExtract, setAutoExtract] = useState(true);
+  const [autoExtractDelete, setAutoExtractDelete] = useState(false);
 
   // Vault state
   const [vaultPassword, setVaultPassword] = useState('');
   const [vaultUnlocked, setVaultUnlocked] = useState(false);
   const [vaultItems, setVaultItems] = useState<any[]>([]);
   const [vaultError, setVaultError] = useState<string | null>(null);
+  const [vaultLoading, setVaultLoading] = useState(false);
 
   // Bot state
   const [botCommand, setBotCommand] = useState('');
   const [botLogs, setBotLogs] = useState<string[]>(['🤖 G1DM Bot Ready']);
 
-  const [loading, setLoading] = useState(false);
-
   const handleParsePlaylist = async () => {
     if (!playlistUrl) return;
-    setLoading(true);
+    setPlaylistLoading(true);
     setPlaylistError(null);
     try {
       const res = await fetch('/api/media/playlist/parse', {
@@ -73,13 +86,13 @@ export const PowerFeaturesView: React.FC<{ lang: Language }> = ({ lang }) => {
     } catch (err: any) {
       setPlaylistError(err.message || 'Failed to parse playlist.');
     } finally {
-      setLoading(false);
+      setPlaylistLoading(false);
     }
   };
 
   const handleEnqueuePlaylist = async () => {
     if (!playlistResult) return;
-    setLoading(true);
+    setEnqueueLoading(true);
     setPlaylistError(null);
     try {
       const res = await fetch('/api/media/playlist/enqueue', {
@@ -93,12 +106,14 @@ export const PowerFeaturesView: React.FC<{ lang: Language }> = ({ lang }) => {
     } catch (err: any) {
       setPlaylistError(err.message || 'Failed to enqueue playlist.');
     } finally {
-      setLoading(false);
+      setEnqueueLoading(false);
     }
   };
 
   const handleScheduleDVR = async () => {
     if (!dvrStreamUrl) return;
+    if (dvrDurationSec < 1) { setDvrError('Duration must be at least 1 second.'); return; }
+    setDvrLoading(true);
     setDvrError(null);
     setDvrSuccess(null);
     try {
@@ -118,11 +133,14 @@ export const PowerFeaturesView: React.FC<{ lang: Language }> = ({ lang }) => {
       setDvrSuccess(`DVR recording scheduled (ID: ${data.id})`);
     } catch (err: any) {
       setDvrError(err.message || 'Failed to schedule DVR recording.');
+    } finally {
+      setDvrLoading(false);
     }
   };
 
   const handleAddTorrent = async () => {
     if (!magnetUri) return;
+    setMagnetLoading(true);
     setMagnetError(null);
     try {
       const res = await fetch('/api/torrent/add', {
@@ -135,11 +153,14 @@ export const PowerFeaturesView: React.FC<{ lang: Language }> = ({ lang }) => {
       setMagnetResult(data);
     } catch (err: any) {
       setMagnetError(err.message || 'Failed to add torrent.');
+    } finally {
+      setMagnetLoading(false);
     }
   };
 
   const handleUnrestrictLink = async () => {
     if (!unrestrictUrl) return;
+    setUnrestrictLoading(true);
     setUnrestrictError(null);
     try {
       const res = await fetch('/api/debrid/unrestrict', {
@@ -152,11 +173,14 @@ export const PowerFeaturesView: React.FC<{ lang: Language }> = ({ lang }) => {
       setUnrestrictResult(data);
     } catch (err: any) {
       setUnrestrictError(err.message || 'Debrid unrestrict failed.');
+    } finally {
+      setUnrestrictLoading(false);
     }
   };
 
   const handleUnlockVault = async () => {
     setVaultError(null);
+    setVaultLoading(true);
     try {
       const res = await fetch('/api/security/vault/unlock', {
         method: 'POST',
@@ -165,6 +189,8 @@ export const PowerFeaturesView: React.FC<{ lang: Language }> = ({ lang }) => {
       });
       if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || `HTTP ${res.status}`); }
       const data = await res.json();
+      // Clear password from state immediately — do not hold it in memory
+      setVaultPassword('');
       setVaultUnlocked(data.unlocked);
       if (data.unlocked) {
         const itemsRes = await fetch('/api/security/vault/items');
@@ -173,7 +199,10 @@ export const PowerFeaturesView: React.FC<{ lang: Language }> = ({ lang }) => {
         setVaultError('Incorrect vault password.');
       }
     } catch (err: any) {
+      setVaultPassword('');
       setVaultError(err.message || 'Failed to unlock vault.');
+    } finally {
+      setVaultLoading(false);
     }
   };
 
@@ -181,7 +210,8 @@ export const PowerFeaturesView: React.FC<{ lang: Language }> = ({ lang }) => {
     if (!botCommand) return;
     const cmd = botCommand;
     setBotCommand('');
-    setBotLogs((prev) => [...prev, `> ${cmd}`]);
+    // Cap log at 200 entries to prevent unbounded memory growth
+    setBotLogs((prev) => [...prev.slice(-199), `> ${cmd}`]);
     try {
       const res = await fetch('/api/remote/bot/command', {
         method: 'POST',
@@ -189,9 +219,29 @@ export const PowerFeaturesView: React.FC<{ lang: Language }> = ({ lang }) => {
         body: JSON.stringify({ commandText: cmd }),
       });
       const data = await res.json();
-      setBotLogs((prev) => [...prev, data.responseText]);
+      setBotLogs((prev) => [...prev.slice(-199), data.responseText]);
     } catch (err: any) {
-      setBotLogs((prev) => [...prev, `❌ Error: ${err.message}`]);
+      setBotLogs((prev) => [...prev.slice(-199), `❌ Error: ${err.message}`]);
+    }
+  };
+
+  const handleTestWebhook = async () => {
+    if (!webhookUrl) return;
+    setWebhookLoading(true);
+    setWebhookError(null);
+    setWebhookSuccess(null);
+    try {
+      const res = await fetch('/api/automation/webhook/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: webhookUrl, event: webhookEvent }),
+      });
+      if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || `HTTP ${res.status}`); }
+      setWebhookSuccess('Webhook test delivered successfully.');
+    } catch (err: any) {
+      setWebhookError(err.message || 'Webhook test failed.');
+    } finally {
+      setWebhookLoading(false);
     }
   };
 
@@ -209,7 +259,7 @@ export const PowerFeaturesView: React.FC<{ lang: Language }> = ({ lang }) => {
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b border-slate-800 gap-2">
+      <div className="flex border-b border-slate-800 gap-2 overflow-x-auto">
         {[
           { id: 'media', label: '🎥 Media & Streaming', icon: Radio },
           { id: 'network', label: '⚡ Speed & Torrent', icon: Wifi },
@@ -221,7 +271,7 @@ export const PowerFeaturesView: React.FC<{ lang: Language }> = ({ lang }) => {
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id as any)}
-            className={`px-4 py-2.5 text-xs font-bold transition-all border-b-2 -mb-px flex items-center gap-2 ${
+            className={`px-4 py-2.5 text-xs font-bold transition-all border-b-2 -mb-px flex items-center gap-2 whitespace-nowrap ${
               activeTab === tab.id
                 ? 'border-amber-400 text-amber-400 bg-amber-400/10 rounded-t-xl'
                 : 'border-transparent text-slate-400 hover:text-slate-200'
@@ -231,8 +281,6 @@ export const PowerFeaturesView: React.FC<{ lang: Language }> = ({ lang }) => {
           </button>
         ))}
       </div>
-
-      {/* Tab Content */}
 
       {/* 1. MEDIA */}
       {activeTab === 'media' && (
@@ -253,10 +301,10 @@ export const PowerFeaturesView: React.FC<{ lang: Language }> = ({ lang }) => {
               />
               <button
                 onClick={handleParsePlaylist}
-                disabled={loading}
-                className="w-full py-2 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-xl flex items-center justify-center gap-2"
+                disabled={playlistLoading}
+                className="w-full py-2 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-xl flex items-center justify-center gap-2 disabled:opacity-60"
               >
-                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
+                {playlistLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
                 <span>Extract Playlist Items</span>
               </button>
             </div>
@@ -285,8 +333,10 @@ export const PowerFeaturesView: React.FC<{ lang: Language }> = ({ lang }) => {
                 {!playlistResult._enqueued && (
                   <button
                     onClick={handleEnqueuePlaylist}
-                    className="w-full py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg text-xs"
+                    disabled={enqueueLoading}
+                    className="w-full py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg text-xs disabled:opacity-60 flex items-center justify-center gap-2"
                   >
+                    {enqueueLoading && <Loader2 className="w-3 h-3 animate-spin" />}
                     Enqueue All Tracks to Download Manager
                   </button>
                 )}
@@ -319,6 +369,7 @@ export const PowerFeaturesView: React.FC<{ lang: Language }> = ({ lang }) => {
                 <span className="text-slate-400">Duration (sec):</span>
                 <input
                   type="number"
+                  min={1}
                   value={dvrDurationSec}
                   onChange={(e) => setDvrDurationSec(Number(e.target.value))}
                   className="w-24 bg-slate-950 border border-slate-800 rounded-lg p-1.5 text-slate-200 text-xs font-mono"
@@ -326,8 +377,10 @@ export const PowerFeaturesView: React.FC<{ lang: Language }> = ({ lang }) => {
               </div>
               <button
                 onClick={handleScheduleDVR}
-                className="w-full py-2 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-xl"
+                disabled={dvrLoading || !dvrStreamUrl}
+                className="w-full py-2 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-xl disabled:opacity-60 flex items-center justify-center gap-2"
               >
+                {dvrLoading && <Loader2 className="w-4 h-4 animate-spin" />}
                 Schedule Live DVR Recording
               </button>
             </div>
@@ -366,8 +419,10 @@ export const PowerFeaturesView: React.FC<{ lang: Language }> = ({ lang }) => {
               />
               <button
                 onClick={handleAddTorrent}
-                className="w-full py-2 bg-cyan-600 hover:bg-cyan-500 text-white font-bold rounded-xl"
+                disabled={magnetLoading || !magnetUri}
+                className="w-full py-2 bg-cyan-600 hover:bg-cyan-500 text-white font-bold rounded-xl disabled:opacity-60 flex items-center justify-center gap-2"
               >
+                {magnetLoading && <Loader2 className="w-4 h-4 animate-spin" />}
                 Start Accelerated Torrent Download
               </button>
             </div>
@@ -395,10 +450,10 @@ export const PowerFeaturesView: React.FC<{ lang: Language }> = ({ lang }) => {
               <Wifi className="w-4 h-4 text-emerald-400" />
               <span>Zero-Lag RTT Latency Sense (Ping-Adaptive Auto-Throttling)</span>
             </h3>
-            <p className="text-slate-400">
+            <p className="text-slate-400 text-xs">
               Automatically detects gaming or video call ping spikes and throttles background downloads in real time.
             </p>
-            <div className="space-y-3">
+            <div className="space-y-3 text-xs">
               <div className="flex items-center justify-between">
                 <span className="text-slate-300 font-semibold">Latency Sense Active</span>
                 <input
@@ -424,14 +479,94 @@ export const PowerFeaturesView: React.FC<{ lang: Language }> = ({ lang }) => {
 
       {/* 3. AUTOMATION */}
       {activeTab === 'automation' && (
-        <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 space-y-4 text-xs shadow-xl">
-          <h3 className="text-sm font-bold text-white flex items-center gap-2">
-            <FolderArchive className="w-4 h-4 text-indigo-400" />
-            <span>Auto-Extract Compressed Archives & Webhook Triggers</span>
-          </h3>
-          <p className="text-slate-300">
-            Automatically extract completed .zip, .rar, .7z archives with auto-matched password lists and trigger post-download Discord / Slack / IFTTT webhooks.
-          </p>
+        <div className="space-y-5 text-xs">
+          {/* Webhooks */}
+          <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 space-y-4 shadow-xl">
+            <h3 className="text-sm font-bold text-white flex items-center gap-2">
+              <FolderArchive className="w-4 h-4 text-indigo-400" />
+              <span>Post-Download Webhook Triggers</span>
+            </h3>
+            <p className="text-slate-400">
+              Fire HTTP POST payloads to Discord, Slack, IFTTT, or any custom endpoint when download events occur.
+            </p>
+            <div className="space-y-3">
+              <div className="space-y-1">
+                <label className="text-slate-300 font-semibold">Webhook URL</label>
+                <input
+                  type="url"
+                  placeholder="https://discord.com/api/webhooks/..."
+                  value={webhookUrl}
+                  onChange={(e) => setWebhookUrl(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-200 font-mono"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-slate-300 font-semibold">Trigger Event</label>
+                <select
+                  value={webhookEvent}
+                  onChange={(e) => setWebhookEvent(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2 text-slate-200"
+                >
+                  <option value="DOWNLOAD_COMPLETED">Download Completed</option>
+                  <option value="DOWNLOAD_FAILED">Download Failed</option>
+                  <option value="DOWNLOAD_STARTED">Download Started</option>
+                  <option value="BATCH_COMPLETED">Batch Completed</option>
+                </select>
+              </div>
+              <button
+                onClick={handleTestWebhook}
+                disabled={webhookLoading || !webhookUrl}
+                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl disabled:opacity-60 flex items-center gap-2"
+              >
+                {webhookLoading && <Loader2 className="w-4 h-4 animate-spin" />}
+                Send Test Payload
+              </button>
+              {webhookError && (
+                <div role="alert" className="flex items-center justify-between p-2.5 rounded-xl bg-rose-950/40 border border-rose-500/40 text-rose-300">
+                  <span>{webhookError}</span>
+                  <button onClick={() => setWebhookError(null)} className="ml-3 text-rose-400 hover:text-rose-200 font-bold">✕</button>
+                </div>
+              )}
+              {webhookSuccess && (
+                <div role="status" className="p-2.5 rounded-xl bg-emerald-950/40 border border-emerald-500/40 text-emerald-300">
+                  {webhookSuccess}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Auto-Extract Archives */}
+          <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 space-y-4 shadow-xl">
+            <h3 className="text-sm font-bold text-white flex items-center gap-2">
+              <FolderCog className="w-4 h-4 text-amber-400" />
+              <span>Auto-Extract Compressed Archives</span>
+            </h3>
+            <p className="text-slate-400">
+              Automatically extract .zip, .rar, and .7z archives after download completes, using auto-matched password lists.
+            </p>
+            <div className="space-y-3 p-3.5 rounded-xl bg-slate-950/60 border border-slate-800">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={autoExtract}
+                  onChange={(e) => setAutoExtract(e.target.checked)}
+                  className="rounded text-amber-500"
+                />
+                <span className="text-slate-300 font-semibold">Auto-extract archives on completion</span>
+              </label>
+              {autoExtract && (
+                <label className="flex items-center gap-2 cursor-pointer pl-5">
+                  <input
+                    type="checkbox"
+                    checked={autoExtractDelete}
+                    onChange={(e) => setAutoExtractDelete(e.target.checked)}
+                    className="rounded text-rose-500"
+                  />
+                  <span className="text-slate-400">Delete archive after successful extraction</span>
+                </label>
+              )}
+            </div>
+          </div>
         </div>
       )}
 
@@ -448,23 +583,25 @@ export const PowerFeaturesView: React.FC<{ lang: Language }> = ({ lang }) => {
               placeholder="Paste Rapidgator, 1Fichier, or Mega restricted link..."
               value={unrestrictUrl}
               onChange={(e) => setUnrestrictUrl(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-200 font-mono text-xs"
+              className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-200 font-mono"
             />
             <button
               onClick={handleUnrestrictLink}
-              className="px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white font-bold rounded-xl"
+              disabled={unrestrictLoading || !unrestrictUrl}
+              className="px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white font-bold rounded-xl disabled:opacity-60 flex items-center gap-2"
             >
+              {unrestrictLoading && <Loader2 className="w-4 h-4 animate-spin" />}
               Unrestrict High-Speed Link
             </button>
 
             {unrestrictError && (
-              <div role="alert" className="flex items-center justify-between p-2.5 rounded-xl bg-rose-950/40 border border-rose-500/40 text-rose-300 text-xs">
+              <div role="alert" className="flex items-center justify-between p-2.5 rounded-xl bg-rose-950/40 border border-rose-500/40 text-rose-300">
                 <span>{unrestrictError}</span>
                 <button onClick={() => setUnrestrictError(null)} className="ml-3 text-rose-400 hover:text-rose-200 font-bold">✕</button>
               </div>
             )}
             {unrestrictResult && (
-              <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 text-emerald-400 font-mono">
+              <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 text-emerald-400 font-mono text-xs break-all">
                 Unrestricted: {unrestrictResult.downloadUrl}
               </div>
             )}
@@ -487,30 +624,38 @@ export const PowerFeaturesView: React.FC<{ lang: Language }> = ({ lang }) => {
                 placeholder="Enter Vault Master Password"
                 value={vaultPassword}
                 onChange={(e) => setVaultPassword(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-200 text-xs"
+                onKeyDown={(e) => e.key === 'Enter' && handleUnlockVault()}
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-200"
               />
               <button
                 onClick={handleUnlockVault}
-                className="w-full py-2 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-xl flex items-center justify-center gap-2"
+                disabled={vaultLoading || !vaultPassword}
+                className="w-full py-2 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-xl flex items-center justify-center gap-2 disabled:opacity-60"
               >
-                <Key className="w-4 h-4" />
+                {vaultLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Key className="w-4 h-4" />}
                 <span>Unlock Hardware Encrypted Vault</span>
               </button>
               {vaultError && (
-                <div role="alert" className="p-2.5 rounded-xl bg-rose-950/40 border border-rose-500/40 text-rose-300 text-xs">
+                <div role="alert" className="p-2.5 rounded-xl bg-rose-950/40 border border-rose-500/40 text-rose-300">
                   {vaultError}
                 </div>
               )}
             </div>
           ) : (
-            <div className="p-4 bg-emerald-950/20 border border-emerald-500/30 rounded-xl space-y-2">
+            <div className="p-4 bg-emerald-950/20 border border-emerald-500/30 rounded-xl space-y-3">
               <div className="flex items-center gap-2 text-emerald-400 font-bold">
                 <CheckCircle2 className="w-4 h-4" />
                 <span>Vault Unlocked & Active</span>
               </div>
-              <p className="text-slate-300">
-                {vaultItems.length} encrypted items stored in disk vault.
-              </p>
+              {vaultItems.length === 0 ? (
+                <p className="text-slate-400 text-xs">
+                  No encrypted items stored yet. Use the download manager to move files into the vault after completion.
+                </p>
+              ) : (
+                <p className="text-slate-300 text-xs">
+                  {vaultItems.length} encrypted item{vaultItems.length === 1 ? '' : 's'} stored in disk vault.
+                </p>
+              )}
             </div>
           )}
         </div>
@@ -541,7 +686,8 @@ export const PowerFeaturesView: React.FC<{ lang: Language }> = ({ lang }) => {
             />
             <button
               onClick={handleSendBotCommand}
-              className="px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl"
+              disabled={!botCommand}
+              className="px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl disabled:opacity-60"
             >
               Send
             </button>

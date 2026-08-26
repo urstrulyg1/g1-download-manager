@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { DownloadQueue, CategoryRule, Priority, DownloadItem } from '../../shared/types';
 import { api } from '../lib/api';
+import { formatBytes } from '../lib/formatters';
 
 interface AddDownloadModalProps {
   isOpen: boolean;
@@ -109,14 +110,6 @@ export const AddDownloadModal: React.FC<AddDownloadModalProps> = ({
     setExpectedChecksum('');
     setChecksumAlgo('sha256');
   }, [isOpen, initialUrl, defaultDownloadDir]);
-
-  const formatBytes = (bytes: number) => {
-    if (bytes <= 0) return '0 B';
-    const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return `${(bytes / Math.pow(k, i)).toFixed(2)} ${sizes[i]}`;
-  };
 
   // Debounced URL probe
   useEffect(() => {

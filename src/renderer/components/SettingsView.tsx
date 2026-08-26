@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   Settings,
   Save,
@@ -18,10 +18,12 @@ import {
   Bot,
   Gauge,
   Info,
+  AlertTriangle,
 } from 'lucide-react';
 import { AppSettings } from '../../shared/types';
 import { Language, translations } from '../lib/i18n';
 import { api } from '../lib/api';
+import { useToasts, ToastContainer } from './ui/Toast';
 
 interface SettingsViewProps {
   settings: AppSettings | null;
@@ -32,24 +34,33 @@ interface SettingsViewProps {
 export const SettingsView: React.FC<SettingsViewProps> = ({ settings, lang, onSave }) => {
   const t = translations[lang] || translations.en;
   const [formData, setFormData] = useState<AppSettings | null>(settings);
+  const savedFormRef = useRef<AppSettings | null>(settings);
   const [activeSection, setActiveSection] = useState<
     'general' | 'downloads' | 'bandwidth' | 'network' | 'browser' | 'security' | 'privacy' | 'scheduler' | 'automation' | 'power' | 'remote' | 'backup' | 'about'
   >('general');
   const [saved, setSaved] = useState(false);
   const [wipePhrase, setWipePhrase] = useState('');
   const [wipeMessage, setWipeMessage] = useState<string | null>(null);
+  const [toasts, addToast, dismissToast] = useToasts();
+  // Track whether current formData differs from last-saved state
+  const hasUnsavedChanges = formData !== null && JSON.stringify(formData) !== JSON.stringify(savedFormRef.current);
 
   // Settings arrive asynchronously from the engine. Keep the form in sync so
   // opening the Settings view after the first render never leaves it blank.
   useEffect(() => {
-    if (settings) setFormData(settings);
+    if (settings) {
+      setFormData(settings);
+      savedFormRef.current = settings;
+    }
   }, [settings]);
 
   if (!formData) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!formData) return;
     await api.saveSettings(formData);
+    savedFormRef.current = formData;
     onSave(formData);
     setSaved(true);
     setTimeout(() => setSaved(false), 2500);
@@ -66,17 +77,20 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, lang, onSa
       const text = await file.text();
       const json = JSON.parse(text);
       const res = await api.importBackup(json);
-      alert(res.message || 'Application state restored successfully! Refreshing...');
-      window.location.reload();
+      addToast(res.message || 'Application state restored successfully! The page will reload.', 'success');
+      setTimeout(() => window.location.reload(), 1500);
     } catch (err: any) {
-      alert(`Import error: ${err.message}`);
+      addToast(`Import error: ${err.message}`, 'error');
     }
+    e.target.value = '';
   };
 
   return (
+    <>
+    <ToastContainer toasts={toasts} onDismiss={dismissToast} />
     <div className="p-6 space-y-6 max-w-7xl mx-auto overflow-y-auto h-[calc(100vh-4rem)]">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-4">
         <div>
           <h1 className="text-xl font-bold text-white flex items-center gap-2">
             <Settings className="w-5 h-5 text-slate-400" />
@@ -87,12 +101,20 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, lang, onSa
           </p>
         </div>
 
-        {saved && (
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs font-semibold animate-in fade-in">
-            <CheckCircle2 className="w-4 h-4" />
-            <span>Settings Saved!</span>
-          </div>
-        )}
+        <div className="flex items-center gap-2 shrink-0">
+          {hasUnsavedChanges && (
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30 text-xs font-semibold animate-in fade-in">
+              <AlertTriangle className="w-3.5 h-3.5" />
+              <span>Unsaved changes</span>
+            </div>
+          )}
+          {saved && (
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs font-semibold animate-in fade-in">
+              <CheckCircle2 className="w-4 h-4" />
+              <span>Settings Saved!</span>
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
@@ -1189,5 +1211,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, lang, onSa
         </form>
       </div>
     </div>
+    </>
   );
 };

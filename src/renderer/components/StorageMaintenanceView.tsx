@@ -5,13 +5,13 @@ import {
   RotateCcw,
   CheckCircle2,
   AlertTriangle,
-  FileQuestion,
   Loader2,
-  FolderOpen,
 } from 'lucide-react';
 import { MaintenanceScanResult, SystemMetrics } from '../../shared/types';
 import { Language, translations } from '../lib/i18n';
 import { api } from '../lib/api';
+import { formatBytes } from '../lib/formatters';
+import { useToasts, ToastContainer } from './ui/Toast';
 
 interface StorageMaintenanceViewProps {
   metrics: SystemMetrics | null;
@@ -24,14 +24,9 @@ export const StorageMaintenanceView: React.FC<StorageMaintenanceViewProps> = ({ 
   const [isScanning, setIsScanning] = useState(false);
   const [selectedOrphans, setSelectedOrphans] = useState<Set<string>>(new Set());
   const [isCleaning, setIsCleaning] = useState(false);
-
-  const formatBytes = (bytes: number) => {
-    if (bytes <= 0) return '0 B';
-    const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return `${(bytes / Math.pow(k, i)).toFixed(2)} ${sizes[i]}`;
-  };
+  // Track whether the first automatic scan has run to avoid re-scanning on every visit
+  const [hasScanned, setHasScanned] = useState(false);
+  const [toasts, addToast, dismissToast] = useToasts();
 
   const handleScan = async () => {
     setIsScanning(true);
@@ -39,15 +34,18 @@ export const StorageMaintenanceView: React.FC<StorageMaintenanceViewProps> = ({ 
       const res = await api.scanMaintenance();
       setScanResult(res);
       setSelectedOrphans(new Set(res.orphanedPartialFiles.map((o) => o.path)));
+      setHasScanned(true);
     } catch (err: any) {
-      alert(`Scan error: ${err.message}`);
+      addToast(`Scan error: ${err.message}`, 'error');
     } finally {
       setIsScanning(false);
     }
   };
 
+  // Run once on first mount only
   useEffect(() => {
     handleScan();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleCleanSelected = async () => {
@@ -55,10 +53,10 @@ export const StorageMaintenanceView: React.FC<StorageMaintenanceViewProps> = ({ 
     setIsCleaning(true);
     try {
       const res = await api.cleanOrphanedFiles(Array.from(selectedOrphans));
-      alert(`Successfully deleted ${res.cleaned} orphaned files and freed ${formatBytes(res.freedBytes)}!`);
+      addToast(`Deleted ${res.cleaned} orphaned files and freed ${formatBytes(res.freedBytes)}.`, 'success');
       handleScan();
     } catch (err: any) {
-      alert(`Clean error: ${err.message}`);
+      addToast(`Clean error: ${err.message}`, 'error');
     } finally {
       setIsCleaning(false);
     }
@@ -73,7 +71,13 @@ export const StorageMaintenanceView: React.FC<StorageMaintenanceViewProps> = ({ 
     });
   };
 
+  const diskUsedPct = metrics
+    ? Math.min(100, Math.round(((metrics.storage.usedBytes || 0) / (metrics.storage.totalBytes || 1)) * 100))
+    : 0;
+
   return (
+    <>
+    <ToastContainer toasts={toasts} onDismiss={dismissToast} />
     <div className="p-6 space-y-6 max-w-7xl mx-auto overflow-y-auto h-[calc(100vh-4rem)]">
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -115,8 +119,14 @@ export const StorageMaintenanceView: React.FC<StorageMaintenanceViewProps> = ({ 
             <div className="text-2xl font-bold text-slate-200 font-mono">
               {formatBytes(metrics.storage.usedBytes)}
             </div>
-            <div className="text-[11px] text-slate-500">
-              {(((metrics.storage.usedBytes || 1) / (metrics.storage.totalBytes || 1)) * 100).toFixed(1)}% disk utilization
+            <div className="text-[11px] text-slate-500 space-y-1">
+              <span>{diskUsedPct}% disk utilization</span>
+              <div className="h-1.5 w-full bg-slate-950 rounded-full overflow-hidden border border-slate-800">
+                <div
+                  className={`h-full rounded-full ${diskUsedPct >= 90 ? 'bg-rose-500' : diskUsedPct >= 75 ? 'bg-amber-400' : 'bg-teal-400'}`}
+                  style={{ width: `${diskUsedPct}%` }}
+                />
+              </div>
             </div>
           </div>
 
@@ -195,5 +205,6 @@ export const StorageMaintenanceView: React.FC<StorageMaintenanceViewProps> = ({ 
         </div>
       )}
     </div>
+    </>
   );
 };

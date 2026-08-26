@@ -1,18 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Layers,
   Search,
-  Filter,
-  CheckCircle2,
   Download,
-  Plus,
   Loader2,
-  FileText,
-  Video,
-  Music,
-  Image,
-  Archive,
-  Terminal,
 } from 'lucide-react';
 import { LinkBatchCandidate, DownloadQueue, CategoryRule } from '../../shared/types';
 import { Language, translations } from '../lib/i18n';
@@ -92,12 +83,21 @@ export const BatchLinksView: React.FC<BatchLinksViewProps> = ({ queues, categori
     }
   };
 
-  const filteredCandidates = candidates.filter((c) => {
-    if (activeTab === 'all') return true;
-    return c.category === activeTab;
-  });
+  const filteredCandidates = useMemo(
+    () => candidates.filter((c) => activeTab === 'all' || c.category === activeTab),
+    [candidates, activeTab]
+  );
 
-  const selectedCount = candidates.filter((c) => c.selected).length;
+  const selectedCount = useMemo(() => candidates.filter((c) => c.selected).length, [candidates]);
+
+  // Per-tab item counts for the badges
+  const tabCounts = useMemo(() => {
+    const acc: Record<string, number> = { all: candidates.length };
+    for (const c of candidates) {
+      acc[c.category] = (acc[c.category] || 0) + 1;
+    }
+    return acc;
+  }, [candidates]);
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto overflow-y-auto h-[calc(100vh-4rem)]">
@@ -153,17 +153,37 @@ export const BatchLinksView: React.FC<BatchLinksViewProps> = ({ queues, categori
                 <button
                   key={cat}
                   onClick={() => setActiveTab(cat)}
-                  className={`px-3 py-1 rounded-lg capitalize whitespace-nowrap transition-colors ${
+                  className={`px-3 py-1 rounded-lg capitalize whitespace-nowrap transition-colors flex items-center gap-1 ${
                     activeTab === cat ? 'bg-cyan-600 text-white font-bold' : 'text-slate-400 hover:text-slate-200'
                   }`}
                 >
-                  {cat}
+                  <span>{cat}</span>
+                  {(tabCounts[cat] ?? 0) > 0 && (
+                    <span className={`text-[10px] px-1 rounded ${activeTab === cat ? 'bg-cyan-500 text-white' : 'bg-slate-800 text-slate-400'}`}>
+                      {tabCounts[cat]}
+                    </span>
+                  )}
                 </button>
               ))}
             </div>
 
             {/* Batch Destination & Enqueue */}
             <div className="flex items-center gap-2 flex-wrap">
+              {/* Category override */}
+              <select
+                value={targetCategory}
+                onChange={(e) => setTargetCategory(e.target.value)}
+                className="bg-slate-950 border border-slate-800 rounded-xl px-2.5 py-1.5 text-xs text-slate-200"
+                title="Override category for selected items"
+              >
+                <option value="other">Category: Auto-detect</option>
+                {categories.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    Category: {c.name}
+                  </option>
+                ))}
+              </select>
+
               <select
                 value={targetQueue}
                 onChange={(e) => setTargetQueue(e.target.value)}
@@ -231,13 +251,18 @@ export const BatchLinksView: React.FC<BatchLinksViewProps> = ({ queues, categori
                   <tr
                     key={idx}
                     onClick={() => toggleSelect(idx)}
-                    className="hover:bg-slate-800/40 cursor-pointer"
+                    onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && toggleSelect(idx)}
+                    tabIndex={0}
+                    role="row"
+                    aria-selected={item.selected}
+                    className="hover:bg-slate-800/40 cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-500 focus-visible:outline-offset-[-2px]"
                   >
                     <td className="p-2.5 text-center" onClick={(e) => e.stopPropagation()}>
                       <input
                         type="checkbox"
                         checked={item.selected}
                         onChange={() => toggleSelect(idx)}
+                        tabIndex={-1}
                         className="rounded border-slate-700 text-cyan-600 focus:ring-0 bg-slate-900 cursor-pointer"
                       />
                     </td>

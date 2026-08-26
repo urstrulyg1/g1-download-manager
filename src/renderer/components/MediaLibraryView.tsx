@@ -1,55 +1,55 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   Video,
   Music,
   Play,
   Pause,
-  Volume2,
-  Maximize2,
-  Search,
-  Filter,
-  Layers,
-  Sparkles,
-  ArrowUpDown,
   Download,
-  FolderOpen,
 } from 'lucide-react';
 import { DownloadItem } from '../../shared/types';
-import { MediaLibraryItem, DownloadComparisonReport } from '../../main/media/MediaLibrary';
-import { Button } from './ui/Button';
-import { Badge } from './ui/Badge';
 import { Language, translations } from '../lib/i18n';
+import { formatBytes } from '../lib/formatters';
 
 interface MediaLibraryViewProps {
   downloads: DownloadItem[];
   lang: Language;
 }
 
+/** Derive a display resolution label from a DownloadItem.
+ *  Prefers metadata from the mediaInfo field if present; falls back to filename heuristics. */
+function resolveResolution(item: DownloadItem): string {
+  const meta = (item as any).mediaInfo;
+  if (meta?.height) {
+    if (meta.height >= 2160) return '2160p 4K';
+    if (meta.height >= 1080) return '1080p FHD';
+    if (meta.height >= 720) return '720p HD';
+    return `${meta.height}p`;
+  }
+  const name = item.filename.toLowerCase();
+  if (name.includes('2160p') || name.includes('4k') || name.includes('uhd')) return '2160p 4K';
+  if (name.includes('1080p') || name.includes('fhd')) return '1080p FHD';
+  if (name.includes('720p') || name.includes('hd')) return '720p HD';
+  return 'SD';
+}
+
 export const MediaLibraryView: React.FC<MediaLibraryViewProps> = ({ downloads, lang }) => {
   const t = translations[lang] || translations.en;
   const [selectedMedia, setSelectedMedia] = useState<DownloadItem | null>(null);
-  const [isPlaying, setIsPlaying] = useState(false);
   const [resolutionFilter, setResolutionFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const videoRef = useRef<HTMLVideoElement>(null);
 
   const completedMedia = downloads.filter(
     (d) => d.status === 'completed' && (d.category === 'video' || d.category === 'audio')
   );
 
-  const formatBytes = (bytes: number) => {
-    if (bytes <= 0) return '0 B';
-    const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return `${(bytes / Math.pow(k, i)).toFixed(1)} ${sizes[i]}`;
-  };
-
   const filteredMedia = completedMedia.filter((m) => {
     if (searchQuery && !m.filename.toLowerCase().includes(searchQuery.toLowerCase())) return false;
     if (resolutionFilter !== 'all') {
-      if (resolutionFilter === '4k' && !m.filename.includes('2160p')) return false;
-      if (resolutionFilter === '1080p' && !m.filename.includes('1080p')) return false;
-      if (resolutionFilter === '720p' && !m.filename.includes('720p')) return false;
+      const res = resolveResolution(m);
+      if (resolutionFilter === '4k' && !res.includes('2160')) return false;
+      if (resolutionFilter === '1080p' && !res.includes('1080')) return false;
+      if (resolutionFilter === '720p' && !res.includes('720')) return false;
     }
     return true;
   });
@@ -69,6 +69,14 @@ export const MediaLibraryView: React.FC<MediaLibraryViewProps> = ({ downloads, l
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Search */}
+          <input
+            type="text"
+            placeholder="Search files..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-amber-500 w-40"
+          />
           {/* Resolution Filter Tabs */}
           <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-800 text-[11px] font-semibold">
             {['all', '4k', '1080p', '720p'].map((res) => (
@@ -86,7 +94,7 @@ export const MediaLibraryView: React.FC<MediaLibraryViewProps> = ({ downloads, l
         </div>
       </div>
 
-      {/* Embedded Player Section if media selected */}
+      {/* Embedded Player Section */}
       {selectedMedia && (
         <div className="p-5 rounded-2xl bg-slate-900/90 border border-slate-800 shadow-2xl space-y-3 animate-in fade-in duration-200">
           <div className="flex justify-between items-center">
@@ -103,13 +111,23 @@ export const MediaLibraryView: React.FC<MediaLibraryViewProps> = ({ downloads, l
           </div>
 
           <div className="rounded-xl overflow-hidden bg-black aspect-video max-h-72 flex items-center justify-center relative border border-slate-800">
-            <div className="text-center space-y-2">
-              <div className="w-12 h-12 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/40 flex items-center justify-center mx-auto">
-                <Play className="w-6 h-6 fill-amber-400" />
+            {selectedMedia.finalPath ? (
+              <video
+                ref={videoRef}
+                key={selectedMedia.id}
+                src={`file://${selectedMedia.finalPath}`}
+                controls
+                autoPlay
+                className="w-full h-full object-contain"
+              />
+            ) : (
+              <div className="text-center space-y-2">
+                <div className="w-12 h-12 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/40 flex items-center justify-center mx-auto">
+                  <Play className="w-6 h-6 fill-amber-400" />
+                </div>
+                <div className="text-xs font-semibold text-slate-300">Path not available</div>
               </div>
-              <div className="text-xs font-semibold text-slate-300">Local Media Stream Ready</div>
-              <div className="text-[10px] text-slate-500 font-mono truncate max-w-xs">{selectedMedia.finalPath}</div>
-            </div>
+            )}
           </div>
         </div>
       )}
@@ -142,7 +160,7 @@ export const MediaLibraryView: React.FC<MediaLibraryViewProps> = ({ downloads, l
                     {media.filename}
                   </h4>
                   <div className="text-[11px] text-slate-400 font-mono flex items-center gap-2 mt-1">
-                    <span className="text-amber-300 font-bold">{media.filename.includes('2160p') ? '2160p 4K' : media.filename.includes('1080p') ? '1080p FHD' : 'HD'}</span>
+                    <span className="text-amber-300 font-bold">{resolveResolution(media)}</span>
                     <span>•</span>
                     <span>{new Date(media.completedAt || media.createdAt).toLocaleDateString()}</span>
                   </div>
@@ -151,16 +169,7 @@ export const MediaLibraryView: React.FC<MediaLibraryViewProps> = ({ downloads, l
 
               <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px]">
                 <span className="text-slate-500 font-mono uppercase">{media.serverCapabilities.protocol}</span>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setSelectedMedia(media);
-                  }}
-                  className="px-2.5 py-1 rounded-lg bg-amber-600/20 text-amber-300 hover:bg-amber-600/30 font-bold flex items-center gap-1"
-                >
-                  <Play className="w-3 h-3 fill-amber-300" />
-                  <span>Play</span>
-                </button>
+                <span className="text-slate-500 font-mono">{formatBytes(media.downloadedBytes, 1)}</span>
               </div>
             </div>
           ))

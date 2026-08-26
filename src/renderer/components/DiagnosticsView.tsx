@@ -8,16 +8,16 @@ import {
   RotateCcw,
   Download,
   Loader2,
-  ShieldCheck,
   HardDrive,
   Globe,
   Radio,
   Cpu,
-  Lock,
 } from 'lucide-react';
 import { DiagnosticCheckResult, SystemMetrics } from '../../shared/types';
 import { Language, translations } from '../lib/i18n';
 import { api } from '../lib/api';
+import { formatBytes } from '../lib/formatters';
+import { useToasts, ToastContainer } from './ui/Toast';
 
 interface DiagnosticsViewProps {
   lang: Language;
@@ -28,6 +28,7 @@ export const DiagnosticsView: React.FC<DiagnosticsViewProps> = ({ lang }) => {
   const [results, setResults] = useState<DiagnosticCheckResult[]>([]);
   const [metrics, setMetrics] = useState<SystemMetrics | null>(null);
   const [isRunning, setIsRunning] = useState(false);
+  const [toasts, addToast, dismissToast] = useToasts();
 
   const runDiagnostics = async () => {
     setIsRunning(true);
@@ -39,7 +40,7 @@ export const DiagnosticsView: React.FC<DiagnosticsViewProps> = ({ lang }) => {
       setResults(diagRes);
       if (metricsRes) setMetrics(metricsRes);
     } catch (err: any) {
-      alert(`Diagnostics error: ${err.message}`);
+      addToast(`Diagnostics error: ${err.message}`, 'error');
     } finally {
       setIsRunning(false);
     }
@@ -57,15 +58,9 @@ export const DiagnosticsView: React.FC<DiagnosticsViewProps> = ({ lang }) => {
     window.open('/api/diagnostics/crash-report', '_blank');
   };
 
-  const formatBytes = (bytes?: number) => {
-    if (!bytes || bytes <= 0) return '0 B';
-    const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return `${(bytes / Math.pow(k, i)).toFixed(1)} ${sizes[i]}`;
-  };
-
   return (
+    <>
+    <ToastContainer toasts={toasts} onDismiss={dismissToast} />
     <div className="p-6 space-y-6 max-w-7xl mx-auto overflow-y-auto h-[calc(100vh-4rem)]">
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -116,10 +111,10 @@ export const DiagnosticsView: React.FC<DiagnosticsViewProps> = ({ lang }) => {
               <span>Runtime & Platform</span>
             </div>
             <div className="text-lg font-bold text-white font-mono">
-              G1DM v1.0.0
+              G1DM
             </div>
             <div className="text-[11px] text-slate-400">
-              Memory: <strong className="text-slate-200">{formatBytes(metrics.engine.memoryUsageBytes)}</strong> (Heap)
+              Memory: <strong className="text-slate-200">{formatBytes(metrics.engine.memoryUsageBytes ?? 0, 1)}</strong> (Heap)
             </div>
           </div>
 
@@ -129,10 +124,10 @@ export const DiagnosticsView: React.FC<DiagnosticsViewProps> = ({ lang }) => {
               <span>Storage Free Space</span>
             </div>
             <div className="text-lg font-bold text-emerald-400 font-mono">
-              {formatBytes(metrics.storage.freeBytes)} Free
+              {formatBytes(metrics.storage.freeBytes ?? 0, 1)} Free
             </div>
             <div className="text-[11px] text-slate-400">
-              Total Capacity: <strong className="text-slate-200">{formatBytes(metrics.storage.totalBytes)}</strong>
+              Total Capacity: <strong className="text-slate-200">{formatBytes(metrics.storage.totalBytes ?? 0, 1)}</strong>
             </div>
           </div>
 
@@ -155,7 +150,7 @@ export const DiagnosticsView: React.FC<DiagnosticsViewProps> = ({ lang }) => {
               <span>Network State</span>
             </div>
             <div className="text-lg font-bold text-white font-mono flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
+              <span className={`w-2.5 h-2.5 rounded-full ${metrics.network.online ? 'bg-emerald-400 animate-ping' : 'bg-slate-600'}`} />
               <span>{metrics.network.online ? 'Online' : 'Offline'}</span>
             </div>
             <div className="text-[11px] text-slate-400">
@@ -222,5 +217,6 @@ export const DiagnosticsView: React.FC<DiagnosticsViewProps> = ({ lang }) => {
         })}
       </div>
     </div>
+    </>
   );
 };

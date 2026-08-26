@@ -5,6 +5,7 @@ import {
   Trash2,
   Clock,
   Loader2,
+  Pencil,
 } from 'lucide-react';
 import { AutomationRule, RuleExecutionLog } from '../../main/automation/RuleEngine';
 import { RuleSimulator, SimulationResult } from '../../main/automation/RuleSimulator';
@@ -29,13 +30,23 @@ export const AutomationView: React.FC<AutomationViewProps> = ({ downloads, lang 
   const [saveError, setSaveError] = useState<string | null>(null);
 
   // New Rule Form State
+  const [editingRuleId, setEditingRuleId] = useState<string | null>(null);
+
   const [ruleName, setRuleName] = useState('Auto Move Movies');
   const [trigger, setTrigger] = useState<AutomationRule['trigger']>('DOWNLOAD_COMPLETED');
-  const [conditionField, setConditionField] = useState('category');
-  const [conditionOperator, setConditionOperator] = useState<'equals' | 'greater_than' | 'less_than'>('equals');
-  const [conditionValue, setConditionValue] = useState('video');
-  const [actionType, setActionType] = useState<AutomationRule['actions'][0]['actionType']>('MOVE_TO_DIR');
-  const [actionParam, setActionParam] = useState('Videos');
+  // Support multiple conditions/actions
+  const [conditions, setConditions] = useState<AutomationRule['conditions']>([
+    { field: 'category', operator: 'equals', value: 'video' },
+  ]);
+  const [actions, setActions] = useState<AutomationRule['actions']>([
+    { actionType: 'MOVE_TO_DIR', params: { targetDir: 'Videos' } },
+  ]);
+  // Keep single-row shortcuts in sync for simple display
+  const conditionField = conditions[0]?.field ?? 'category';
+  const conditionOperator = conditions[0]?.operator ?? 'equals';
+  const conditionValue = conditions[0]?.value ?? '';
+  const actionType = actions[0]?.actionType ?? 'MOVE_TO_DIR';
+  const actionParam = actions[0]?.params?.targetDir ?? '';
 
   const fetchRules = async () => {
     setRulesError(null);
@@ -55,14 +66,35 @@ export const AutomationView: React.FC<AutomationViewProps> = ({ downloads, lang 
     fetchRules();
   }, []);
 
+  const resetForm = () => {
+    setEditingRuleId(null);
+    setRuleName('Auto Move Movies');
+    setTrigger('DOWNLOAD_COMPLETED');
+    setConditions([{ field: 'category', operator: 'equals', value: 'video' }]);
+    setActions([{ actionType: 'MOVE_TO_DIR', params: { targetDir: 'Videos' } }]);
+    setSimResult(null);
+    setSaveError(null);
+  };
+
+  const openEditRule = (rule: AutomationRule) => {
+    setEditingRuleId(rule.id);
+    setRuleName(rule.name);
+    setTrigger(rule.trigger);
+    setConditions(rule.conditions.length > 0 ? [...rule.conditions] : [{ field: 'category', operator: 'equals', value: '' }]);
+    setActions(rule.actions.length > 0 ? [...rule.actions] : [{ actionType: 'MOVE_TO_DIR', params: { targetDir: '' } }]);
+    setSimResult(null);
+    setSaveError(null);
+    setIsModalOpen(true);
+  };
+
   const handleSimulate = () => {
     const candidateRule: AutomationRule = {
       id: 'rule_sim',
       name: ruleName,
       enabled: true,
       trigger,
-      conditions: [{ field: conditionField, operator: conditionOperator as any, value: conditionValue }],
-      actions: [{ actionType, params: { targetDir: actionParam } }],
+      conditions,
+      actions,
     };
 
     const res = RuleSimulator.simulate(candidateRule, downloads, rules);
@@ -72,19 +104,26 @@ export const AutomationView: React.FC<AutomationViewProps> = ({ downloads, lang 
   const handleCreateRule = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaveError(null);
-    const newRule: AutomationRule = {
-      id: `rule_${Date.now()}`,
+
+    const updatedRule: AutomationRule = {
+      id: editingRuleId ?? `rule_${Date.now()}`,
       name: ruleName,
       enabled: true,
       trigger,
-      conditions: [{ field: conditionField, operator: conditionOperator as any, value: conditionValue }],
-      actions: [{ actionType, params: { targetDir: actionParam } }],
+      conditions,
+      actions,
     };
 
     try {
-      await api.saveRules([...rules, newRule]);
+      let updatedRules: AutomationRule[];
+      if (editingRuleId) {
+        updatedRules = rules.map((r) => (r.id === editingRuleId ? updatedRule : r));
+      } else {
+        updatedRules = [...rules, updatedRule];
+      }
+      await api.saveRules(updatedRules);
       setIsModalOpen(false);
-      setSimResult(null);
+      resetForm();
       fetchRules();
     } catch (err: any) {
       setSaveError(err.message || 'Failed to save rule.');
@@ -151,12 +190,22 @@ export const AutomationView: React.FC<AutomationViewProps> = ({ downloads, lang 
                     {rule.enabled ? 'ACTIVE' : 'DISABLED'}
                   </Badge>
                 </div>
-                <button
-                  onClick={() => handleDeleteRule(rule.id)}
-                  className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-950 text-slate-400 hover:text-rose-400"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
+                <div className="flex gap-1">
+                  <button
+                    onClick={() => openEditRule(rule)}
+                    className="p-1.5 rounded-lg bg-slate-800 hover:bg-blue-950 text-slate-400 hover:text-blue-400"
+                    title="Edit rule"
+                  >
+                    <Pencil className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => handleDeleteRule(rule.id)}
+                    className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-950 text-slate-400 hover:text-rose-400"
+                    title="Delete rule"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
 
               {/* WHEN / IF / THEN Badges */}
@@ -221,7 +270,7 @@ export const AutomationView: React.FC<AutomationViewProps> = ({ downloads, lang 
               ) : (
                 executionLogs.map((log, i) => (
                   <tr key={i} className="hover:bg-slate-800/30">
-                    <td className="p-2.5 text-slate-500">{new Date(log.timestamp).toLocaleTimeString()}</td>
+                    <td className="p-2.5 text-slate-500">{new Date(log.timestamp).toLocaleString()}</td>
                     <td className="p-2.5 text-slate-200 font-bold">{log.ruleName}</td>
                     <td className="p-2.5 text-indigo-400">{log.trigger}</td>
                     <td className="p-2.5 text-emerald-400 truncate max-w-xs">{log.executedActions.join(', ')}</td>
@@ -233,16 +282,22 @@ export const AutomationView: React.FC<AutomationViewProps> = ({ downloads, lang 
         </div>
       </div>
 
-      {/* Create Rule Modal with Simulator */}
+      {/* Create / Edit Rule Modal with Simulator */}
       {isModalOpen && (
-        <div className="theme-overlay fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4">
+        <div
+          className="theme-overlay fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label={editingRuleId ? 'Edit automation rule' : 'Create automation rule'}
+          onKeyDown={(e) => { if (e.key === 'Escape') { setIsModalOpen(false); resetForm(); } }}
+        >
           <form
             onSubmit={handleCreateRule}
-            className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg shadow-2xl p-5 space-y-4 text-xs"
+            className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg shadow-2xl p-5 space-y-4 text-xs max-h-[90vh] overflow-y-auto"
           >
             <div className="flex justify-between items-center pb-2 border-b border-slate-800">
-              <h2 className="text-sm font-bold text-white">Create Automation Rule</h2>
-              <button type="button" onClick={() => setIsModalOpen(false)} className="p-1 text-slate-400 hover:text-white">
+              <h2 className="text-sm font-bold text-white">{editingRuleId ? 'Edit Automation Rule' : 'Create Automation Rule'}</h2>
+              <button type="button" onClick={() => { setIsModalOpen(false); resetForm(); }} className="p-1 text-slate-400 hover:text-white">
                 ✕
               </button>
             </div>
@@ -273,58 +328,86 @@ export const AutomationView: React.FC<AutomationViewProps> = ({ downloads, lang 
               </select>
             </div>
 
-            {/* IF */}
-            <div className="space-y-1">
-              <label className="text-cyan-400 font-bold uppercase text-[11px]">IF (Condition)</label>
-              <div className="grid grid-cols-3 gap-2">
-                <input
-                  type="text"
-                  placeholder="Field (e.g. category)"
-                  value={conditionField}
-                  onChange={(e) => setConditionField(e.target.value)}
-                  className="bg-slate-950 border border-slate-800 rounded-lg p-2 text-slate-200 font-mono"
-                />
-                <select
-                  value={conditionOperator}
-                  onChange={(e) => setConditionOperator(e.target.value as any)}
-                  className="bg-slate-950 border border-slate-800 rounded-lg p-2 text-slate-200"
+            {/* IF — Multiple Conditions */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-cyan-400 font-bold uppercase text-[11px]">IF (Conditions)</label>
+                <button
+                  type="button"
+                  onClick={() => setConditions((prev) => [...prev, { field: 'category', operator: 'equals', value: '' }])}
+                  className="text-[10px] text-cyan-400 hover:text-cyan-300 font-bold"
                 >
-                  <option value="equals">equals</option>
-                  <option value="less_than">less than</option>
-                  <option value="greater_than">greater than</option>
-                </select>
-                <input
-                  type="text"
-                  placeholder="Value (e.g. video)"
-                  value={conditionValue}
-                  onChange={(e) => setConditionValue(e.target.value)}
-                  className="bg-slate-950 border border-slate-800 rounded-lg p-2 text-slate-200 font-mono"
-                />
+                  + Add Condition
+                </button>
               </div>
+              {conditions.map((cond, i) => (
+                <div key={i} className="grid grid-cols-[1fr_1fr_1fr_auto] gap-2 items-center">
+                  <input
+                    type="text"
+                    placeholder="Field"
+                    value={cond.field}
+                    onChange={(e) => setConditions((prev) => prev.map((c, j) => j === i ? { ...c, field: e.target.value } : c))}
+                    className="bg-slate-950 border border-slate-800 rounded-lg p-2 text-slate-200 font-mono"
+                  />
+                  <select
+                    value={cond.operator}
+                    onChange={(e) => setConditions((prev) => prev.map((c, j) => j === i ? { ...c, operator: e.target.value as any } : c))}
+                    className="bg-slate-950 border border-slate-800 rounded-lg p-2 text-slate-200"
+                  >
+                    <option value="equals">equals</option>
+                    <option value="less_than">less than</option>
+                    <option value="greater_than">greater than</option>
+                  </select>
+                  <input
+                    type="text"
+                    placeholder="Value"
+                    value={cond.value}
+                    onChange={(e) => setConditions((prev) => prev.map((c, j) => j === i ? { ...c, value: e.target.value } : c))}
+                    className="bg-slate-950 border border-slate-800 rounded-lg p-2 text-slate-200 font-mono"
+                  />
+                  {conditions.length > 1 && (
+                    <button type="button" onClick={() => setConditions((prev) => prev.filter((_, j) => j !== i))} className="text-rose-400 hover:text-rose-300 font-bold text-xs">✕</button>
+                  )}
+                </div>
+              ))}
             </div>
 
-            {/* THEN */}
-            <div className="space-y-1">
-              <label className="text-emerald-400 font-bold uppercase text-[11px]">THEN (Action)</label>
-              <div className="grid grid-cols-2 gap-2">
-                <select
-                  value={actionType}
-                  onChange={(e) => setActionType(e.target.value as any)}
-                  className="bg-slate-950 border border-slate-800 rounded-lg p-2 text-slate-200"
+            {/* THEN — Multiple Actions */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-emerald-400 font-bold uppercase text-[11px]">THEN (Actions)</label>
+                <button
+                  type="button"
+                  onClick={() => setActions((prev) => [...prev, { actionType: 'NOTIFY_USER', params: {} }])}
+                  className="text-[10px] text-emerald-400 hover:text-emerald-300 font-bold"
                 >
-                  <option value="MOVE_TO_DIR">Move File to Folder</option>
-                  <option value="APPLY_PROFILE">Apply Download Profile</option>
-                  <option value="PAUSE_DOWNLOADS">Pause Downloads</option>
-                  <option value="NOTIFY_USER">Notify Desktop</option>
-                </select>
-                <input
-                  type="text"
-                  placeholder="Target (e.g. Videos or TURBO)"
-                  value={actionParam}
-                  onChange={(e) => setActionParam(e.target.value)}
-                  className="bg-slate-950 border border-slate-800 rounded-lg p-2 text-slate-200 font-mono"
-                />
+                  + Add Action
+                </button>
               </div>
+              {actions.map((act, i) => (
+                <div key={i} className="grid grid-cols-[1fr_1fr_auto] gap-2 items-center">
+                  <select
+                    value={act.actionType}
+                    onChange={(e) => setActions((prev) => prev.map((a, j) => j === i ? { ...a, actionType: e.target.value as any } : a))}
+                    className="bg-slate-950 border border-slate-800 rounded-lg p-2 text-slate-200"
+                  >
+                    <option value="MOVE_TO_DIR">Move File to Folder</option>
+                    <option value="APPLY_PROFILE">Apply Download Profile</option>
+                    <option value="PAUSE_DOWNLOADS">Pause Downloads</option>
+                    <option value="NOTIFY_USER">Notify Desktop</option>
+                  </select>
+                  <input
+                    type="text"
+                    placeholder="Target (e.g. Videos)"
+                    value={act.params?.targetDir ?? ''}
+                    onChange={(e) => setActions((prev) => prev.map((a, j) => j === i ? { ...a, params: { ...a.params, targetDir: e.target.value } } : a))}
+                    className="bg-slate-950 border border-slate-800 rounded-lg p-2 text-slate-200 font-mono"
+                  />
+                  {actions.length > 1 && (
+                    <button type="button" onClick={() => setActions((prev) => prev.filter((_, j) => j !== i))} className="text-rose-400 hover:text-rose-300 font-bold text-xs">✕</button>
+                  )}
+                </div>
+              ))}
             </div>
 
             {/* Pre-Activation Simulator */}
@@ -345,7 +428,12 @@ export const AutomationView: React.FC<AutomationViewProps> = ({ downloads, lang 
                   <div>Tested against: <strong className="text-white">{simResult.testedHistoricalItemsCount} downloads</strong></div>
                   <div>Would trigger: <strong className="text-emerald-400">{simResult.wouldHaveTriggeredCount} times</strong></div>
                   {simResult.hasConflicts && (
-                    <div className="text-rose-400 font-bold">⚠ {simResult.conflictsDetails}</div>
+                    <div className="text-rose-400 font-bold space-y-1">
+                      <div>⚠ Rule Conflicts Detected:</div>
+                      {simResult.conflictsDetails?.split(';').filter(Boolean).map((detail: string, i: number) => (
+                        <div key={i} className="pl-3 text-rose-300">• {detail.trim()}</div>
+                      ))}
+                    </div>
                   )}
                 </div>
               )}
@@ -354,13 +442,13 @@ export const AutomationView: React.FC<AutomationViewProps> = ({ downloads, lang 
             <div className="flex justify-end gap-2 pt-3 border-t border-slate-800">
               <button
                 type="button"
-                onClick={() => setIsModalOpen(false)}
+                onClick={() => { setIsModalOpen(false); resetForm(); }}
                 className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 font-semibold"
               >
                 Cancel
               </button>
               <button type="submit" className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold">
-                Save & Activate Rule
+                {editingRuleId ? 'Update Rule' : 'Save & Activate Rule'}
               </button>
             </div>
 

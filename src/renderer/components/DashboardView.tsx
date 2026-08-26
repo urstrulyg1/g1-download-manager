@@ -26,6 +26,7 @@ import { DownloadItem, SystemMetrics, CategoryRule } from '../../shared/types';
 import { Language, translations } from '../lib/i18n';
 import { ActiveView } from './Sidebar';
 import { api } from '../lib/api';
+import { formatBytes } from '../lib/formatters';
 import { getDownloadClarity } from '../lib/downloadClarity';
 import { DeleteConfirmModal } from './DeleteConfirmModal';
 
@@ -39,8 +40,8 @@ interface DashboardViewProps {
   onSelectDownload: (item: DownloadItem) => void;
 }
 
-// Persisted across navigation (module-level — survives React unmount/remount)
-let _speedHistoryCache: number[] = new Array(40).fill(0);
+// Persisted across navigation using a ref-stable cache to avoid shared mutable module state
+const _speedHistoryCacheRef = { current: new Array(40).fill(0) as number[] };
 
 const DashboardViewComponent: React.FC<DashboardViewProps> = ({
   downloads,
@@ -52,16 +53,8 @@ const DashboardViewComponent: React.FC<DashboardViewProps> = ({
   onSelectDownload,
 }) => {
   const t = translations[lang] || translations.en;
-  const [speedHistory, setSpeedHistory] = useState<number[]>(() => [..._speedHistoryCache]);
+  const [speedHistory, setSpeedHistory] = useState<number[]>(() => [..._speedHistoryCacheRef.current]);
   const [itemToDelete, setItemToDelete] = useState<DownloadItem | null>(null);
-
-  const formatBytes = (bytes: number) => {
-    if (bytes <= 0) return '0 B';
-    const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return `${(bytes / Math.pow(k, i)).toFixed(2)} ${sizes[i]}`;
-  };
 
   // Aggregate stats
   const activeDownloads = React.useMemo(() => downloads.filter((d) => d.status === 'downloading'), [downloads]);
@@ -79,7 +72,7 @@ const DashboardViewComponent: React.FC<DashboardViewProps> = ({
     const timer = setTimeout(() => {
       setSpeedHistory((prev) => {
         const next = [...prev.slice(1), currentSpeed];
-        _speedHistoryCache = next;
+        _speedHistoryCacheRef.current = next;
         return next;
       });
     }, 200);
@@ -246,6 +239,15 @@ const DashboardViewComponent: React.FC<DashboardViewProps> = ({
           </div>
           <div className="text-2xl font-bold text-white font-mono">{pausedDownloads.length}</div>
           <div className="text-xs font-semibold text-slate-400">Paused</div>
+          {pausedDownloads.length > 0 && (
+            <button
+              onClick={async (e) => { e.stopPropagation(); await api.resumeAll().catch(console.error); }}
+              className="mt-1.5 text-[10px] text-emerald-400 hover:text-emerald-300 font-semibold flex items-center gap-0.5"
+            >
+              <Play className="w-3 h-3 fill-emerald-400" />
+              Resume All
+            </button>
+          )}
         </button>
 
         {/* Failed */}
