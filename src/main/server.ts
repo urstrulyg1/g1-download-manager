@@ -169,6 +169,8 @@ export async function createUnifiedServer(port: number = 8055) {
 
   // Attach engine events to WebSocket broadcast with throttled progress updates
   const lastProgressBroadcast = new Map<string, number>();
+  const lastProgressLog = new Map<string, number>();
+
   engine.on('item_progress', (item) => {
     const now = Date.now();
     const last = lastProgressBroadcast.get(item.id) || 0;
@@ -176,11 +178,31 @@ export async function createUnifiedServer(port: number = 8055) {
       lastProgressBroadcast.set(item.id, now);
       broadcast('item_progress', item);
     }
+
+    // Terminal log every 2 seconds for active downloads
+    const lastLog = lastProgressLog.get(item.id) || 0;
+    if (now - lastLog >= 2000 && item.speed > 0) {
+      lastProgressLog.set(item.id, now);
+      const speedMB = (item.speed / 1024 / 1024).toFixed(2);
+      const downloadedMB = (item.downloadedBytes / 1024 / 1024).toFixed(2);
+      const totalMB = item.totalBytes > 0 ? `${(item.totalBytes / 1024 / 1024).toFixed(2)} MB` : 'Stream';
+      console.log(`[G1DM Core] ⚡ [${item.filename}] ${item.progress.toFixed(1)}% (${downloadedMB}/${totalMB}) @ ${speedMB} MB/s · ${item.activeConnections} conns`);
+    }
   });
-  engine.on('item_added', (item) => broadcast('item_added', item));
-  engine.on('item_updated', (item) => broadcast('item_updated', item));
+
+  engine.on('item_added', (item) => {
+    console.log(`[G1DM Core] 📥 Added download: "${item.filename}" (${item.category}) · [ID: ${item.id}]`);
+    broadcast('item_added', item);
+  });
+
+  engine.on('item_updated', (item) => {
+    broadcast('item_updated', item);
+  });
+
   engine.on('item_completed', (item) => {
     lastProgressBroadcast.delete(item.id);
+    lastProgressLog.delete(item.id);
+    console.log(`[G1DM Core] ✅ Download complete: "${item.filename}" (${(item.downloadedBytes / 1024 / 1024).toFixed(2)} MB)`);
     broadcast('item_completed', item);
     const settings = db.getSettings();
 
@@ -218,6 +240,7 @@ export async function createUnifiedServer(port: number = 8055) {
   });
 
   engine.on('item_error', (err: any, item: any) => {
+    console.error(`[G1DM Core] ❌ Download error [${item?.id || 'unknown'}]: ${err?.message || err}`);
     const settings = db.getSettings();
     if (settings.automation?.webhooksEnabled && settings.automation.triggerOnError && item) {
       WebhookTrigger.executeTriggers(item, {
@@ -230,15 +253,20 @@ export async function createUnifiedServer(port: number = 8055) {
     }
   });
   engine.on('item_error', (err, item) => broadcast('item_error', { error: err.message, item }));
-  engine.on('item_deleted', (id) => broadcast('item_deleted', { id }));
+  engine.on('item_deleted', (id) => {
+    console.log(`[G1DM Core] 🗑️ Removed download record [ID: ${id}]`);
+    broadcast('item_deleted', { id });
+  });
   engine.on('log', (log) => broadcast('log', log));
 
   grabber.on('project_updated', (proj) => broadcast('grabber_project_updated', proj));
 
   networkIntelligence.on('network_lost', (status) => {
+    console.warn(`[G1DM Core] ⚠️ Network connection lost!`);
     broadcast('network_lost', status);
   });
   networkIntelligence.on('network_restored', (status) => {
+    console.log(`[G1DM Core] 🌐 Network connection restored.`);
     broadcast('network_restored', status);
   });
   networkIntelligence.on('status_change', (status) => {
@@ -275,6 +303,21 @@ export async function createUnifiedServer(port: number = 8055) {
 
   // --- REST Routes ---
 
+  // Extension / Companion telemetry log receiver
+  app.post('/api/extension/log', (req, res) => {
+    const { level = 'info', message = '', details = '', source = 'Extension' } = req.body || {};
+    const prefix = `[G1DM ${source}]`;
+    const detailsStr = details ? (typeof details === 'object' ? ` - ${JSON.stringify(details)}` : ` - ${details}`) : '';
+    if (level === 'error') {
+      console.error(`${prefix} ❌ ${message}${detailsStr}`);
+    } else if (level === 'warn') {
+      console.warn(`${prefix} ⚠️ ${message}${detailsStr}`);
+    } else {
+      console.log(`${prefix} ℹ️ ${message}${detailsStr}`);
+    }
+    res.json({ success: true });
+  });
+
   // Downloads
   app.get('/api/downloads', (req, res) => {
     res.json(engine.getAllDownloads());
@@ -282,9 +325,11 @@ export async function createUnifiedServer(port: number = 8055) {
 
   app.post('/api/downloads', async (req, res) => {
     try {
+      console.log(`[G1DM Core] 📥 Received download submission for "${req.body?.filename || req.body?.url}"`);
       const item = await engine.addDownload(req.body);
       res.json(item);
     } catch (err: any) {
+      console.error(`[G1DM Core] ❌ Failed to add download: ${err.message}`);
       res.status(500).json({ error: err.message });
     }
   });
@@ -293,6 +338,7 @@ export async function createUnifiedServer(port: number = 8055) {
     try {
       const { url, auth, proxy } = req.body;
       if (!url) return res.status(400).json({ error: 'URL is required' });
+      console.log(`[G1DM Core] 🔍 Probing link capability & metadata for: ${url}`);
       const probe = await ProbeService.probe(url, auth, proxy);
 
       // Optional cloud threat-intelligence enrichment (URLhaus + VirusTotal)

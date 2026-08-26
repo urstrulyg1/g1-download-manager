@@ -2,8 +2,20 @@
 const G1DM_PORT = 8055;
 const G1DM_API_BASE = `http://127.0.0.1:${G1DM_PORT}/api`;
 
-chrome.runtime.onInstalled.addListener(() => {
+function logToCore(level, message, details) {
+  console.log(`[G1DM Extension] ${message}`, details || '');
+  fetch(`${G1DM_API_BASE}/extension/log`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ level, message, details, source: 'Chrome Extension' })
+  }).catch(() => {});
+}
 
+// Notify backend when background service worker wakes up
+logToCore('info', 'Chrome companion extension active & connected.');
+
+chrome.runtime.onInstalled.addListener(() => {
+  logToCore('info', 'Extension installed/updated — registered context menus.');
 
   // Create context menus
   chrome.contextMenus.create({
@@ -43,6 +55,7 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
   if (info.menuItemId === 'g1dm-download-link') {
     const targetUrl = info.linkUrl || info.srcUrl;
     if (targetUrl) {
+      logToCore('info', `Right-click "Download with G1DM" selected for URL: ${targetUrl}`);
       if (tab && tab.id) {
         chrome.tabs.sendMessage(
           tab.id,
@@ -60,6 +73,7 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
     }
   } else if (info.menuItemId === 'g1dm-download-page-links') {
     if (tab && tab.url) {
+      logToCore('info', `Batch link extractor triggered for page: ${tab.url}`);
       openOrFocusG1DMTab(`http://127.0.0.1:${G1DM_PORT}/#batch?url=${encodeURIComponent(tab.url)}`);
     }
   } else if (info.menuItemId === 'g1dm-open-manager') {
@@ -76,6 +90,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'DOWNLOAD_URL') {
     const container = message.container || message.format || 'mp4';
     const formatSpec = message.formatSpec || message.mediaFormatSpec;
+    logToCore('info', `Extension submitting download: "${message.filename || message.url}" (${message.category || 'other'})`);
     sendToG1DM(
       message.url,
       message.filename,
@@ -84,15 +99,19 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       container,
       message.startImmediately !== false
     ).then((result) => {
+      logToCore('info', `Download accepted by core engine: "${message.filename || message.url}"`);
       sendResponse({ success: true, result });
     }).catch((err) => {
+      logToCore('error', `Download submission failed: ${err.message}`);
       sendResponse({ success: false, error: err.message });
     });
     return true; // async response
   } else if (message.type === 'PROBE_URL') {
+    logToCore('info', `Probing video stream URL: ${message.url}`);
     probeUrl(message.url).then(sendResponse);
     return true; // async
   } else if (message.type === 'OPEN_G1DM_STUDIO') {
+    logToCore('info', `Opening G1DM Studio for URL: ${message.url || 'general'}`);
     const target = message.url ? `http://127.0.0.1:${G1DM_PORT}/#media?url=${encodeURIComponent(message.url)}` : `http://127.0.0.1:${G1DM_PORT}/#media`;
     openOrFocusG1DMTab(target);
     sendResponse({ success: true });
