@@ -1427,6 +1427,8 @@
         qualityLabel: params.qualityLabel || (params.height ? `${params.height}p` : undefined),
         clarity: params.clarity || params.qualityLabel || (params.height ? `${params.height}p` : undefined),
         resolution: params.resolution,
+        thumbnailUrl: params.thumbnailUrl || getPageThumbnailUrl(),
+        source: 'browser-extension',
         startImmediately: startImmediately
       };
 
