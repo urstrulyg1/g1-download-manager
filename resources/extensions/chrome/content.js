@@ -2,6 +2,11 @@
 (function () {
   'use strict';
 
+  // Do not execute companion overlay on G1DM Manager application UI itself
+  if (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost' || window.location.port === '8055') {
+    return;
+  }
+
   if (window.__G1DM_CONTENT_SCRIPT_INITIALIZED__) return;
   window.__G1DM_CONTENT_SCRIPT_INITIALIZED__ = true;
 
@@ -250,6 +255,7 @@
 
   // ── Main World Bridge (Reads YouTube/Site Player APIs directly) ───────────
   function injectMainWorldBridge() {
+    if (!/youtube\.com|youtu\.be/i.test(window.location.hostname)) return;
     if (document.getElementById('g1dm-main-bridge')) return;
     try {
       const script = document.createElement('script');
