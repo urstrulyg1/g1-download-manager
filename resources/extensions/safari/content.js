@@ -1,4 +1,4 @@
-// G1DM Browser Companion — Universal In-Video Download Pill & Full Format/Codec Matrix Overlay
+// G1DM Browser Companion — Ultra-Premium In-Video Quality Matrix & Media Hub
 (function () {
   'use strict';
 
@@ -37,7 +37,8 @@
   let mainIntervalId = null;
   const detectedMediaUrls = new Set();
   const videoOverlays = new Map(); // Map<HTMLVideoElement, OverlayInfo>
-  let currentFilter = 'ALL';
+  let currentCategoryFilter = 'ALL';
+  let searchQuery = '';
 
   function cleanupOrphanedContentScript() {
     if (isCleanedUp) return;
@@ -148,121 +149,69 @@
   if (window.__G1DM_CONTENT_SCRIPT_INITIALIZED__) return;
   window.__G1DM_CONTENT_SCRIPT_INITIALIZED__ = true;
 
-  // Load saved user format preference if available
-  safeGetStorage(['preferredVideoFormat'], (data) => {
-    if (data && data.preferredVideoFormat) {
-      currentFilter = data.preferredVideoFormat;
-    }
-  });
-
-  // Filter Categories
-  const FILTER_TABS = [
-    { id: 'ALL', label: 'All Combinations', badge: 'ALL' },
-    { id: 'MKV', label: 'MKV Container', badge: 'MKV' },
-    { id: 'MP4', label: 'MP4 Container', badge: 'MP4' },
-    { id: 'HEVC', label: 'HEVC / H.265', badge: 'HEVC' },
-    { id: 'H264', label: 'H.264 / AVC', badge: 'H.264' },
-    { id: 'AV1', label: 'AV1 Next-Gen', badge: 'AV1' },
-    { id: 'WEBM', label: 'WebM (VP9/AV1)', badge: 'WebM' },
-    { id: 'AUDIO', label: 'Audio Only', badge: 'AUDIO' },
-    { id: 'STREAMS', label: 'Live Streams', badge: 'STREAMS' }
-  ];
-
-  // Standard resolutions
+  // Resolution Tiers with Rich Metadata
   const RESOLUTION_TIERS = [
-    { height: 4320, label: '8K • 4320p (FUHD)', badge: '8K', color: '#ec4899', width: 7680, bitrate: '60-120 Mbps' },
-    { height: 2160, label: '4K • 2160p (UHD)', badge: '4K', color: '#c084fc', width: 3840, bitrate: '25-45 Mbps' },
-    { height: 1440, label: '2K • 1440p (QHD)', badge: '2K', color: '#a855f7', width: 2560, bitrate: '16-24 Mbps' },
-    { height: 1080, label: '1080p (Full HD)', badge: '1080p', color: '#38bdf8', width: 1920, bitrate: '8-12 Mbps' },
-    { height: 720, label: '720p (HD)', badge: '720p', color: '#34d399', width: 1280, bitrate: '4-6 Mbps' },
-    { height: 480, label: '480p (SD)', badge: '480p', color: '#fbbf24', width: 854, bitrate: '1.5-2.5 Mbps' },
-    { height: 360, label: '360p (SD)', badge: '360p', color: '#94a3b8', width: 640, bitrate: '800 kbps' },
-    { height: 240, label: '240p (Low)', badge: '240p', color: '#64748b', width: 426, bitrate: '400 kbps' }
+    { height: 4320, label: '8K • 4320p Ultra HD', badge: '8K UHD', color: '#ec4899', width: 7680, bitrate: '60-120 Mbps', fps: '60fps' },
+    { height: 2160, label: '4K • 2160p Ultra HD', badge: '4K UHD', color: '#c084fc', width: 3840, bitrate: '25-45 Mbps', fps: '60fps' },
+    { height: 1440, label: '2K • 1440p Quad HD', badge: '2K QHD', color: '#a855f7', width: 2560, bitrate: '16-24 Mbps', fps: '60fps' },
+    { height: 1080, label: '1080p • Full HD', badge: '1080p FHD', color: '#38bdf8', width: 1920, bitrate: '8-12 Mbps', fps: '60fps' },
+    { height: 720, label: '720p • High Definition', badge: '720p HD', color: '#34d399', width: 1280, bitrate: '4-6 Mbps', fps: '60fps' },
+    { height: 480, label: '480p • Standard Definition', badge: '480p SD', color: '#fbbf24', width: 854, bitrate: '1.5-2.5 Mbps', fps: '30fps' },
+    { height: 360, label: '360p • Mobile Crisp', badge: '360p', color: '#94a3b8', width: 640, bitrate: '800 kbps', fps: '30fps' },
+    { height: 240, label: '240p • Data Saver', badge: '240p', color: '#64748b', width: 426, bitrate: '400 kbps', fps: '30fps' }
   ];
 
   // Codec/Container Matrix definitions per resolution
-  const CONTAINER_CODEC_CONFIGS = [
+  const CODEC_CHIPS = [
     {
-      container: 'mkv',
-      codec: 'HEVC',
-      codecLabel: 'HEVC / H.265 (High Efficiency)',
-      tag: 'MKV • HEVC',
-      badgeColor: '#c084fc',
-      filterTags: ['MKV', 'HEVC'],
-      description: 'MKV Container • HEVC/H.265 (HDR & Multi-Track)'
-    },
-    {
-      container: 'mkv',
-      codec: 'H264',
-      codecLabel: 'H.264 / AVC (Standard Matroska)',
-      tag: 'MKV • H.264',
-      badgeColor: '#818cf8',
-      filterTags: ['MKV', 'H264'],
-      description: 'MKV Container • H.264 AVC (Subtitles & Chapters)'
-    },
-    {
-      container: 'mkv',
-      codec: 'AV1',
-      codecLabel: 'AV1 (Next-Gen Open Codec)',
-      tag: 'MKV • AV1',
-      badgeColor: '#06b6d4',
-      filterTags: ['MKV', 'AV1'],
-      description: 'MKV Container • AV1 Royalty-Free Ultra-High Compression'
-    },
-    {
+      id: 'mp4-h264',
       container: 'mp4',
       codec: 'H264',
-      codecLabel: 'H.264 / AVC (Universal Compatibility)',
-      tag: 'MP4 • H.264',
+      name: 'MP4 Universal',
+      badge: 'MP4 • H.264',
       badgeColor: '#38bdf8',
-      filterTags: ['MP4', 'H264'],
-      description: 'MP4 Container • H.264 (Plays on all devices/TVs)'
+      desc: 'H.264 AVC (Plays on all TVs & Devices)',
+      formatSpec: (h) => `bestvideo[height<=${h}][vcodec^=avc1]+bestaudio[ext=m4a]/bestvideo[height<=${h}][vcodec^=avc]+bestaudio/bestvideo[height<=${h}]+bestaudio/best[height<=${h}]/best`
     },
     {
-      container: 'mp4',
+      id: 'mkv-hevc',
+      container: 'mkv',
       codec: 'HEVC',
-      codecLabel: 'HEVC / H.265 (Apple/SmartTV MP4)',
-      tag: 'MP4 • HEVC',
-      badgeColor: '#a855f7',
-      filterTags: ['MP4', 'HEVC'],
-      description: 'MP4 Container • HEVC (Apple & Modern Hardware)'
+      name: 'MKV HEVC',
+      badge: 'MKV • H.265',
+      badgeColor: '#c084fc',
+      desc: 'HEVC HDR & Multi-Track Audio',
+      formatSpec: (h) => `bestvideo[height<=${h}][vcodec^=hev1]+bestaudio[ext=m4a]/bestvideo[height<=${h}][vcodec^=hvc1]+bestaudio/bestvideo[height<=${h}][vcodec^=h265]+bestaudio/bestvideo[height<=${h}]+bestaudio/best[height<=${h}]/best`
     },
     {
-      container: 'mp4',
+      id: 'mkv-av1',
+      container: 'mkv',
       codec: 'AV1',
-      codecLabel: 'AV1 (Ultra-Efficiency MP4)',
-      tag: 'MP4 • AV1',
-      badgeColor: '#2dd4bf',
-      filterTags: ['MP4', 'AV1'],
-      description: 'MP4 Container • AV1 Codec'
+      name: 'MKV AV1',
+      badge: 'MKV • AV1',
+      badgeColor: '#06b6d4',
+      desc: 'Next-Gen Ultra High Efficiency',
+      formatSpec: (h) => `bestvideo[height<=${h}][vcodec^=av01]+bestaudio[ext=m4a]/bestvideo[height<=${h}][vcodec^=av1]+bestaudio/bestvideo[height<=${h}]+bestaudio/best[height<=${h}]/best`
     },
     {
+      id: 'webm-vp9',
       container: 'webm',
       codec: 'VP9',
-      codecLabel: 'VP9 / AV1 (Google/Web Standard)',
-      tag: 'WebM • VP9',
+      name: 'WebM VP9',
+      badge: 'WebM • VP9',
       badgeColor: '#10b981',
-      filterTags: ['WEBM'],
-      description: 'WebM Container • VP9/AV1 YouTube Standard'
-    },
-    {
-      container: 'mov',
-      codec: 'H264',
-      codecLabel: 'QuickTime MOV (Apple ProRes/H.264)',
-      tag: 'MOV • H.264',
-      badgeColor: '#f43f5e',
-      filterTags: ['H264'],
-      description: 'QuickTime MOV Container • macOS & Final Cut Ready'
+      desc: 'Web Standard Video',
+      formatSpec: (h) => `bestvideo[height<=${h}][vcodec^=vp9]+bestaudio[ext=webm]/bestvideo[height<=${h}]+bestaudio/best[height<=${h}]/best`
     }
   ];
 
-  // Audio formats
+  // Studio-Quality Audio formats
   const AUDIO_FORMATS = [
-    { container: 'flac', codec: 'FLAC', label: 'FLAC • Lossless Studio Master', sublabel: '24-bit / 96kHz Lossless Audio', badge: 'FLAC', color: '#f59e0b' },
-    { container: 'wav', codec: 'PCM', label: 'WAV • Uncompressed PCM', sublabel: 'Original Waveform Audio', badge: 'WAV', color: '#fbbf24' },
-    { container: 'm4a', codec: 'AAC', label: 'M4A • AAC High Quality', sublabel: '320 kbps Apple Music Standard', badge: 'M4A', color: '#f97316' },
-    { container: 'mp3', codec: 'MP3', label: 'MP3 • Universal High Bitrate', sublabel: '320 kbps Constant Bitrate', badge: 'MP3', color: '#eab308' },
-    { container: 'opus', codec: 'OPUS', label: 'OGG • OPUS Low-Latency', sublabel: '160 kbps High Fidelity Speech/Music', badge: 'OPUS', color: '#84cc16' }
+    { container: 'flac', codec: 'FLAC', label: 'FLAC Lossless Master', sublabel: '24-bit / 96kHz Studio Master Audio', badge: 'FLAC 24-bit', color: '#f59e0b', icon: '🎧' },
+    { container: 'mp3', codec: 'MP3', label: 'MP3 Constant Bitrate', sublabel: '320 kbps Universal Audio', badge: 'MP3 320k', color: '#eab308', icon: '🎵' },
+    { container: 'm4a', codec: 'AAC', label: 'M4A High Quality', sublabel: '320 kbps Apple Music Standard', badge: 'M4A AAC', color: '#f97316', icon: '🍎' },
+    { container: 'opus', codec: 'OPUS', label: 'OPUS Low Latency', sublabel: '160 kbps Ultra High-Fidelity', badge: 'OPUS 160k', color: '#84cc16', icon: '⚡' },
+    { container: 'wav', codec: 'PCM', label: 'WAV Uncompressed PCM', sublabel: 'Original Pristine Waveform', badge: 'WAV Master', color: '#fbbf24', icon: '🎙️' }
   ];
 
   // Sniff media network requests
@@ -321,7 +270,7 @@
       }
     }
 
-    return 'video';
+    return 'Media Download';
   }
 
   function getBestMediaSource(video) {
@@ -444,19 +393,16 @@
   function detectMaxAvailableResolution(video) {
     let detected = 0;
 
-    // 1. Probed analysis from backend media engine
     if (probedMaxResolution > 0) {
       detected = Math.max(detected, probedMaxResolution);
     }
 
-    // 2. Read from main-world DOM bridge (populated from YouTube player API)
     const domMax = document.documentElement.getAttribute('data-g1dm-max-height');
     if (domMax) {
       const parsed = parseInt(domMax, 10);
       if (parsed > 0) detected = Math.max(detected, parsed);
     }
 
-    // 3. Inspect YouTube in-player quality menu items if present in DOM
     const ytMenuItems = document.querySelectorAll('.ytp-panel-menu .ytp-menuitem, .ytp-quality-menu .ytp-menuitem');
     if (ytMenuItems && ytMenuItems.length > 0) {
       for (const item of ytMenuItems) {
@@ -469,125 +415,16 @@
       }
     }
 
-    // 4. Read HTML5 video element decoded height
     if (video && video.videoHeight && video.videoHeight > 0) {
       detected = Math.max(detected, video.videoHeight);
     }
 
-    // 5. Return detected maximum height (default to 1080p if video not yet loaded)
     return detected > 0 ? detected : 1080;
   }
 
-  function buildAllCombinations(video, filter) {
-    const maxAvailableHeight = detectMaxAvailableResolution(video);
-    const vWidth = video.videoWidth || Math.round(maxAvailableHeight * (16 / 9));
-    const vHeight = video.videoHeight || maxAvailableHeight;
-    const durationSec = video.duration;
-    const isStreamSite = /youtube\.com|youtu\.be|googlevideo\.com|vimeo\.com|twitch\.tv|twitter\.com|x\.com|tiktok\.com|instagram\.com|facebook\.com|dailymotion\.com|reddit\.com|bilibili\.com|rumble\.com|bitchute\.com|odysee\.com/i.test(window.location.hostname);
-    const bestSrc = getBestMediaSource(video);
-    const pageUrl = window.location.href;
-    const results = [];
-
-    // 1. Live Sniffed Streams (.m3u8 / .mpd / direct stream)
-    if (filter === 'ALL' || filter === 'STREAMS' || filter === 'MKV' || filter === 'MP4') {
-      const streamUrls = Array.from(detectedMediaUrls).filter(u =>
-        u.includes('.m3u8') || u.includes('.mpd') || u.includes('.mp4') || u.includes('.mkv') || u.includes('.webm')
-      );
-
-      for (const sUrl of streamUrls.slice(0, 3)) {
-        const isHls = sUrl.includes('.m3u8');
-        const isDash = sUrl.includes('.mpd');
-        const badge = isHls ? 'HLS M3U8' : isDash ? 'DASH MPD' : 'DIRECT';
-        const estSize = estimateFileSize(durationSec, vHeight, 'H264', false);
-        results.push({
-          label: isHls ? 'Master HLS Stream (.m3u8)' : isDash ? 'DASH Manifest (.mpd)' : 'Direct Video Stream',
-          formatLabel: isHls ? 'Adaptive Bitrate • M3U8 Playlist' : isDash ? 'Multi-Track • MPD Manifest' : 'Direct Stream',
-          badge,
-          color: isHls ? '#10b981' : isDash ? '#f59e0b' : '#38bdf8',
-          url: sUrl,
-          formatSpec: 'bestvideo+bestaudio/best',
-          resolution: `${vWidth}×${vHeight}`,
-          container: isHls ? 'mkv' : isDash ? 'mkv' : 'mp4',
-          codec: 'ORIGINAL',
-          estimatedSize: estSize,
-          isStream: true,
-          isDirectStream: true
-        });
-      }
-    }
-
-    // 2. Video Resolution & Container & Codec Combinations (Capped at true max available resolution)
-    for (const res of RESOLUTION_TIERS) {
-      if (res.height > maxAvailableHeight) {
-        continue;
-      }
-
-      const calcWidth = Math.round(res.height * (16 / 9));
-      const isCurrentPlayback = (vHeight >= res.height * 0.9 && vHeight <= res.height * 1.1) || (res.height === 1080 && vHeight <= 1080 && vHeight > 720);
-
-      for (const cfg of CONTAINER_CODEC_CONFIGS) {
-        if (filter !== 'ALL') {
-          const matchTab = cfg.filterTags.includes(filter);
-          if (!matchTab) continue;
-        }
-
-        const estSize = estimateFileSize(durationSec, res.height, cfg.codec, false);
-
-        let formatSpec = `bestvideo[height<=${res.height}]+bestaudio/best[height<=${res.height}]/best`;
-        if (cfg.codec === 'H264') {
-          formatSpec = `bestvideo[height<=${res.height}][vcodec^=avc1]+bestaudio[ext=m4a]/bestvideo[height<=${res.height}][vcodec^=avc]+bestaudio/bestvideo[height<=${res.height}]+bestaudio/best[height<=${res.height}]/best`;
-        } else if (cfg.codec === 'HEVC') {
-          formatSpec = `bestvideo[height<=${res.height}][vcodec^=hev1]+bestaudio[ext=m4a]/bestvideo[height<=${res.height}][vcodec^=hvc1]+bestaudio/bestvideo[height<=${res.height}][vcodec^=h265]+bestaudio/bestvideo[height<=${res.height}]+bestaudio/best[height<=${res.height}]/best`;
-        } else if (cfg.codec === 'AV1') {
-          formatSpec = `bestvideo[height<=${res.height}][vcodec^=av01]+bestaudio[ext=m4a]/bestvideo[height<=${res.height}][vcodec^=av1]+bestaudio/bestvideo[height<=${res.height}]+bestaudio/best[height<=${res.height}]/best`;
-        } else if (cfg.codec === 'VP9') {
-          formatSpec = `bestvideo[height<=${res.height}][vcodec^=vp9]+bestaudio[ext=webm]/bestvideo[height<=${res.height}]+bestaudio/best[height<=${res.height}]/best`;
-        }
-
-        results.push({
-          label: `${res.label}${isCurrentPlayback ? ' (Current Stream)' : ''}`,
-          formatLabel: cfg.description,
-          badge: `${res.badge} ${cfg.codec}`,
-          color: cfg.badgeColor,
-          url: isStreamSite ? pageUrl : bestSrc,
-          formatSpec,
-          resolution: `${calcWidth}×${res.height} • ${res.bitrate}`,
-          container: cfg.container,
-          codec: cfg.codec,
-          height: res.height,
-          estimatedSize: estSize,
-          isCurrent: isCurrentPlayback
-        });
-      }
-    }
-
-    // 3. Audio Extraction Formats
-    if (filter === 'ALL' || filter === 'AUDIO') {
-      for (const aud of AUDIO_FORMATS) {
-        const estSize = estimateFileSize(durationSec, 0, aud.codec, true);
-        const formatSpec = aud.container === 'm4a' || aud.codec === 'AAC' ? 'bestaudio[ext=m4a]/bestaudio/best' : 'bestaudio/best';
-        results.push({
-          label: aud.label,
-          formatLabel: aud.sublabel,
-          badge: aud.badge,
-          color: aud.color,
-          url: isStreamSite ? pageUrl : bestSrc,
-          formatSpec,
-          container: aud.container,
-          codec: aud.codec,
-          estimatedSize: estSize,
-          isAudio: true
-        });
-      }
-    }
-
-    return results;
-  }
-
+  // ── Ultra-Premium In-Video Floating Pill & Quality Matrix ────────────────
   function createVideoPill(video) {
     if (videoOverlays.has(video)) return;
-
-    let activeFilter = currentFilter || 'ALL';
 
     const overlay = document.createElement('div');
     overlay.className = 'g1dm-invideo-container';
@@ -605,53 +442,53 @@
       transition: opacity 0.25s cubic-bezier(0.16, 1, 0.3, 1), transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
     `;
 
-    // Pill Button
+    // Modern Frosted Floating Pill
     const pill = document.createElement('div');
     pill.className = 'g1dm-video-pill';
     pill.style.cssText = `
       display: flex;
       align-items: center;
-      gap: 8px;
-      padding: 7px 14px;
-      background: linear-gradient(135deg, rgba(15, 23, 42, 0.96), rgba(30, 41, 59, 0.96));
-      border: 1px solid rgba(59, 130, 246, 0.65);
+      gap: 9px;
+      padding: 7px 16px;
+      background: linear-gradient(135deg, rgba(15, 23, 42, 0.94) 0%, rgba(30, 41, 59, 0.94) 100%);
+      border: 1px solid rgba(56, 189, 248, 0.55);
       border-radius: 9999px;
-      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.7), 0 0 16px rgba(59, 130, 246, 0.4);
-      backdrop-filter: blur(16px);
-      -webkit-backdrop-filter: blur(16px);
+      box-shadow: 0 12px 28px -4px rgba(0, 0, 0, 0.75), 0 0 20px rgba(56, 189, 248, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+      backdrop-filter: blur(20px) saturate(180%);
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
       color: #f8fafc;
-      font-size: 12px;
-      font-weight: 600;
+      font-size: 12.5px;
+      font-weight: 700;
       cursor: pointer;
-      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+      transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
     `;
 
     pill.innerHTML = `
-      <div style="width: 22px; height: 22px; background: linear-gradient(135deg, #2563eb, #38bdf8); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800; color: #fff; box-shadow: 0 0 10px rgba(56, 189, 248, 0.6);">⚡</div>
+      <div style="width: 22px; height: 22px; background: linear-gradient(135deg, #2563eb, #06b6d4); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 900; color: #fff; box-shadow: 0 0 12px rgba(6, 182, 212, 0.6);">⚡</div>
       <span style="letter-spacing: 0.2px;">Download Video</span>
-      <span class="g1dm-res-badge" style="background: rgba(56, 189, 248, 0.18); border: 1px solid rgba(56, 189, 248, 0.35); color: #38bdf8; padding: 2px 7px; border-radius: 6px; font-family: monospace; font-size: 10px; font-weight: 700;">1080p • ALL</span>
+      <span class="g1dm-res-badge" style="background: rgba(56, 189, 248, 0.18); border: 1px solid rgba(56, 189, 248, 0.4); color: #38bdf8; padding: 2px 8px; border-radius: 9999px; font-family: monospace; font-size: 10px; font-weight: 800; letter-spacing: 0.5px;">1080p FHD</span>
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="g1dm-chevron" style="transition: transform 0.2s ease;"><path d="m6 9 6 6 6-6"/></svg>
     `;
 
-    // Dropdown Menu Panel
+    // Dropdown Matrix Panel (Spacious 450px with VisionOS glassmorphism)
     const dropdown = document.createElement('div');
     dropdown.className = 'g1dm-quality-dropdown';
     dropdown.style.cssText = `
       display: none;
-      width: 360px;
-      margin-top: 8px;
-      background: linear-gradient(180deg, rgba(15, 23, 42, 0.98), rgba(2, 6, 23, 0.98));
-      border: 1px solid rgba(59, 130, 246, 0.55);
-      border-radius: 14px;
-      box-shadow: 0 20px 40px -8px rgba(0, 0, 0, 0.9), 0 0 24px rgba(59, 130, 246, 0.3);
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
-      padding: 12px;
+      width: 450px;
+      margin-top: 10px;
+      background: linear-gradient(180deg, rgba(15, 23, 42, 0.97) 0%, rgba(2, 6, 23, 0.98) 100%);
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      border-radius: 16px;
+      box-shadow: 0 30px 70px -15px rgba(0, 0, 0, 0.95), 0 0 35px rgba(56, 189, 248, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+      backdrop-filter: blur(28px) saturate(180%);
+      -webkit-backdrop-filter: blur(28px) saturate(180%);
+      padding: 14px;
       box-sizing: border-box;
-      max-height: 480px;
+      max-height: 520px;
       overflow-y: auto;
       transform-origin: top right;
-      animation: g1dm-scale-in 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+      animation: g1dm-scale-in 0.22s cubic-bezier(0.16, 1, 0.3, 1);
     `;
 
     overlay.appendChild(pill);
@@ -665,172 +502,472 @@
       const badgeEl = pill.querySelector('.g1dm-res-badge');
       if (!badgeEl) return;
       const h = detectMaxAvailableResolution(video);
-      const resStr = h >= 3600 ? '8K' : h >= 2000 ? '4K' : h >= 1400 ? '2K' : h >= 1000 ? '1080p' : h >= 700 ? '720p' : `${h}p`;
-      badgeEl.innerText = `${resStr} • ${activeFilter}`;
+      const resStr = h >= 3600 ? '8K FUHD' : h >= 2000 ? '4K UHD' : h >= 1400 ? '2K QHD' : h >= 1000 ? '1080p FHD' : h >= 700 ? '720p HD' : `${h}p`;
+      badgeEl.innerText = resStr;
     }
 
     function renderDropdownContent() {
-      const combinations = buildAllCombinations(video, activeFilter);
-      const title = getPageVideoTitle();
+      const maxAvailableHeight = detectMaxAvailableResolution(video);
+      const rawTitle = getPageVideoTitle();
+      const durationSec = video.duration;
+      const isStreamSite = /youtube\.com|youtu\.be|googlevideo\.com|vimeo\.com|twitch\.tv|twitter\.com|x\.com|tiktok\.com|instagram\.com|facebook\.com|dailymotion\.com|reddit\.com|bilibili\.com|rumble\.com|bitchute\.com|odysee\.com/i.test(window.location.hostname);
+      const bestSrc = getBestMediaSource(video);
+      const pageUrl = window.location.href;
 
-      // Filter tabs bar
-      const tabsHtml = FILTER_TABS.map(tab => {
-        const isActive = activeFilter === tab.id;
-        return `
-          <button class="g1dm-filter-tab" data-filter="${tab.id}" style="
-            padding: 4px 8px;
-            font-size: 10px;
-            font-weight: 700;
-            border-radius: 6px;
-            cursor: pointer;
-            border: 1px solid ${isActive ? '#38bdf8' : 'rgba(255,255,255,0.1)'};
-            background: ${isActive ? 'linear-gradient(135deg, #2563eb, #0284c7)' : 'rgba(30, 41, 59, 0.65)'};
-            color: ${isActive ? '#ffffff' : '#94a3b8'};
-            transition: all 0.15s ease;
-          ">${tab.badge}</button>
-        `;
-      }).join('');
+      const q = searchQuery.toLowerCase().trim();
 
-      let itemsHtml = combinations.map((item, idx) => `
-        <div class="g1dm-combo-item" data-idx="${idx}" style="
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          padding: 8px 10px;
-          border-radius: 8px;
-          margin-bottom: 5px;
-          cursor: pointer;
-          transition: background 0.15s ease, border-color 0.15s ease;
-          background: rgba(30, 41, 59, 0.45);
-          border: 1px solid rgba(255, 255, 255, 0.06);
-        ">
-          <div style="display: flex; align-items: center; gap: 8px; overflow: hidden;">
-            <span style="
-              background: ${item.color}22;
-              color: ${item.color};
-              border: 1px solid ${item.color}66;
-              padding: 3px 6px;
-              border-radius: 5px;
-              font-family: monospace;
-              font-size: 10px;
-              font-weight: 800;
-              min-width: 60px;
-              text-align: center;
-            ">${item.badge}</span>
-            <div style="display: flex; flex-direction: column; overflow: hidden;">
-              <div style="display: flex; align-items: center; gap: 6px;">
-                <span style="font-size: 11px; font-weight: 700; color: #f8fafc; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${item.label}</span>
-                <span style="background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.35); color: #34d399; padding: 1px 5px; border-radius: 4px; font-family: monospace; font-size: 9px; font-weight: 700; white-space: nowrap;">${item.estimatedSize}</span>
+      // Top Quality Badge
+      const topBadge = maxAvailableHeight >= 3600 ? '8K FUHD Master' :
+                       maxAvailableHeight >= 2000 ? '4K UHD Cinema' :
+                       maxAvailableHeight >= 1400 ? '2K Quad HD' :
+                       maxAvailableHeight >= 1000 ? '1080p Full HD' : '720p HD';
+
+      // 1. Build Filtered Video Resolutions
+      const activeResolutions = RESOLUTION_TIERS.filter(r => r.height <= maxAvailableHeight);
+      let resCardsHtml = '';
+
+      if (currentCategoryFilter === 'ALL' || currentCategoryFilter === 'VIDEO') {
+        for (const res of activeResolutions) {
+          if (q && !res.label.toLowerCase().includes(q) && !res.badge.toLowerCase().includes(q) && !'video'.includes(q)) {
+            // Check if any codec chip matches query
+            const matchesChip = CODEC_CHIPS.some(c => c.name.toLowerCase().includes(q) || c.container.includes(q) || c.codec.toLowerCase().includes(q));
+            if (!matchesChip) continue;
+          }
+
+          const estSize = estimateFileSize(durationSec, res.height, 'HEVC', false);
+          const isHighest = res.height === activeResolutions[0]?.height;
+
+          const chipsHtml = CODEC_CHIPS.map(c => {
+            if (q && !c.name.toLowerCase().includes(q) && !c.container.includes(q) && !c.codec.toLowerCase().includes(q) && !res.label.toLowerCase().includes(q)) {
+              return '';
+            }
+
+            const formatSpec = c.formatSpec(res.height);
+            return `
+              <button class="g1dm-codec-chip"
+                data-height="${res.height}"
+                data-container="${c.container}"
+                data-codec="${c.codec}"
+                data-quality="${res.badge}"
+                data-resolution="${res.width}×${res.height}"
+                data-formatspec="${formatSpec}"
+                data-url="${isStreamSite ? pageUrl : bestSrc}"
+                title="${c.desc}"
+                style="
+                  display: flex;
+                  align-items: center;
+                  justify-content: space-between;
+                  gap: 6px;
+                  padding: 6px 10px;
+                  background: rgba(30, 41, 59, 0.55);
+                  border: 1px solid rgba(255, 255, 255, 0.08);
+                  border-radius: 8px;
+                  color: #f1f5f9;
+                  font-size: 11px;
+                  font-weight: 600;
+                  cursor: pointer;
+                  transition: all 0.16s cubic-bezier(0.16, 1, 0.3, 1);
+                ">
+                <div style="display: flex; align-items: center; gap: 5px;">
+                  <span style="width: 6px; height: 6px; border-radius: 50%; background: ${c.badgeColor}; box-shadow: 0 0 6px ${c.badgeColor};"></span>
+                  <span>${c.badge}</span>
+                </div>
+                <span style="font-size: 9.5px; color: #94a3b8; font-family: monospace;">Download</span>
+              </button>
+            `;
+          }).filter(Boolean).join('');
+
+          resCardsHtml += `
+            <div class="g1dm-res-card" style="
+              background: ${isHighest ? 'linear-gradient(135deg, rgba(30, 41, 59, 0.7), rgba(15, 23, 42, 0.7))' : 'rgba(30, 41, 59, 0.35)'};
+              border: 1px solid ${isHighest ? 'rgba(56, 189, 248, 0.35)' : 'rgba(255, 255, 255, 0.06)'};
+              border-radius: 12px;
+              padding: 10px 12px;
+              margin-bottom: 8px;
+              transition: all 0.18s ease;
+            ">
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <span style="
+                    background: ${res.color}22;
+                    border: 1px solid ${res.color}55;
+                    color: ${res.color};
+                    padding: 2px 7px;
+                    border-radius: 6px;
+                    font-family: monospace;
+                    font-size: 10.5px;
+                    font-weight: 800;
+                  ">${res.badge}</span>
+                  <span style="font-size: 12px; font-weight: 700; color: #f8fafc;">${res.label}</span>
+                  ${isHighest ? `<span style="background: rgba(16, 185, 129, 0.2); border: 1px solid rgba(16, 185, 129, 0.4); color: #34d399; font-size: 9px; font-weight: 800; padding: 1px 5px; border-radius: 4px;">MAX</span>` : ''}
+                </div>
+                <div style="display: flex; align-items: center; gap: 6px; font-family: monospace; font-size: 10px;">
+                  <span style="color: #94a3b8;">${res.bitrate}</span>
+                  <span style="background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.35); color: #34d399; padding: 1px 6px; border-radius: 4px; font-weight: 700;">${estSize}</span>
+                </div>
               </div>
-              <span style="font-size: 10px; color: #94a3b8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${item.formatLabel} ${item.resolution ? '• ' + item.resolution : ''}</span>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
+                ${chipsHtml}
+              </div>
             </div>
-          </div>
-          <button class="g1dm-dl-btn" style="
-            background: linear-gradient(135deg, #2563eb, #1d4ed8);
-            border: 1px solid rgba(59, 130, 246, 0.5);
-            color: #fff;
-            padding: 5px 10px;
-            border-radius: 6px;
-            font-size: 10px;
-            font-weight: 700;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 4px;
-            transition: all 0.15s ease;
-            white-space: nowrap;
-          ">
-            <span>Download</span>
-          </button>
-        </div>
-      `).join('');
+          `;
+        }
+      }
+
+      // 2. Audio Extraction Items
+      let audioCardsHtml = '';
+      if (currentCategoryFilter === 'ALL' || currentCategoryFilter === 'AUDIO') {
+        const audioItems = AUDIO_FORMATS.filter(a => {
+          if (!q) return true;
+          return a.label.toLowerCase().includes(q) || a.container.includes(q) || a.codec.toLowerCase().includes(q) || 'audio'.includes(q);
+        });
+
+        if (audioItems.length > 0) {
+          audioCardsHtml = `
+            <div style="margin-top: 10px; margin-bottom: 6px; display: flex; align-items: center; justify-content: space-between;">
+              <span style="font-size: 11px; font-weight: 800; color: #f59e0b; text-transform: uppercase; letter-spacing: 0.5px;">🎵 Master Studio Audio</span>
+              <span style="font-size: 10px; color: #94a3b8;">Lossless & Universal</span>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 5px;">
+              ${audioItems.map(aud => {
+                const estSize = estimateFileSize(durationSec, 0, aud.codec, true);
+                const formatSpec = aud.container === 'm4a' || aud.codec === 'AAC' ? 'bestaudio[ext=m4a]/bestaudio/best' : 'bestaudio/best';
+                return `
+                  <div class="g1dm-audio-row"
+                    data-container="${aud.container}"
+                    data-codec="${aud.codec}"
+                    data-quality="${aud.badge}"
+                    data-formatspec="${formatSpec}"
+                    data-url="${isStreamSite ? pageUrl : bestSrc}"
+                    style="
+                      display: flex;
+                      align-items: center;
+                      justify-content: space-between;
+                      padding: 8px 10px;
+                      background: rgba(30, 41, 59, 0.4);
+                      border: 1px solid rgba(255, 255, 255, 0.06);
+                      border-radius: 8px;
+                      cursor: pointer;
+                      transition: all 0.16s ease;
+                    ">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                      <span style="font-size: 14px;">${aud.icon}</span>
+                      <div style="display: flex; flex-direction: column;">
+                        <span style="font-size: 11.5px; font-weight: 700; color: #f8fafc;">${aud.label}</span>
+                        <span style="font-size: 10px; color: #94a3b8;">${aud.sublabel}</span>
+                      </div>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                      <span style="background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.35); color: #fbbf24; font-family: monospace; font-size: 9.5px; font-weight: 700; padding: 1px 6px; border-radius: 4px;">${estSize}</span>
+                      <button class="g1dm-mini-dl-btn" style="
+                        background: linear-gradient(135deg, #d97706, #b45309);
+                        border: 1px solid rgba(245, 158, 11, 0.5);
+                        color: #fff;
+                        padding: 4px 9px;
+                        border-radius: 6px;
+                        font-size: 10px;
+                        font-weight: 700;
+                        cursor: pointer;
+                        white-space: nowrap;
+                      ">Extract</button>
+                    </div>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          `;
+        }
+      }
+
+      // 3. Live Streams (if sniffed)
+      let streamCardsHtml = '';
+      if (currentCategoryFilter === 'ALL' || currentCategoryFilter === 'STREAMS') {
+        const streamUrls = Array.from(detectedMediaUrls).filter(u => u.includes('.m3u8') || u.includes('.mpd'));
+        if (streamUrls.length > 0) {
+          streamCardsHtml = `
+            <div style="margin-top: 10px; margin-bottom: 6px; display: flex; align-items: center; justify-content: space-between;">
+              <span style="font-size: 11px; font-weight: 800; color: #10b981; text-transform: uppercase; letter-spacing: 0.5px;">📡 Live Streams & Manifests</span>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 5px;">
+              ${streamUrls.map((sUrl, sIdx) => {
+                const isHls = sUrl.includes('.m3u8');
+                return `
+                  <div class="g1dm-stream-row"
+                    data-container="${isHls ? 'mkv' : 'mp4'}"
+                    data-codec="ORIGINAL"
+                    data-quality="${isHls ? 'HLS Stream' : 'DASH Stream'}"
+                    data-formatspec="bestvideo+bestaudio/best"
+                    data-url="${sUrl}"
+                    style="
+                      display: flex;
+                      align-items: center;
+                      justify-content: space-between;
+                      padding: 8px 10px;
+                      background: rgba(16, 185, 129, 0.1);
+                      border: 1px solid rgba(16, 185, 129, 0.25);
+                      border-radius: 8px;
+                      cursor: pointer;
+                      transition: all 0.16s ease;
+                    ">
+                    <div style="display: flex; align-items: center; gap: 8px; overflow: hidden;">
+                      <span style="font-size: 14px;">📡</span>
+                      <div style="display: flex; flex-direction: column; overflow: hidden;">
+                        <span style="font-size: 11.5px; font-weight: 700; color: #34d399;">${isHls ? 'Master HLS Stream (.m3u8)' : 'DASH Manifest (.mpd)'}</span>
+                        <span style="font-size: 9.5px; color: #94a3b8; font-family: monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${sUrl}</span>
+                      </div>
+                    </div>
+                    <button class="g1dm-mini-dl-btn" style="
+                      background: linear-gradient(135deg, #059669, #047857);
+                      border: 1px solid rgba(16, 185, 129, 0.5);
+                      color: #fff;
+                      padding: 4px 9px;
+                      border-radius: 6px;
+                      font-size: 10px;
+                      font-weight: 700;
+                      cursor: pointer;
+                      white-space: nowrap;
+                    ">Stream</button>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          `;
+        }
+      }
 
       dropdown.innerHTML = `
-        <div style="padding-bottom: 8px; border-bottom: 1px solid rgba(255, 255, 255, 0.08); margin-bottom: 8px;">
+        <!-- Top Header Bar -->
+        <div style="padding-bottom: 10px; border-bottom: 1px solid rgba(255, 255, 255, 0.08); margin-bottom: 10px;">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-            <div style="display: flex; align-items: center; gap: 6px;">
-              <span style="font-size: 11px; font-weight: 800; color: #38bdf8; text-transform: uppercase; letter-spacing: 0.5px;">All Formats & Codecs</span>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <div style="width: 20px; height: 20px; border-radius: 6px; background: linear-gradient(135deg, #2563eb, #06b6d4); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 900; color: #fff;">⚡</div>
+              <span style="font-size: 12px; font-weight: 800; color: #f8fafc; letter-spacing: 0.3px;">G1DM MEDIA HUB</span>
             </div>
-            <span style="font-size: 10px; color: #94a3b8; font-weight: 600;">${combinations.length} combinations</span>
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <span style="
+                background: linear-gradient(135deg, rgba(236, 72, 153, 0.2), rgba(192, 132, 252, 0.2));
+                border: 1px solid rgba(236, 72, 153, 0.4);
+                color: #f472b6;
+                padding: 2px 8px;
+                border-radius: 9999px;
+                font-family: monospace;
+                font-size: 10px;
+                font-weight: 800;
+              ">✨ ${topBadge}</span>
+            </div>
           </div>
-          <div style="display: flex; flex-wrap: wrap; gap: 4px;">
-            ${tabsHtml}
+
+          <!-- Video Title Preview -->
+          <div style="font-size: 12px; font-weight: 600; color: #cbd5e1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 8px;" title="${rawTitle}">
+            ${rawTitle}
+          </div>
+
+          <!-- Search Input Bar -->
+          <div style="display: flex; align-items: center; gap: 6px; background: rgba(30, 41, 59, 0.6); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 8px; padding: 4px 8px; margin-bottom: 8px;">
+            <span style="font-size: 11px; color: #94a3b8;">🔍</span>
+            <input id="g1dm-search-input" type="text" placeholder="Filter quality, format, codec (e.g. 4k, mp4, flac, hevc)..." value="${searchQuery.replace(/"/g, '&quot;')}" style="
+              flex: 1;
+              background: transparent;
+              border: none;
+              outline: none;
+              color: #f8fafc;
+              font-size: 11px;
+              font-family: inherit;
+            " />
+            ${searchQuery ? `<button id="g1dm-search-clear" style="background: none; border: none; color: #94a3b8; cursor: pointer; font-size: 11px; padding: 0 4px;">✕</button>` : ''}
+          </div>
+
+          <!-- Segmented Filter Tabs -->
+          <div style="display: flex; gap: 5px;">
+            ${[
+              { id: 'ALL', label: 'All Combinations' },
+              { id: 'VIDEO', label: '🎬 Video Matrix' },
+              { id: 'AUDIO', label: '🎵 Master Audio' },
+              { id: 'STREAMS', label: '📡 Streams' }
+            ].map(tab => {
+              const isActive = currentCategoryFilter === tab.id;
+              return `
+                <button class="g1dm-seg-tab" data-filter="${tab.id}" style="
+                  flex: 1;
+                  padding: 4px 6px;
+                  font-size: 10.5px;
+                  font-weight: 700;
+                  border-radius: 6px;
+                  cursor: pointer;
+                  border: 1px solid ${isActive ? 'rgba(56, 189, 248, 0.5)' : 'rgba(255, 255, 255, 0.08)'};
+                  background: ${isActive ? 'linear-gradient(135deg, #2563eb, #0284c7)' : 'rgba(30, 41, 59, 0.5)'};
+                  color: ${isActive ? '#ffffff' : '#94a3b8'};
+                  transition: all 0.15s ease;
+                  white-space: nowrap;
+                  text-align: center;
+                ">${tab.label}</button>
+              `;
+            }).join('')}
           </div>
         </div>
-        <div class="g1dm-items-list" style="max-height: 280px; overflow-y: auto; padding-right: 2px;">
-          ${itemsHtml.length > 0 ? itemsHtml : '<div style="font-size:11px; color:#94a3b8; text-align:center; padding:16px;">No streams found for this filter</div>'}
+
+        <!-- Scrollable Resolutions & Media Cards -->
+        <div class="g1dm-items-list" style="max-height: 310px; overflow-y: auto; padding-right: 2px;">
+          ${resCardsHtml}
+          ${audioCardsHtml}
+          ${streamCardsHtml}
+          ${(!resCardsHtml && !audioCardsHtml && !streamCardsHtml) ? '<div style="font-size:11px; color:#94a3b8; text-align:center; padding:20px;">No matching formats found for this search filter.</div>' : ''}
         </div>
-        <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255, 255, 255, 0.08); display: flex; gap: 6px;">
+
+        <!-- Bottom Action Bar -->
+        <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255, 255, 255, 0.08); display: flex; gap: 8px;">
           <button id="g1dm-open-studio" style="
             flex: 1;
-            padding: 7px 8px;
+            padding: 8px 10px;
             background: rgba(30, 41, 59, 0.85);
-            border: 1px solid rgba(59, 130, 246, 0.35);
+            border: 1px solid rgba(56, 189, 248, 0.35);
             color: #38bdf8;
-            border-radius: 8px;
-            font-size: 10px;
+            border-radius: 9px;
+            font-size: 11px;
             font-weight: 700;
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 4px;
+            gap: 6px;
+            transition: all 0.15s ease;
           ">
             <span>🎬 G1DM Media Studio</span>
           </button>
           <button id="g1dm-dl-best" style="
-            flex: 1;
-            padding: 7px 8px;
+            flex: 1.2;
+            padding: 8px 12px;
             background: linear-gradient(135deg, #10b981, #059669);
-            border: 1px solid rgba(16, 185, 129, 0.4);
+            border: 1px solid rgba(16, 185, 129, 0.5);
             color: #fff;
-            border-radius: 8px;
-            font-size: 10px;
+            border-radius: 9px;
+            font-size: 11px;
             font-weight: 800;
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 4px;
+            gap: 6px;
+            box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35);
+            transition: all 0.15s ease;
           ">
-            <span>⚡ Best (1-Click)</span>
+            <span>⚡ Best Quality (1-Click)</span>
           </button>
         </div>
       `;
 
-      // Filter tab clicks
-      dropdown.querySelectorAll('.g1dm-filter-tab').forEach((tabBtn) => {
+      // Event Handlers
+      // Search input
+      const searchInput = dropdown.querySelector('#g1dm-search-input');
+      if (searchInput) {
+        searchInput.addEventListener('input', (e) => {
+          searchQuery = e.target.value;
+          renderDropdownContent();
+          const nextInput = dropdown.querySelector('#g1dm-search-input');
+          if (nextInput) {
+            nextInput.focus();
+            nextInput.setSelectionRange(nextInput.value.length, nextInput.value.length);
+          }
+        });
+      }
+
+      dropdown.querySelector('#g1dm-search-clear')?.addEventListener('click', () => {
+        searchQuery = '';
+        renderDropdownContent();
+      });
+
+      // Filter tabs
+      dropdown.querySelectorAll('.g1dm-seg-tab').forEach((tabBtn) => {
         tabBtn.addEventListener('click', (e) => {
           e.stopPropagation();
-          activeFilter = tabBtn.getAttribute('data-filter') || 'ALL';
-          currentFilter = activeFilter;
-          updateResBadge();
+          currentCategoryFilter = tabBtn.getAttribute('data-filter') || 'ALL';
           renderDropdownContent();
         });
       });
 
-      // Item download clicks
-      dropdown.querySelectorAll('.g1dm-combo-item').forEach((itemEl) => {
-        itemEl.addEventListener('mouseenter', () => {
-          itemEl.style.background = 'rgba(59, 130, 246, 0.2)';
-          itemEl.style.borderColor = 'rgba(59, 130, 246, 0.4)';
+      // Hover and Click on Codec Chips
+      dropdown.querySelectorAll('.g1dm-codec-chip').forEach((chip) => {
+        chip.addEventListener('mouseenter', () => {
+          chip.style.background = 'rgba(56, 189, 248, 0.2)';
+          chip.style.borderColor = 'rgba(56, 189, 248, 0.5)';
         });
-        itemEl.addEventListener('mouseleave', () => {
-          itemEl.style.background = 'rgba(30, 41, 59, 0.45)';
-          itemEl.style.borderColor = 'rgba(255, 255, 255, 0.06)';
+        chip.addEventListener('mouseleave', () => {
+          chip.style.background = 'rgba(30, 41, 59, 0.55)';
+          chip.style.borderColor = 'rgba(255, 255, 255, 0.08)';
         });
-        itemEl.addEventListener('click', (e) => {
-          const idx = parseInt(itemEl.getAttribute('data-idx') || '0', 10);
-          const selected = combinations[idx];
-          triggerDownload(selected, title);
+        chip.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const item = {
+            container: chip.getAttribute('data-container'),
+            codec: chip.getAttribute('data-codec'),
+            badge: chip.getAttribute('data-quality'),
+            resolution: chip.getAttribute('data-resolution'),
+            height: parseInt(chip.getAttribute('data-height') || '0', 10),
+            formatSpec: chip.getAttribute('data-formatspec'),
+            url: chip.getAttribute('data-url'),
+            isAudio: false
+          };
+          triggerDownload(item, rawTitle);
 
-          const btn = itemEl.querySelector('.g1dm-dl-btn');
+          chip.innerHTML = '<span style="color:#34d399; font-weight:800;">✓ Added to G1DM</span>';
+          chip.style.background = 'rgba(16, 185, 129, 0.25)';
+          chip.style.borderColor = '#10b981';
+          setTimeout(() => closeDropdown(), 1000);
+        });
+      });
+
+      // Audio Rows Click
+      dropdown.querySelectorAll('.g1dm-audio-row').forEach((row) => {
+        row.addEventListener('mouseenter', () => {
+          row.style.background = 'rgba(245, 158, 11, 0.15)';
+          row.style.borderColor = 'rgba(245, 158, 11, 0.4)';
+        });
+        row.addEventListener('mouseleave', () => {
+          row.style.background = 'rgba(30, 41, 59, 0.4)';
+          row.style.borderColor = 'rgba(255, 255, 255, 0.06)';
+        });
+        row.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const item = {
+            container: row.getAttribute('data-container'),
+            codec: row.getAttribute('data-codec'),
+            badge: row.getAttribute('data-quality'),
+            formatSpec: row.getAttribute('data-formatspec'),
+            url: row.getAttribute('data-url'),
+            isAudio: true
+          };
+          triggerDownload(item, rawTitle);
+
+          const btn = row.querySelector('.g1dm-mini-dl-btn');
           if (btn) {
-            btn.innerHTML = '<span>✓ Added</span>';
+            btn.innerText = '✓ Added';
             btn.style.background = '#10b981';
-            btn.style.borderColor = '#34d399';
           }
-          setTimeout(() => closeDropdown(), 1200);
+          setTimeout(() => closeDropdown(), 1000);
+        });
+      });
+
+      // Stream Rows Click
+      dropdown.querySelectorAll('.g1dm-stream-row').forEach((row) => {
+        row.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const item = {
+            container: row.getAttribute('data-container'),
+            codec: row.getAttribute('data-codec'),
+            badge: row.getAttribute('data-quality'),
+            formatSpec: row.getAttribute('data-formatspec'),
+            url: row.getAttribute('data-url'),
+            isDirectStream: true,
+            isAudio: false
+          };
+          triggerDownload(item, rawTitle);
+
+          const btn = row.querySelector('.g1dm-mini-dl-btn');
+          if (btn) {
+            btn.innerText = '✓ Added';
+            btn.style.background = '#10b981';
+          }
+          setTimeout(() => closeDropdown(), 1000);
         });
       });
 
@@ -847,9 +984,18 @@
       });
 
       dropdown.querySelector('#g1dm-dl-best')?.addEventListener('click', () => {
-        if (combinations.length > 0) {
-          triggerDownload(combinations[0], title);
-        }
+        const bestRes = activeResolutions[0] || RESOLUTION_TIERS[0];
+        const bestItem = {
+          container: 'mp4',
+          codec: 'H264',
+          badge: bestRes.badge,
+          resolution: `${bestRes.width}×${bestRes.height}`,
+          height: bestRes.height,
+          formatSpec: CODEC_CHIPS[0].formatSpec(bestRes.height),
+          url: isStreamSite ? pageUrl : bestSrc,
+          isAudio: false
+        };
+        triggerDownload(bestItem, rawTitle);
         closeDropdown();
       });
     }
@@ -881,13 +1027,13 @@
 
       // Visual feedback on pill
       pill.style.borderColor = '#10b981';
-      pill.style.boxShadow = '0 0 20px rgba(16, 185, 129, 0.5)';
+      pill.style.boxShadow = '0 0 24px rgba(16, 185, 129, 0.6)';
       const textSpan = pill.querySelector('span:not(.g1dm-res-badge)');
       if (textSpan) textSpan.innerText = `✓ Selected (${ext.toUpperCase()})!`;
 
       setTimeout(() => {
-        pill.style.borderColor = 'rgba(59, 130, 246, 0.65)';
-        pill.style.boxShadow = '0 10px 25px -5px rgba(0, 0, 0, 0.7), 0 0 16px rgba(59, 130, 246, 0.4)';
+        pill.style.borderColor = 'rgba(56, 189, 248, 0.55)';
+        pill.style.boxShadow = '0 12px 28px -4px rgba(0, 0, 0, 0.75), 0 0 20px rgba(56, 189, 248, 0.35)';
         if (textSpan) textSpan.innerText = 'Download Video';
       }, 2500);
     }
@@ -906,7 +1052,7 @@
       isDropdownOpen = false;
       const chevron = pill.querySelector('.g1dm-chevron');
       if (chevron) chevron.style.transform = 'rotate(0deg)';
-      pill.style.borderColor = 'rgba(59, 130, 246, 0.65)';
+      pill.style.borderColor = 'rgba(56, 189, 248, 0.55)';
     }
 
     function toggleDropdown(e) {
@@ -960,13 +1106,13 @@
 
     pill.addEventListener('mouseenter', () => {
       pill.style.transform = 'scale(1.04)';
-      pill.style.boxShadow = '0 12px 30px -4px rgba(0, 0, 0, 0.85), 0 0 24px rgba(59, 130, 246, 0.6)';
+      pill.style.boxShadow = '0 14px 34px -4px rgba(0, 0, 0, 0.85), 0 0 28px rgba(56, 189, 248, 0.6)';
       clearTimeout(hideTimeout);
     });
 
     pill.addEventListener('mouseleave', () => {
       pill.style.transform = 'none';
-      pill.style.boxShadow = '0 10px 25px -5px rgba(0, 0, 0, 0.7), 0 0 16px rgba(59, 130, 246, 0.4)';
+      pill.style.boxShadow = '0 12px 28px -4px rgba(0, 0, 0, 0.75), 0 0 20px rgba(56, 189, 248, 0.35)';
       resetHideTimer();
     });
 
@@ -1037,8 +1183,8 @@
       align-items: center;
       justify-content: center;
       background: rgba(0, 0, 0, 0.65);
-      backdrop-filter: blur(8px);
-      -webkit-backdrop-filter: blur(8px);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       user-select: none;
       animation: g1dm-fade-in 0.15s ease-out;
@@ -1049,9 +1195,9 @@
       width: 530px;
       max-width: 95vw;
       background: linear-gradient(180deg, #0f172a 0%, #020617 100%);
-      border: 1px solid rgba(59, 130, 246, 0.45);
-      border-radius: 12px;
-      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.9), 0 0 30px rgba(59, 130, 246, 0.25);
+      border: 1px solid rgba(56, 189, 248, 0.45);
+      border-radius: 14px;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.9), 0 0 35px rgba(56, 189, 248, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.12);
       color: #f3f4f6;
       overflow: hidden;
       display: flex;
@@ -1129,11 +1275,9 @@
     root.appendChild(dialog);
     (document.fullscreenElement || document.body || document.documentElement).appendChild(root);
 
-    // Elements
     const urlInput = dialog.querySelector('#g1dm-input-url');
     const filenameInput = dialog.querySelector('#g1dm-input-filename');
     const catSelect = dialog.querySelector('#g1dm-select-cat');
-    const descInput = dialog.querySelector('#g1dm-input-desc');
     const catIcon = dialog.querySelector('#g1dm-cat-icon');
     const filesizeLabel = dialog.querySelector('#g1dm-filesize-label');
     const resumableLabel = dialog.querySelector('#g1dm-resumable-label');
@@ -1278,7 +1422,6 @@
           if (res && res.success !== false) {
             onSuccess(res?.result);
           } else {
-            console.warn('[G1DM Extension] Service worker message failed, trying direct HTTP fallback:', res?.error);
             sendViaFetch();
           }
         },
@@ -1812,7 +1955,6 @@
         progAvg.innerText = data.avgSpeed > 0 ? `${formatBytes(data.avgSpeed)}/s` : '—';
       }
 
-      // Update pill if minimized
       const pillPct = document.getElementById('g1dm-pill-percent');
       const pillSpd = document.getElementById('g1dm-pill-speed');
       if (pillPct) pillPct.innerText = `${data.progress !== undefined ? data.progress.toFixed(1) : 0}%`;
@@ -1822,7 +1964,6 @@
     // Live poller
     const poll = () => {
       if (!downloadId) {
-        // Look up newest download if ID not yet known
         const lookupDirectHttp = () => {
           fetch('http://127.0.0.1:8055/api/downloads')
             .then((r) => r.json())
@@ -1938,7 +2079,7 @@
   const styleEl = document.createElement('style');
   styleEl.textContent = `
     @keyframes g1dm-scale-in {
-      from { opacity: 0; transform: scale(0.92) translateY(-8px); }
+      from { opacity: 0; transform: scale(0.94) translateY(-8px); }
       to { opacity: 1; transform: scale(1) translateY(0); }
     }
     @keyframes g1dm-fade-in {
