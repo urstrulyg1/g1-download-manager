@@ -320,7 +320,10 @@ export const IdmProgressModal: React.FC<IdmProgressModalProps> = ({
 
           {/* IDM Segmented Progress Bar */}
           <div className="w-full bg-slate-950 rounded-xl p-1 border border-slate-800 shadow-inner">
-            <div className="h-3 w-full bg-slate-900 rounded-lg overflow-hidden relative" role="progressbar" aria-label="Download progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.max(0, Math.min(100, item.progress || 0))}>
+            <div className="h-3.5 w-full bg-slate-900 rounded-lg overflow-hidden relative" role="progressbar" aria-label="Download progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.max(0, Math.min(100, item.progress || 0))}>
+              {(!item.speed || item.speed === 0) && (!item.progress || item.progress === 0) && !isCompleted && !isPaused && !isFailed && (
+                <div className="absolute inset-0 w-3/5 bg-gradient-to-r from-transparent via-cyan-400/60 to-transparent animate-pulse rounded-lg pointer-events-none z-10" style={{ animationDuration: '1.2s' }} />
+              )}
               <div
                 className={`h-full transition-all duration-200 motion-reduce:transition-none rounded-lg ${
                   isCompleted
@@ -366,21 +369,21 @@ export const IdmProgressModal: React.FC<IdmProgressModalProps> = ({
             <div className="p-2.5 rounded-xl bg-slate-950/50 border border-slate-800/80">
               <span className="text-[10px] text-slate-500 uppercase block mb-0.5">Current Speed</span>
               <span className="font-bold text-emerald-400 text-xs" data-testid="idm-speed">
-                {item.speed > 0 ? `↓ ${formatBytes(item.speed)}/s` : '0 B/s'}
+                {item.speed > 0 ? `↓ ${formatBytes(item.speed)}/s` : (item.status === 'downloading' ? '⚡ Connecting...' : '0 B/s')}
               </span>
             </div>
 
             <div className="p-2.5 rounded-xl bg-slate-950/50 border border-slate-800/80">
               <span className="text-[10px] text-slate-500 uppercase block mb-0.5">Time Remaining</span>
               <span className="font-bold text-slate-200 text-xs" data-testid="idm-eta">
-                {etaDisplay}
+                {item.status === 'downloading' && (!item.speed || item.speed === 0) ? 'Allocating streams...' : etaDisplay}
               </span>
             </div>
 
             <div className="p-2.5 rounded-xl bg-slate-950/50 border border-slate-800/80">
               <span className="text-[10px] text-slate-500 uppercase block mb-0.5">Connections</span>
               <span className="font-bold text-cyan-400 text-xs">
-                {item.activeConnections || 0} streams
+                {item.activeConnections > 0 ? `${item.activeConnections} streams` : (item.status === 'downloading' ? 'Probing...' : '—')}
               </span>
             </div>
 

@@ -1319,7 +1319,7 @@
           </div>
           <div style="padding: 9px 12px; border-radius: 10px; background: rgba(2, 6, 23, 0.5); border: 1px solid rgba(51, 65, 85, 0.6);">
             <span style="font-size: 10px; color: #64748b; text-transform: uppercase; display: block; margin-bottom: 2px;">Status</span>
-            <span id="g1dm-prog-status-label" style="font-weight: 700; color: #38bdf8;">Downloading</span>
+            <span id="g1dm-prog-status-label" style="font-weight: 700; color: #38bdf8; display: flex; align-items: center; gap: 4px;"><span class="g1dm-loader-ring"></span> Initializing Turbo Engine...</span>
           </div>
           <div style="padding: 9px 12px; border-radius: 10px; background: rgba(2, 6, 23, 0.5); border: 1px solid rgba(51, 65, 85, 0.6);">
             <span style="font-size: 10px; color: #64748b; text-transform: uppercase; display: block; margin-bottom: 2px;">Filename</span>
@@ -1341,24 +1341,25 @@
           <div id="g1dm-prog-percent" style="font-size: 16px; font-weight: 900; color: #22d3ee; letter-spacing: -0.02em;">0.0%</div>
         </div>
 
-        <!-- Progress Bar -->
-        <div style="width: 100%; height: 13px; background: #020617; border-radius: 8px; padding: 2px; border: 1px solid rgba(51, 65, 85, 0.9); box-shadow: inset 0 2px 6px rgba(0,0,0,0.6); overflow: hidden; box-sizing: border-box;">
-          <div id="g1dm-prog-bar" style="width: 0%; height: 100%; border-radius: 5px; background: linear-gradient(90deg, #2563eb, #06b6d4, #6366f1); transition: width 0.2s cubic-bezier(0.4, 0, 0.2, 1); box-shadow: 0 0 12px rgba(6, 182, 212, 0.5);"></div>
+        <!-- Progress Bar with Shimmer Loading Effect -->
+        <div style="position: relative; width: 100%; height: 14px; background: #020617; border-radius: 8px; padding: 2px; border: 1px solid rgba(51, 65, 85, 0.9); box-shadow: inset 0 2px 6px rgba(0,0,0,0.6); overflow: hidden; box-sizing: border-box;">
+          <div id="g1dm-prog-shimmer" style="position: absolute; top: 0; left: 0; width: 55%; height: 100%; background: linear-gradient(90deg, transparent, rgba(56, 189, 248, 0.75), rgba(129, 140, 248, 0.75), transparent); animation: g1dm-shimmer 1.4s infinite ease-in-out; border-radius: 6px; pointer-events: none; z-index: 2;"></div>
+          <div id="g1dm-prog-bar" style="width: 0%; height: 100%; border-radius: 5px; background: linear-gradient(90deg, #2563eb, #06b6d4, #8b5cf6, #06b6d4); background-size: 300% 100%; animation: g1dm-flow-gradient 3s ease infinite; transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1); box-shadow: 0 0 14px rgba(6, 182, 212, 0.6); position: relative; z-index: 1;"></div>
         </div>
 
         <!-- Telemetry Matrix -->
         <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; font-family: monospace; font-size: 11px;">
           <div style="padding: 9px 10px; border-radius: 10px; background: rgba(2, 6, 23, 0.5); border: 1px solid rgba(51, 65, 85, 0.6);">
             <span style="font-size: 9px; color: #64748b; text-transform: uppercase; display: block; margin-bottom: 2px;">Current Speed</span>
-            <span id="g1dm-prog-speed" style="font-weight: 800; color: #34d399; font-size: 11px;">↓ 0 B/s</span>
+            <span id="g1dm-prog-speed" style="font-weight: 800; color: #34d399; font-size: 11px;"><span style="animation: g1dm-pulse-text 1.2s infinite ease-in-out; color: #38bdf8;">⚡ Connecting...</span></span>
           </div>
           <div style="padding: 9px 10px; border-radius: 10px; background: rgba(2, 6, 23, 0.5); border: 1px solid rgba(51, 65, 85, 0.6);">
             <span style="font-size: 9px; color: #64748b; text-transform: uppercase; display: block; margin-bottom: 2px;">Time Remaining</span>
-            <span id="g1dm-prog-eta" style="font-weight: 700; color: #e2e8f0; font-size: 11px;">—</span>
+            <span id="g1dm-prog-eta" style="font-weight: 700; color: #e2e8f0; font-size: 11px;"><span style="animation: g1dm-pulse-text 1.2s infinite ease-in-out; color: #94a3b8;">Allocating streams...</span></span>
           </div>
           <div style="padding: 9px 10px; border-radius: 10px; background: rgba(2, 6, 23, 0.5); border: 1px solid rgba(51, 65, 85, 0.6);">
             <span style="font-size: 9px; color: #64748b; text-transform: uppercase; display: block; margin-bottom: 2px;">Connections</span>
-            <span id="g1dm-prog-conns" style="font-weight: 700; color: #38bdf8; font-size: 11px;">— streams</span>
+            <span id="g1dm-prog-conns" style="font-weight: 700; color: #38bdf8; font-size: 11px;"><span style="animation: g1dm-pulse-text 1.2s infinite ease-in-out; color: #38bdf8;">Probing mirrors...</span></span>
           </div>
           <div style="padding: 9px 10px; border-radius: 10px; background: rgba(2, 6, 23, 0.5); border: 1px solid rgba(51, 65, 85, 0.6);">
             <span style="font-size: 9px; color: #64748b; text-transform: uppercase; display: block; margin-bottom: 2px;">Average Speed</span>
@@ -1550,6 +1551,7 @@
       const progConns = dialog.querySelector('#g1dm-prog-conns');
       const progAvg = dialog.querySelector('#g1dm-prog-avgspeed');
       const progDest = dialog.querySelector('#g1dm-prog-dest-path');
+      const progShimmer = dialog.querySelector('#g1dm-prog-shimmer');
 
       if (progId) progId.innerText = data.id || downloadId || '—';
       if (progName && data.filename) progName.innerText = data.filename;
@@ -1560,15 +1562,17 @@
       const isFailed = data.status === 'failed';
       const isMerging = data.phase === 'merging';
       const isVerifying = data.phase === 'verifying';
+      const isActivelyStreaming = (data.speed && data.speed > 0) || (data.progress && data.progress > 0.1);
 
       if (isCompleted) {
         if (titleEl) titleEl.innerText = 'DOWNLOAD COMPLETE';
-        if (statusLabel) { statusLabel.innerText = 'Completed'; statusLabel.style.color = '#34d399'; }
+        if (statusLabel) { statusLabel.innerHTML = '<span style="color: #34d399; font-weight: 800;">✓ Completed</span>'; }
         if (progPercent) { progPercent.innerText = '100.0%'; progPercent.style.color = '#34d399'; }
         if (progBar) {
           progBar.style.width = '100%';
           progBar.style.background = 'linear-gradient(90deg, #059669, #10b981)';
         }
+        if (progShimmer) progShimmer.style.display = 'none';
         if (progSpeed) progSpeed.innerText = 'Finished';
         if (progEta) progEta.innerText = 'Done';
         pauseBtn.style.display = 'none';
@@ -1578,23 +1582,39 @@
         dialog.querySelector('#g1dm-prog-btn-hide').innerText = 'Close';
       } else if (isMerging) {
         if (titleEl) titleEl.innerText = 'MULTIPLEXING MEDIA';
-        if (statusLabel) { statusLabel.innerText = 'Muxing Video + Audio'; statusLabel.style.color = '#c084fc'; }
+        if (statusLabel) { statusLabel.innerHTML = '<span class="g1dm-loader-ring" style="border-top-color:#c084fc;"></span> <span style="color:#c084fc;">Muxing Video + Audio</span>'; }
+        if (progShimmer) progShimmer.style.display = 'block';
         if (progSpeed) progSpeed.innerText = 'Processing';
       } else if (isVerifying) {
         if (titleEl) titleEl.innerText = 'VERIFYING CONTAINER';
-        if (statusLabel) { statusLabel.innerText = 'Verifying Container'; statusLabel.style.color = '#fbbf24'; }
+        if (statusLabel) { statusLabel.innerHTML = '<span class="g1dm-loader-ring" style="border-top-color:#fbbf24;"></span> <span style="color:#fbbf24;">Verifying Container</span>'; }
+        if (progShimmer) progShimmer.style.display = 'block';
       } else if (isPaused) {
         if (titleEl) titleEl.innerText = 'DOWNLOAD PAUSED';
-        if (statusLabel) { statusLabel.innerText = 'Paused'; statusLabel.style.color = '#fbbf24'; }
+        if (statusLabel) { statusLabel.innerHTML = '<span style="color:#fbbf24; font-weight: 800;">⏸ Paused</span>'; }
+        if (progShimmer) progShimmer.style.display = 'none';
         if (pauseIcon) pauseIcon.innerText = '▶';
         if (pauseText) pauseText.innerText = 'Resume';
         pauseBtn.style.background = '#059669';
       } else if (isFailed) {
         if (titleEl) titleEl.innerText = 'DOWNLOAD FAILED';
-        if (statusLabel) { statusLabel.innerText = data.error?.message || 'Failed'; statusLabel.style.color = '#f87171'; }
+        if (statusLabel) { statusLabel.innerHTML = `<span style="color:#f87171; font-weight: 800;">✕ ${data.error?.message || 'Failed'}</span>`; }
+        if (progShimmer) progShimmer.style.display = 'none';
       } else {
         if (titleEl) titleEl.innerText = 'DOWNLOADING';
-        if (statusLabel) { statusLabel.innerText = 'Downloading'; statusLabel.style.color = '#38bdf8'; }
+        if (isActivelyStreaming) {
+          if (statusLabel) {
+            statusLabel.innerHTML = '<span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#38bdf8; box-shadow:0 0 8px #38bdf8; animation:g1dm-pulse-ring 1.5s infinite; margin-right:6px;"></span> Downloading';
+            statusLabel.style.color = '#38bdf8';
+          }
+          if (progShimmer) progShimmer.style.display = 'none';
+        } else {
+          if (statusLabel) {
+            statusLabel.innerHTML = '<span class="g1dm-loader-ring"></span> Initializing Turbo Streams...';
+            statusLabel.style.color = '#38bdf8';
+          }
+          if (progShimmer) progShimmer.style.display = 'block';
+        }
         if (pauseIcon) pauseIcon.innerText = '⏸';
         if (pauseText) pauseText.innerText = 'Pause';
         pauseBtn.style.background = '#d97706';
@@ -1615,13 +1635,27 @@
         progBar.style.width = `${pct}%`;
       }
       if (progSpeed && !isCompleted && !isPaused) {
-        progSpeed.innerText = data.speed > 0 ? `↓ ${formatBytes(data.speed)}/s` : '0 B/s';
+        if (data.speed > 0) {
+          progSpeed.innerText = `↓ ${formatBytes(data.speed)}/s`;
+        } else {
+          progSpeed.innerHTML = '<span style="animation: g1dm-pulse-text 1.2s infinite ease-in-out; color: #38bdf8;">⚡ Connecting...</span>';
+        }
       }
       if (progEta && !isCompleted) {
-        progEta.innerText = isPaused ? 'Paused' : formatEta(data.eta);
+        if (isPaused) {
+          progEta.innerText = 'Paused';
+        } else if (data.eta && data.eta > 0) {
+          progEta.innerText = formatEta(data.eta);
+        } else {
+          progEta.innerHTML = '<span style="animation: g1dm-pulse-text 1.2s infinite ease-in-out; color: #94a3b8;">Allocating streams...</span>';
+        }
       }
-      if (progConns && data.activeConnections !== undefined) {
-        progConns.innerText = `${data.activeConnections || 1} streams`;
+      if (progConns) {
+        if (data.activeConnections && data.activeConnections > 0) {
+          progConns.innerText = `${data.activeConnections} streams`;
+        } else {
+          progConns.innerHTML = '<span style="animation: g1dm-pulse-text 1.2s infinite ease-in-out; color: #38bdf8;">Probing mirrors...</span>';
+        }
       }
       if (progAvg && data.avgSpeed !== undefined) {
         progAvg.innerText = data.avgSpeed > 0 ? `${formatBytes(data.avgSpeed)}/s` : '—';
@@ -1737,7 +1771,6 @@
 
   // Inject CSS keyframes
   const styleEl = document.createElement('style');
-  styleEl.textContent = `
     @keyframes g1dm-scale-in {
       from { opacity: 0; transform: scale(0.92) translateY(-8px); }
       to { opacity: 1; transform: scale(1) translateY(0); }
@@ -1745,6 +1778,39 @@
     @keyframes g1dm-fade-in {
       from { opacity: 0; }
       to { opacity: 1; }
+    }
+    @keyframes g1dm-shimmer {
+      0% { transform: translateX(-100%); }
+      100% { transform: translateX(250%); }
+    }
+    @keyframes g1dm-flow-gradient {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+    @keyframes g1dm-spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+    @keyframes g1dm-pulse-ring {
+      0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(6, 182, 212, 0.7); }
+      70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(6, 182, 212, 0); }
+      100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(6, 182, 212, 0); }
+    }
+    @keyframes g1dm-pulse-text {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.45; }
+    }
+    .g1dm-loader-ring {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border: 2px solid rgba(56, 189, 248, 0.25);
+      border-top-color: #38bdf8;
+      border-radius: 50%;
+      animation: g1dm-spin 0.75s linear infinite;
+      vertical-align: middle;
+      margin-right: 5px;
     }
   `;
   document.head?.appendChild(styleEl);
