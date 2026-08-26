@@ -1771,6 +1771,7 @@
 
   // Inject CSS keyframes
   const styleEl = document.createElement('style');
+  styleEl.textContent = `
     @keyframes g1dm-scale-in {
       from { opacity: 0; transform: scale(0.92) translateY(-8px); }
       to { opacity: 1; transform: scale(1) translateY(0); }
