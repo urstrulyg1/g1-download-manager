@@ -31,17 +31,17 @@ export class DownloadBenchmark {
 
     for (const workers of tiers) {
       const start = Date.now();
-      const bytesTransferred = await this.probeThroughput(targetUrl, workers, probeDurationMs);
+      const probe = await this.probeThroughput(targetUrl, workers, probeDurationMs);
       const elapsedSec = Math.max(0.5, (Date.now() - start) / 1000);
-      const throughput = Math.round(bytesTransferred / elapsedSec);
+      const throughput = Math.round(probe.bytesTransferred / elapsedSec);
 
       testedTiers.push({
         workersCount: workers,
         protocol: isHttps ? 'HTTP/2' : 'HTTP/1.1',
         measuredThroughputBytesPerSec: throughput,
         measuredThroughputFormatted: `${(throughput / (1024 * 1024)).toFixed(1)} MB/s`,
-        rttMs: 30,
-        timeToFirstByteMs: 45,
+        rttMs: probe.avgConnectMs,
+        timeToFirstByteMs: probe.avgTtfbMs,
       });
     }
 
@@ -73,16 +73,20 @@ export class DownloadBenchmark {
     };
   }
 
-  private static async probeThroughput(targetUrl: string, workers: number, durationMs: number): Promise<number> {
-    return new Promise<number>((resolve) => {
+  private static async probeThroughput(targetUrl: string, workers: number, durationMs: number): Promise<{ bytesTransferred: number; avgConnectMs: number; avgTtfbMs: number }> {
+    return new Promise<{ bytesTransferred: number; avgConnectMs: number; avgTtfbMs: number }>((resolve) => {
       const parsed = new URL(targetUrl);
       const reqMod = parsed.protocol === 'https:' ? https : http;
 
       let totalBytes = 0;
       const start = Date.now();
+      const connectSamples: number[] = [];
+      const ttfbSamples: number[] = [];
 
       const promises = Array.from({ length: workers }).map(() => {
         return new Promise<void>((workerResolve) => {
+          const requestStart = Date.now();
+
           const req = reqMod.get(
             targetUrl,
             {
@@ -94,6 +98,15 @@ export class DownloadBenchmark {
               rejectUnauthorized: TlsPolicy.rejectUnauthorized(),
             },
             (res) => {
+              // Real time-to-first-byte: measured from request start until the
+              // first response body byte actually arrives from the server.
+              res.once('data', (c: Buffer) => {
+                ttfbSamples.push(Date.now() - requestStart);
+                totalBytes += c.length;
+                if (Date.now() - start > durationMs) {
+                  res.destroy();
+                }
+              });
               res.on('data', (c) => {
                 totalBytes += c.length;
                 if (Date.now() - start > durationMs) {
@@ -105,6 +118,13 @@ export class DownloadBenchmark {
             }
           );
 
+          // Real round-trip estimate: raw TCP connect latency.
+          req.on('socket', (socket) => {
+            socket.once('connect', () => {
+              connectSamples.push(Date.now() - requestStart);
+            });
+          });
+
           req.on('error', () => workerResolve());
           req.on('timeout', () => {
             req.destroy();
@@ -113,7 +133,15 @@ export class DownloadBenchmark {
         });
       });
 
-      Promise.all(promises).then(() => resolve(totalBytes));
+      Promise.all(promises).then(() => {
+        const avg = (samples: number[]) =>
+          samples.length > 0 ? Math.round(samples.reduce((sum, s) => sum + s, 0) / samples.length) : 0;
+        resolve({
+          bytesTransferred: totalBytes,
+          avgConnectMs: avg(connectSamples),
+          avgTtfbMs: avg(ttfbSamples),
+        });
+      });
     });
   }
 }

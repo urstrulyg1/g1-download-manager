@@ -399,9 +399,10 @@ export const DownloadDetailModal: React.FC<DownloadDetailModalProps> = ({ item, 
 
                 <div className="h-6 w-0.5 bg-blue-500/40 my-1" />
 
-                {/* Sockets Fan-Out Grid */}
+                {/* Sockets Fan-Out Grid — renders only real engine-reported segments */}
                 <div className="w-full grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  {(item.segments && item.segments.length > 0 ? item.segments : [{ id: 1, connectionId: 1, speed: item.speed, status: 'downloading', startOffset: 0, endOffset: item.totalBytes }]).map((s) => (
+                  {item.segments && item.segments.length > 0 ? (
+                    item.segments.map((s) => (
                     <div
                       key={s.id}
                       className={`p-3 rounded-xl border flex flex-col items-center justify-center text-center space-y-1 ${
@@ -416,7 +417,12 @@ export const DownloadDetailModal: React.FC<DownloadDetailModalProps> = ({ item, 
                       <div className="text-[11px] text-cyan-300 font-bold">{s.speed > 0 ? formatBytes(s.speed) + '/s' : 'Idle'}</div>
                       <div className="text-[10px] text-slate-500">[{formatBytes(s.startOffset)} - {formatBytes(s.endOffset)}]</div>
                     </div>
-                  ))}
+                  ))
+                    ) : (
+                    <div className="col-span-2 sm:col-span-4 py-6 px-4 rounded-xl bg-slate-950/40 border border-slate-800 text-center text-slate-500 text-[11px]">
+                      Single-stream mode. No segment telemetry reported by the engine for this download.
+                    </div>
+                  )}
                 </div>
 
                 <div className="h-6 w-0.5 bg-emerald-500/40 my-1" />
