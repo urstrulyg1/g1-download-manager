@@ -34,15 +34,19 @@ export const BatchLinksView: React.FC<BatchLinksViewProps> = ({ queues, categori
   const [targetCategory, setTargetCategory] = useState('other');
   const [targetQueue, setTargetQueue] = useState('default');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [extractError, setExtractError] = useState<string | null>(null);
+  const [enqueueError, setEnqueueError] = useState<string | null>(null);
+  const [enqueueSuccess, setEnqueueSuccess] = useState<string | null>(null);
 
   const handleExtract = async () => {
     if (!input.trim()) return;
     setIsLoading(true);
+    setExtractError(null);
     try {
       const res = await api.extractBatchLinks(input.trim());
       setCandidates(res);
     } catch (err: any) {
-      alert(`Extract error: ${err.message}`);
+      setExtractError(err.message || 'Failed to extract links.');
     } finally {
       setIsLoading(false);
     }
@@ -65,6 +69,8 @@ export const BatchLinksView: React.FC<BatchLinksViewProps> = ({ queues, categori
     if (selected.length === 0) return;
 
     setIsSubmitting(true);
+    setEnqueueError(null);
+    setEnqueueSuccess(null);
     try {
       await Promise.all(
         selected.map((item) =>
@@ -77,10 +83,10 @@ export const BatchLinksView: React.FC<BatchLinksViewProps> = ({ queues, categori
           })
         )
       );
-      alert(`Successfully enqueued ${selected.length} items to G1DM!`);
+      setEnqueueSuccess(`${selected.length} item${selected.length === 1 ? '' : 's'} enqueued successfully.`);
       onAdded();
     } catch (err: any) {
-      alert(`Error enqueuing downloads: ${err.message}`);
+      setEnqueueError(err.message || 'Failed to enqueue downloads.');
     } finally {
       setIsSubmitting(false);
     }
@@ -117,11 +123,18 @@ export const BatchLinksView: React.FC<BatchLinksViewProps> = ({ queues, categori
           className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-slate-200 font-mono text-xs focus:outline-none focus:border-cyan-500"
         />
 
+        {extractError && (
+          <div role="alert" className="flex items-center justify-between p-2.5 rounded-xl bg-rose-950/40 border border-rose-500/40 text-rose-300 text-xs">
+            <span>{extractError}</span>
+            <button onClick={() => setExtractError(null)} className="ml-3 text-rose-400 hover:text-rose-200 font-bold">✕</button>
+          </div>
+        )}
+
         <div className="flex justify-end">
           <button
             onClick={handleExtract}
             disabled={isLoading || !input.trim()}
-            className="px-5 py-2 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white text-xs font-bold shadow-lg shadow-cyan-600/30 flex items-center gap-2"
+            className="px-5 py-2 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white text-xs font-bold shadow-lg shadow-cyan-600/30 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
             <span>Extract Accessible Links</span>
@@ -180,13 +193,27 @@ export const BatchLinksView: React.FC<BatchLinksViewProps> = ({ queues, categori
               <button
                 onClick={handleEnqueueSelected}
                 disabled={isSubmitting || selectedCount === 0}
-                className="px-4 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold shadow-md shadow-blue-600/30 flex items-center gap-1.5"
+                className="px-4 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold shadow-md shadow-blue-600/30 flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isSubmitting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
                 <span>Enqueue {selectedCount} Selected</span>
               </button>
             </div>
           </div>
+
+          {enqueueError && (
+            <div role="alert" className="flex items-center justify-between p-2.5 rounded-xl bg-rose-950/40 border border-rose-500/40 text-rose-300 text-xs">
+              <span>{enqueueError}</span>
+              <button onClick={() => setEnqueueError(null)} className="ml-3 text-rose-400 hover:text-rose-200 font-bold">✕</button>
+            </div>
+          )}
+
+          {enqueueSuccess && (
+            <div role="status" className="flex items-center justify-between p-2.5 rounded-xl bg-emerald-950/40 border border-emerald-500/40 text-emerald-300 text-xs">
+              <span>{enqueueSuccess}</span>
+              <button onClick={() => setEnqueueSuccess(null)} className="ml-3 text-emerald-400 hover:text-emerald-200 font-bold">✕</button>
+            </div>
+          )}
 
           {/* Candidates List */}
           <div className="max-h-96 overflow-y-auto rounded-xl border border-slate-800 bg-slate-950/60">

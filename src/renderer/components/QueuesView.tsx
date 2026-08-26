@@ -31,6 +31,7 @@ export const QueuesView: React.FC<QueuesViewProps> = ({ queues, downloads, setti
   const [editingQueue, setEditingQueue] = useState<Partial<DownloadQueue> | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [expandedQueueId, setExpandedQueueId] = useState<string | null>(null);
+  const [deleteDefaultMsg, setDeleteDefaultMsg] = useState(false);
 
   const defaultDir = settings?.general.defaultDownloadDir ?? '';
 
@@ -68,7 +69,8 @@ export const QueuesView: React.FC<QueuesViewProps> = ({ queues, downloads, setti
 
   const handleDelete = async (id: string) => {
     if (id === 'default') {
-      alert('Cannot delete the default download queue.');
+      setDeleteDefaultMsg(true);
+      setTimeout(() => setDeleteDefaultMsg(false), 3500);
       return;
     }
     await api.deleteQueue(id);
@@ -113,8 +115,22 @@ export const QueuesView: React.FC<QueuesViewProps> = ({ queues, downloads, setti
         </button>
       </div>
 
+      {deleteDefaultMsg && (
+        <div role="alert" className="flex items-center justify-between p-2.5 rounded-xl bg-amber-950/40 border border-amber-500/40 text-amber-300 text-xs">
+          <span>The default download queue cannot be deleted.</span>
+          <button onClick={() => setDeleteDefaultMsg(false)} className="ml-3 text-amber-400 hover:text-amber-200 font-bold">✕</button>
+        </div>
+      )}
+
       {/* Queues Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {queues.length === 0 ? (
+          <div className="col-span-2 p-12 text-center bg-slate-900/60 rounded-2xl border border-slate-800 text-slate-500 text-xs space-y-2">
+            <ListOrdered className="w-10 h-10 mx-auto text-slate-600" />
+            <div className="font-semibold text-slate-300">No download queues yet</div>
+            <div className="text-[11px] text-slate-500">Click "Create New Queue" to organize downloads by schedule, speed, or category.</div>
+          </div>
+        ) : null}
         {queues.map((queue) => {
           const queueItems = downloads.filter((d) => d.queueId === queue.id);
           const activeItems = queueItems.filter((d) => d.status === 'downloading');

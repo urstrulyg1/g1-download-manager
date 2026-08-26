@@ -26,25 +26,30 @@ export const PowerFeaturesView: React.FC<{ lang: Language }> = ({ lang }) => {
   // Media state
   const [playlistUrl, setPlaylistUrl] = useState('');
   const [playlistResult, setPlaylistResult] = useState<any>(null);
+  const [playlistError, setPlaylistError] = useState<string | null>(null);
   const [dvrStreamUrl, setDvrStreamUrl] = useState('');
   const [dvrTitle, setDvrTitle] = useState('');
   const [dvrDurationSec, setDvrDurationSec] = useState(300);
+  const [dvrSuccess, setDvrSuccess] = useState<string | null>(null);
+  const [dvrError, setDvrError] = useState<string | null>(null);
 
   // Network state
   const [magnetUri, setMagnetUri] = useState('');
   const [magnetResult, setMagnetResult] = useState<any>(null);
+  const [magnetError, setMagnetError] = useState<string | null>(null);
   const [pingThreshold, setPingThreshold] = useState(80);
   const [latencySenseActive, setLatencySenseActive] = useState(true);
 
   // Debrid state
-  const [debridKey, setDebridKey] = useState('');
   const [unrestrictUrl, setUnrestrictUrl] = useState('');
   const [unrestrictResult, setUnrestrictResult] = useState<any>(null);
+  const [unrestrictError, setUnrestrictError] = useState<string | null>(null);
 
   // Vault state
   const [vaultPassword, setVaultPassword] = useState('');
   const [vaultUnlocked, setVaultUnlocked] = useState(false);
   const [vaultItems, setVaultItems] = useState<any[]>([]);
+  const [vaultError, setVaultError] = useState<string | null>(null);
 
   // Bot state
   const [botCommand, setBotCommand] = useState('');
@@ -55,16 +60,18 @@ export const PowerFeaturesView: React.FC<{ lang: Language }> = ({ lang }) => {
   const handleParsePlaylist = async () => {
     if (!playlistUrl) return;
     setLoading(true);
+    setPlaylistError(null);
     try {
       const res = await fetch('/api/media/playlist/parse', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: playlistUrl }),
       });
+      if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || `HTTP ${res.status}`); }
       const data = await res.json();
       setPlaylistResult(data);
     } catch (err: any) {
-      alert(`Playlist error: ${err.message}`);
+      setPlaylistError(err.message || 'Failed to parse playlist.');
     } finally {
       setLoading(false);
     }
@@ -73,16 +80,18 @@ export const PowerFeaturesView: React.FC<{ lang: Language }> = ({ lang }) => {
   const handleEnqueuePlaylist = async () => {
     if (!playlistResult) return;
     setLoading(true);
+    setPlaylistError(null);
     try {
       const res = await fetch('/api/media/playlist/enqueue', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ playlist: playlistResult }),
       });
+      if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || `HTTP ${res.status}`); }
       const data = await res.json();
-      alert(`Enqueued ${data.enqueuedIds?.length || 0} playlist tracks!`);
+      setPlaylistResult({ ...playlistResult, _enqueued: data.enqueuedIds?.length || 0 });
     } catch (err: any) {
-      alert(`Error enqueuing playlist: ${err.message}`);
+      setPlaylistError(err.message || 'Failed to enqueue playlist.');
     } finally {
       setLoading(false);
     }
@@ -90,6 +99,8 @@ export const PowerFeaturesView: React.FC<{ lang: Language }> = ({ lang }) => {
 
   const handleScheduleDVR = async () => {
     if (!dvrStreamUrl) return;
+    setDvrError(null);
+    setDvrSuccess(null);
     try {
       const res = await fetch('/api/media/dvr/schedule', {
         method: 'POST',
@@ -102,58 +113,67 @@ export const PowerFeaturesView: React.FC<{ lang: Language }> = ({ lang }) => {
           outputFilename: `dvr_${Date.now()}.mp4`,
         }),
       });
+      if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || `HTTP ${res.status}`); }
       const data = await res.json();
-      alert(`DVR recording scheduled! ID: ${data.id}`);
+      setDvrSuccess(`DVR recording scheduled (ID: ${data.id})`);
     } catch (err: any) {
-      alert(`DVR error: ${err.message}`);
+      setDvrError(err.message || 'Failed to schedule DVR recording.');
     }
   };
 
   const handleAddTorrent = async () => {
     if (!magnetUri) return;
+    setMagnetError(null);
     try {
       const res = await fetch('/api/torrent/add', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ magnetOrFilePath: magnetUri }),
       });
+      if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || `HTTP ${res.status}`); }
       const data = await res.json();
       setMagnetResult(data);
     } catch (err: any) {
-      alert(`Torrent error: ${err.message}`);
+      setMagnetError(err.message || 'Failed to add torrent.');
     }
   };
 
   const handleUnrestrictLink = async () => {
     if (!unrestrictUrl) return;
+    setUnrestrictError(null);
     try {
       const res = await fetch('/api/debrid/unrestrict', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: unrestrictUrl, provider: 'real-debrid' }),
       });
+      if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || `HTTP ${res.status}`); }
       const data = await res.json();
       setUnrestrictResult(data);
     } catch (err: any) {
-      alert(`Debrid error: ${err.message}`);
+      setUnrestrictError(err.message || 'Debrid unrestrict failed.');
     }
   };
 
   const handleUnlockVault = async () => {
+    setVaultError(null);
     try {
       const res = await fetch('/api/security/vault/unlock', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ password: vaultPassword }),
       });
+      if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || `HTTP ${res.status}`); }
       const data = await res.json();
       setVaultUnlocked(data.unlocked);
       if (data.unlocked) {
         const itemsRes = await fetch('/api/security/vault/items');
         setVaultItems(await itemsRes.json());
+      } else {
+        setVaultError('Incorrect vault password.');
       }
     } catch (err: any) {
-      alert(`Vault error: ${err.message}`);
+      setVaultError(err.message || 'Failed to unlock vault.');
     }
   };
 
@@ -241,10 +261,20 @@ export const PowerFeaturesView: React.FC<{ lang: Language }> = ({ lang }) => {
               </button>
             </div>
 
+            {playlistError && (
+              <div role="alert" className="flex items-center justify-between p-2.5 rounded-xl bg-rose-950/40 border border-rose-500/40 text-rose-300 text-xs">
+                <span>{playlistError}</span>
+                <button onClick={() => setPlaylistError(null)} className="ml-3 text-rose-400 hover:text-rose-200 font-bold">✕</button>
+              </div>
+            )}
+
             {playlistResult && (
               <div className="p-3 bg-slate-950/80 rounded-xl border border-slate-800 space-y-2">
                 <div className="font-bold text-slate-200">{playlistResult.playlistTitle}</div>
                 <div className="text-slate-400 text-[11px]">Discovered {playlistResult.totalTracks} tracks</div>
+                {playlistResult._enqueued != null && (
+                  <div className="text-emerald-400 text-[11px] font-semibold">✓ {playlistResult._enqueued} tracks enqueued!</div>
+                )}
                 <div className="max-h-36 overflow-y-auto space-y-1">
                   {playlistResult.tracks?.map((t: any) => (
                     <div key={t.trackNumber} className="text-[11px] font-mono text-slate-300 truncate">
@@ -252,12 +282,14 @@ export const PowerFeaturesView: React.FC<{ lang: Language }> = ({ lang }) => {
                     </div>
                   ))}
                 </div>
-                <button
-                  onClick={handleEnqueuePlaylist}
-                  className="w-full py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg text-xs"
-                >
-                  Enqueue All Tracks to Download Manager
-                </button>
+                {!playlistResult._enqueued && (
+                  <button
+                    onClick={handleEnqueuePlaylist}
+                    className="w-full py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg text-xs"
+                  >
+                    Enqueue All Tracks to Download Manager
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -299,6 +331,18 @@ export const PowerFeaturesView: React.FC<{ lang: Language }> = ({ lang }) => {
                 Schedule Live DVR Recording
               </button>
             </div>
+
+            {dvrError && (
+              <div role="alert" className="flex items-center justify-between p-2.5 rounded-xl bg-rose-950/40 border border-rose-500/40 text-rose-300 text-xs">
+                <span>{dvrError}</span>
+                <button onClick={() => setDvrError(null)} className="ml-3 text-rose-400 hover:text-rose-200 font-bold">✕</button>
+              </div>
+            )}
+            {dvrSuccess && (
+              <div role="status" className="p-2.5 rounded-xl bg-emerald-950/40 border border-emerald-500/40 text-emerald-300 text-xs">
+                {dvrSuccess}
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -328,6 +372,12 @@ export const PowerFeaturesView: React.FC<{ lang: Language }> = ({ lang }) => {
               </button>
             </div>
 
+            {magnetError && (
+              <div role="alert" className="flex items-center justify-between p-2.5 rounded-xl bg-rose-950/40 border border-rose-500/40 text-rose-300 text-xs">
+                <span>{magnetError}</span>
+                <button onClick={() => setMagnetError(null)} className="ml-3 text-rose-400 hover:text-rose-200 font-bold">✕</button>
+              </div>
+            )}
             {magnetResult && (
               <div className="p-3 bg-slate-950/80 rounded-xl border border-slate-800 space-y-1">
                 <div className="font-bold text-emerald-400">{magnetResult.name}</div>
@@ -407,6 +457,12 @@ export const PowerFeaturesView: React.FC<{ lang: Language }> = ({ lang }) => {
               Unrestrict High-Speed Link
             </button>
 
+            {unrestrictError && (
+              <div role="alert" className="flex items-center justify-between p-2.5 rounded-xl bg-rose-950/40 border border-rose-500/40 text-rose-300 text-xs">
+                <span>{unrestrictError}</span>
+                <button onClick={() => setUnrestrictError(null)} className="ml-3 text-rose-400 hover:text-rose-200 font-bold">✕</button>
+              </div>
+            )}
             {unrestrictResult && (
               <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 text-emerald-400 font-mono">
                 Unrestricted: {unrestrictResult.downloadUrl}
@@ -440,6 +496,11 @@ export const PowerFeaturesView: React.FC<{ lang: Language }> = ({ lang }) => {
                 <Key className="w-4 h-4" />
                 <span>Unlock Hardware Encrypted Vault</span>
               </button>
+              {vaultError && (
+                <div role="alert" className="p-2.5 rounded-xl bg-rose-950/40 border border-rose-500/40 text-rose-300 text-xs">
+                  {vaultError}
+                </div>
+              )}
             </div>
           ) : (
             <div className="p-4 bg-emerald-950/20 border border-emerald-500/30 rounded-xl space-y-2">

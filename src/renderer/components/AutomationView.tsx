@@ -2,15 +2,9 @@ import React, { useState, useEffect } from 'react';
 import {
   Sparkles,
   Plus,
-  Play,
   Trash2,
-  CheckCircle2,
-  AlertTriangle,
   Clock,
-  Layers,
-  ArrowRight,
   Loader2,
-  RotateCcw,
 } from 'lucide-react';
 import { AutomationRule, RuleExecutionLog } from '../../main/automation/RuleEngine';
 import { RuleSimulator, SimulationResult } from '../../main/automation/RuleSimulator';
@@ -18,6 +12,7 @@ import { DownloadItem } from '../../shared/types';
 import { Button } from './ui/Button';
 import { Badge } from './ui/Badge';
 import { Language, translations } from '../lib/i18n';
+import { api } from '../lib/api';
 
 interface AutomationViewProps {
   downloads: DownloadItem[];
@@ -30,6 +25,8 @@ export const AutomationView: React.FC<AutomationViewProps> = ({ downloads, lang 
   const [executionLogs, setExecutionLogs] = useState<RuleExecutionLog[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [simResult, setSimResult] = useState<SimulationResult | null>(null);
+  const [rulesError, setRulesError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   // New Rule Form State
   const [ruleName, setRuleName] = useState('Auto Move Movies');
@@ -41,14 +38,17 @@ export const AutomationView: React.FC<AutomationViewProps> = ({ downloads, lang 
   const [actionParam, setActionParam] = useState('Videos');
 
   const fetchRules = async () => {
+    setRulesError(null);
     try {
       const [rRes, lRes] = await Promise.all([
-        fetch('/api/rules').then((r) => r.json()),
+        api.getRules(),
         fetch('/api/rules/logs').then((r) => r.json()).catch(() => []),
       ]);
       setRules(rRes);
       setExecutionLogs(lRes);
-    } catch {}
+    } catch (err: any) {
+      setRulesError(err.message || 'Failed to load automation rules.');
+    }
   };
 
   useEffect(() => {
@@ -71,6 +71,7 @@ export const AutomationView: React.FC<AutomationViewProps> = ({ downloads, lang 
 
   const handleCreateRule = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSaveError(null);
     const newRule: AutomationRule = {
       id: `rule_${Date.now()}`,
       name: ruleName,
@@ -80,36 +81,32 @@ export const AutomationView: React.FC<AutomationViewProps> = ({ downloads, lang 
       actions: [{ actionType, params: { targetDir: actionParam } }],
     };
 
-    const updated = [...rules, newRule];
-    await fetch('/api/rules', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(updated),
-    });
-
-    setIsModalOpen(false);
-    setSimResult(null);
-    fetchRules();
+    try {
+      await api.saveRules([...rules, newRule]);
+      setIsModalOpen(false);
+      setSimResult(null);
+      fetchRules();
+    } catch (err: any) {
+      setSaveError(err.message || 'Failed to save rule.');
+    }
   };
 
   const handleDeleteRule = async (id: string) => {
-    const updated = rules.filter((r) => r.id !== id);
-    await fetch('/api/rules', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(updated),
-    });
-    fetchRules();
+    try {
+      await api.saveRules(rules.filter((r) => r.id !== id));
+      fetchRules();
+    } catch (err: any) {
+      setRulesError(err.message || 'Failed to delete rule.');
+    }
   };
 
   const toggleRuleEnabled = async (rule: AutomationRule) => {
-    const updated = rules.map((r) => (r.id === rule.id ? { ...r, enabled: !r.enabled } : r));
-    await fetch('/api/rules', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(updated),
-    });
-    fetchRules();
+    try {
+      await api.saveRules(rules.map((r) => (r.id === rule.id ? { ...r, enabled: !r.enabled } : r)));
+      fetchRules();
+    } catch (err: any) {
+      setRulesError(err.message || 'Failed to update rule.');
+    }
   };
 
   return (
@@ -130,6 +127,14 @@ export const AutomationView: React.FC<AutomationViewProps> = ({ downloads, lang 
           Create Automation Rule
         </Button>
       </div>
+
+      {/* Global rules error */}
+      {rulesError && (
+        <div role="alert" className="flex items-center justify-between p-2.5 rounded-xl bg-rose-950/40 border border-rose-500/40 text-rose-300 text-xs">
+          <span>{rulesError}</span>
+          <button onClick={() => setRulesError(null)} className="ml-3 text-rose-400 hover:text-rose-200 font-bold">✕</button>
+        </div>
+      )}
 
       {/* Rules Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -358,6 +363,12 @@ export const AutomationView: React.FC<AutomationViewProps> = ({ downloads, lang 
                 Save & Activate Rule
               </button>
             </div>
+
+            {saveError && (
+              <div role="alert" className="p-2.5 rounded-xl bg-rose-950/40 border border-rose-500/40 text-rose-300 text-xs">
+                {saveError}
+              </div>
+            )}
           </form>
         </div>
       )}

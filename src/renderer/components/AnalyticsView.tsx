@@ -33,26 +33,34 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ downloads, metrics
     return `${(bytes / Math.pow(k, i)).toFixed(2)} ${sizes[i]}`;
   };
 
-  const totalBytes = downloads.reduce((sum, d) => sum + d.downloadedBytes, 0);
-  const completedItems = downloads.filter((d) => d.status === 'completed');
-  const failedItems = downloads.filter((d) => d.status === 'failed');
+  // Filter downloads to the selected time window
+  const filteredDownloads = React.useMemo(() => {
+    if (timeRange === 'all') return downloads;
+    const cutoffs = { '24h': 24 * 60 * 60 * 1000, '7d': 7 * 24 * 60 * 60 * 1000, '30d': 30 * 24 * 60 * 60 * 1000 };
+    const since = Date.now() - cutoffs[timeRange];
+    return downloads.filter((d) => d.createdAt >= since);
+  }, [downloads, timeRange]);
+
+  const totalBytes = filteredDownloads.reduce((sum, d) => sum + d.downloadedBytes, 0);
+  const completedItems = filteredDownloads.filter((d) => d.status === 'completed');
+  const failedItems = filteredDownloads.filter((d) => d.status === 'failed');
 
   // Honest statistics: a success rate is only defined when at least one real
   // download exists — no fabricated 100% for an empty history.
-  const successRatePct = downloads.length > 0 ? Math.round((completedItems.length / downloads.length) * 100) : null;
+  const successRatePct = filteredDownloads.length > 0 ? Math.round((completedItems.length / filteredDownloads.length) * 100) : null;
   const avgSpeed = completedItems.length > 0 ? Math.round(completedItems.reduce((sum, d) => sum + (d.avgSpeed || 0), 0) / completedItems.length) : 0;
-  const peakSpeed = Math.max(...downloads.map((d) => d.peakSpeed || 0), 0);
+  const peakSpeed = Math.max(...filteredDownloads.map((d) => d.peakSpeed || 0), 0);
 
   // Protocol Distribution
   const protocolsCount: Record<string, number> = {};
-  downloads.forEach((d) => {
+  filteredDownloads.forEach((d) => {
     const p = (d.serverCapabilities.protocol || 'https').toUpperCase();
     protocolsCount[p] = (protocolsCount[p] || 0) + 1;
   });
 
   // Domain Distribution
   const domainCount: Record<string, { count: number; bytes: number }> = {};
-  downloads.forEach((d) => {
+  filteredDownloads.forEach((d) => {
     try {
       const dom = new URL(d.url).hostname;
       if (!domainCount[dom]) domainCount[dom] = { count: 0, bytes: 0 };
@@ -68,7 +76,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ downloads, metrics
   const handleExportCsv = () => {
     const rows = [
       ['ID', 'Filename', 'URL', 'Category', 'DownloadedBytes', 'TotalBytes', 'Status', 'AvgSpeed', 'CreatedAt'],
-      ...downloads.map((d) => [
+      ...filteredDownloads.map((d) => [
         d.id,
         d.filename,
         d.url,
@@ -130,7 +138,9 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ downloads, metrics
         <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 shadow-xl space-y-1">
           <div className="text-slate-400 font-semibold">Total Download Volume</div>
           <div className="text-2xl font-extrabold text-white font-mono">{formatBytes(totalBytes)}</div>
-          <div className="text-[11px] text-slate-500">{downloads.length} total managed items</div>
+          <div className="text-[11px] text-slate-500">
+            {filteredDownloads.length} item{filteredDownloads.length === 1 ? '' : 's'}{timeRange !== 'all' ? ` in last ${timeRange}` : ' total'}
+          </div>
         </div>
 
         <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 shadow-xl space-y-1">

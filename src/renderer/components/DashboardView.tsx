@@ -39,6 +39,9 @@ interface DashboardViewProps {
   onSelectDownload: (item: DownloadItem) => void;
 }
 
+// Persisted across navigation (module-level — survives React unmount/remount)
+let _speedHistoryCache: number[] = new Array(40).fill(0);
+
 const DashboardViewComponent: React.FC<DashboardViewProps> = ({
   downloads,
   metrics,
@@ -49,7 +52,7 @@ const DashboardViewComponent: React.FC<DashboardViewProps> = ({
   onSelectDownload,
 }) => {
   const t = translations[lang] || translations.en;
-  const [speedHistory, setSpeedHistory] = useState<number[]>(() => new Array(40).fill(0));
+  const [speedHistory, setSpeedHistory] = useState<number[]>(() => [..._speedHistoryCache]);
   const [itemToDelete, setItemToDelete] = useState<DownloadItem | null>(null);
 
   const formatBytes = (bytes: number) => {
@@ -74,7 +77,11 @@ const DashboardViewComponent: React.FC<DashboardViewProps> = ({
   // Update rolling speed graph (throttled to avoid redundant renders)
   useEffect(() => {
     const timer = setTimeout(() => {
-      setSpeedHistory((prev) => [...prev.slice(1), currentSpeed]);
+      setSpeedHistory((prev) => {
+        const next = [...prev.slice(1), currentSpeed];
+        _speedHistoryCache = next;
+        return next;
+      });
     }, 200);
     return () => clearTimeout(timer);
   }, [currentSpeed]);

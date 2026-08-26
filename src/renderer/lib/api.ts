@@ -205,4 +205,23 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(payload),
     }),
+
+  // Archive extraction
+  extractArchive: (filePath: string, passwords?: string[], deleteOriginalArchive?: boolean) =>
+    req<any>('/archive/auto-extract', {
+      method: 'POST',
+      body: JSON.stringify({ filePath, passwords, deleteOriginalArchive }),
+    }),
+
+  // Undo system
+  getUndoStack: () => req<any[]>('/undo/stack'),
+  performUndo: () => req<any>('/undo', { method: 'POST' }),
+
+  // Browser health / self-healing
+  getBrowserHealth: () => req<any>('/browser/health'),
+  repairBrowser: (browser?: string) =>
+    req<any>('/browser/repair', {
+      method: 'POST',
+      body: JSON.stringify({ browser: browser ?? 'chrome' }),
+    }),
 };

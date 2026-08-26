@@ -3,10 +3,7 @@ import {
   AlertTriangle,
   X,
   Wrench,
-  RotateCcw,
   HardDrive,
-  Clock,
-  ShieldAlert,
   CheckCircle2,
 } from 'lucide-react';
 import { DownloadItem, SystemMetrics } from '../../../shared/types';
@@ -101,6 +98,19 @@ export const ActionCenterDrawer: React.FC<ActionCenterDrawerProps> = ({
             )}
           </div>
         )}
+
+        {/* Browser Health Repair */}
+        <div className="pt-2 border-t border-slate-800">
+          <div className="text-[11px] font-bold uppercase text-slate-500 mb-2">Browser Integration</div>
+          <div className="p-4 rounded-xl bg-slate-800/60 border border-slate-700 space-y-2">
+            <div className="text-xs text-slate-300">
+              If the browser extension is not intercepting downloads, use the self-healing repair to reinstall the native host manifest.
+            </div>
+            <Button size="xs" variant="outline" leftIcon={<Wrench className="w-3.5 h-3.5" />} onClick={onRepairBrowser}>
+              Repair Browser Integration
+            </Button>
+          </div>
+        </div>
       </div>
     </div>
   );

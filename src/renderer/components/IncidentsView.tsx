@@ -16,13 +16,21 @@ import { Language, translations } from '../lib/i18n';
 export const IncidentsView: React.FC<{ lang: Language }> = ({ lang }) => {
   const t = translations[lang] || translations.en;
   const [incidents, setIncidents] = useState<IncidentRecord[]>([]);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   const fetchIncidents = async () => {
+    setFetchError(null);
     try {
       const res = await fetch('/api/incidents');
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.error || `HTTP ${res.status}`);
+      }
       const data = await res.json();
       setIncidents(data);
-    } catch {}
+    } catch (err: any) {
+      setFetchError(err.message || 'Failed to load incidents.');
+    }
   };
 
   useEffect(() => {
@@ -51,6 +59,13 @@ export const IncidentsView: React.FC<{ lang: Language }> = ({ lang }) => {
           <span>Refresh Console</span>
         </button>
       </div>
+
+      {fetchError && (
+        <div role="alert" className="flex items-center justify-between p-2.5 rounded-xl bg-rose-950/40 border border-rose-500/40 text-rose-300 text-xs">
+          <span>{fetchError}</span>
+          <button onClick={() => setFetchError(null)} className="ml-3 text-rose-400 hover:text-rose-200 font-bold">✕</button>
+        </div>
+      )}
 
       {/* Incidents List */}
       <div className="space-y-3">

@@ -2,15 +2,9 @@ import React, { useState } from 'react';
 import {
   Camera,
   Download,
-  Upload,
-  RotateCcw,
-  CheckCircle2,
-  FileJson,
-  Shield,
-  Layers,
 } from 'lucide-react';
 import { DownloadItem } from '../../shared/types';
-import { DownloadSnapshot, SnapshotManager } from '../../main/engine/SnapshotManager';
+import { DownloadSnapshot } from '../../main/engine/SnapshotManager';
 import { Button } from './ui/Button';
 import { Language, translations } from '../lib/i18n';
 
@@ -25,16 +19,23 @@ export const SnapshotsView: React.FC<SnapshotsViewProps> = ({ downloads, lang, o
   const [selectedDownloadId, setSelectedDownloadId] = useState<string>(downloads[0]?.id || '');
   const [createdSnapshot, setCreatedSnapshot] = useState<DownloadSnapshot | null>(null);
 
+  const [snapshotError, setSnapshotError] = useState<string | null>(null);
+
   const handleCreateSnapshot = async () => {
     const item = downloads.find((d) => d.id === selectedDownloadId);
     if (!item) return;
 
+    setSnapshotError(null);
     try {
       const res = await fetch(`/api/snapshots/${item.id}`);
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.error || `HTTP ${res.status}`);
+      }
       const data = await res.json();
-      setCreatedSnapshot(data);
+      setCreatedSnapshot(data as DownloadSnapshot);
     } catch (err: any) {
-      alert(`Snapshot error: ${err.message}`);
+      setSnapshotError(err.message || 'Failed to create snapshot.');
     }
   };
 
@@ -101,6 +102,13 @@ export const SnapshotsView: React.FC<SnapshotsViewProps> = ({ downloads, lang, o
             </Button>
           </div>
         </div>
+
+        {snapshotError && (
+          <div role="alert" className="flex items-center justify-between p-2.5 rounded-xl bg-rose-950/40 border border-rose-500/40 text-rose-300 text-xs">
+            <span>{snapshotError}</span>
+            <button onClick={() => setSnapshotError(null)} className="ml-3 text-rose-400 hover:text-rose-200 font-bold">✕</button>
+          </div>
+        )}
 
         {createdSnapshot && (
           <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-2 animate-in fade-in text-xs font-mono">

@@ -23,10 +23,14 @@ interface SiteGrabberViewProps {
   onRefresh: () => void;
 }
 
+const URL_PAGE_SIZE = 50;
+
 export const SiteGrabberView: React.FC<SiteGrabberViewProps> = ({ projects, lang, onRefresh }) => {
   const t = translations[lang] || translations.en;
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedProject, setSelectedProject] = useState<SiteGrabberProject | null>(null);
+  const [urlSearch, setUrlSearch] = useState('');
+  const [urlPage, setUrlPage] = useState(1);
 
   // New Project Form state
   const [name, setName] = useState('Docs Mirror Project');
@@ -209,49 +213,100 @@ export const SiteGrabberView: React.FC<SiteGrabberViewProps> = ({ projects, lang
                 </div>
               </div>
 
+              {/* Search bar */}
+              {selectedProject.discoveredUrls && selectedProject.discoveredUrls.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <Filter className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+                  <input
+                    type="text"
+                    placeholder="Filter URLs…"
+                    value={urlSearch}
+                    onChange={(e) => { setUrlSearch(e.target.value); setUrlPage(1); }}
+                    className="flex-1 bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 font-mono focus:outline-none focus:border-emerald-500/50"
+                  />
+                </div>
+              )}
+
               {/* URL Table */}
-              <div className="flex-1 overflow-y-auto max-h-96 rounded-xl border border-slate-800 bg-slate-950/60">
-                <table className="w-full text-left text-xs border-collapse font-mono">
-                  <thead>
-                    <tr className="bg-slate-950 border-b border-slate-800 text-[10px] uppercase font-bold text-slate-400 font-sans">
-                      <th className="p-2.5">Depth</th>
-                      <th className="p-2.5">Resource URL</th>
-                      <th className="p-2.5">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-800/60 text-[11px]">
-                    {selectedProject.discoveredUrls && selectedProject.discoveredUrls.length > 0 ? (
-                      selectedProject.discoveredUrls.map((d, i) => (
-                        <tr key={i} className="hover:bg-slate-800/40">
-                          <td className="p-2.5 text-blue-400 font-bold">D{d.depth}</td>
-                          <td className="p-2.5 truncate max-w-md text-slate-300" title={d.url}>
-                            {d.url}
-                          </td>
-                          <td className="p-2.5">
-                            <span
-                              className={`px-2 py-0.5 rounded text-[10px] font-sans font-bold capitalize ${
-                                d.status === 'downloaded'
-                                  ? 'bg-emerald-500/20 text-emerald-300'
-                                  : d.status === 'enqueued'
-                                  ? 'bg-blue-500/20 text-blue-300'
-                                  : 'bg-slate-800 text-slate-400'
-                              }`}
-                            >
-                              {d.status}
-                            </span>
-                          </td>
-                        </tr>
-                      ))
-                    ) : (
-                      <tr>
-                        <td colSpan={3} className="text-center py-12 text-slate-500 font-sans text-xs">
-                          Start crawling to discover downloadable assets.
-                        </td>
-                      </tr>
+              {(() => {
+                const allUrls = selectedProject.discoveredUrls || [];
+                const filtered = urlSearch.trim()
+                  ? allUrls.filter((d) => d.url.toLowerCase().includes(urlSearch.toLowerCase()))
+                  : allUrls;
+                const totalPages = Math.max(1, Math.ceil(filtered.length / URL_PAGE_SIZE));
+                const safePage = Math.min(urlPage, totalPages);
+                const pageUrls = filtered.slice((safePage - 1) * URL_PAGE_SIZE, safePage * URL_PAGE_SIZE);
+
+                return (
+                  <div className="flex-1 flex flex-col gap-2">
+                    <div className="overflow-y-auto max-h-80 rounded-xl border border-slate-800 bg-slate-950/60">
+                      <table className="w-full text-left text-xs border-collapse font-mono">
+                        <thead>
+                          <tr className="bg-slate-950 border-b border-slate-800 text-[10px] uppercase font-bold text-slate-400 font-sans">
+                            <th className="p-2.5">Depth</th>
+                            <th className="p-2.5">Resource URL</th>
+                            <th className="p-2.5">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-800/60 text-[11px]">
+                          {pageUrls.length > 0 ? (
+                            pageUrls.map((d, i) => (
+                              <tr key={i} className="hover:bg-slate-800/40">
+                                <td className="p-2.5 text-blue-400 font-bold">D{d.depth}</td>
+                                <td className="p-2.5 truncate max-w-md text-slate-300" title={d.url}>
+                                  {d.url}
+                                </td>
+                                <td className="p-2.5">
+                                  <span
+                                    className={`px-2 py-0.5 rounded text-[10px] font-sans font-bold capitalize ${
+                                      d.status === 'downloaded'
+                                        ? 'bg-emerald-500/20 text-emerald-300'
+                                        : d.status === 'enqueued'
+                                        ? 'bg-blue-500/20 text-blue-300'
+                                        : 'bg-slate-800 text-slate-400'
+                                    }`}
+                                  >
+                                    {d.status}
+                                  </span>
+                                </td>
+                              </tr>
+                            ))
+                          ) : (
+                            <tr>
+                              <td colSpan={3} className="text-center py-12 text-slate-500 font-sans text-xs">
+                                {urlSearch ? 'No URLs match your filter.' : 'Start crawling to discover downloadable assets.'}
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {totalPages > 1 && (
+                      <div className="flex items-center justify-between text-[11px] text-slate-400 font-mono">
+                        <span>{filtered.length} URLs{urlSearch ? ' (filtered)' : ''}</span>
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => setUrlPage((p) => Math.max(1, p - 1))}
+                            disabled={safePage <= 1}
+                            className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed"
+                          >
+                            ‹
+                          </button>
+                          <span className="px-2">{safePage} / {totalPages}</span>
+                          <button
+                            onClick={() => setUrlPage((p) => Math.min(totalPages, p + 1))}
+                            disabled={safePage >= totalPages}
+                            className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed"
+                          >
+                            ›
+                          </button>
+                        </div>
+                      </div>
                     )}
-                  </tbody>
-                </table>
-              </div>
+                  </div>
+                );
+              })()}
             </div>
           ) : (
             <div className="flex-1 flex flex-col items-center justify-center text-slate-500 text-xs">
