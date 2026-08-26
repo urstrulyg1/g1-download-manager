@@ -273,6 +273,42 @@
     return 'Media Download';
   }
 
+  function getPageThumbnailUrl() {
+    // 1. YouTube: construct from video ID (highest quality first, fallback to hqdefault)
+    if (/youtube\.com|youtu\.be/i.test(window.location.hostname)) {
+      try {
+        const params = new URLSearchParams(window.location.search);
+        const videoId = params.get('v');
+        if (videoId) {
+          return `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
+        }
+        // youtu.be short URL
+        const pathId = window.location.pathname.replace('/', '');
+        if (pathId && pathId.length === 11) {
+          return `https://img.youtube.com/vi/${pathId}/maxresdefault.jpg`;
+        }
+      } catch {}
+    }
+
+    // 2. Vimeo thumbnail from og:image
+    // 3. Generic og:image / twitter:image (works on most sites)
+    const ogImage = document.querySelector('meta[property="og:image"]')?.getAttribute('content')?.trim();
+    if (ogImage && ogImage.startsWith('http')) return ogImage;
+
+    const twitterImage = document.querySelector('meta[name="twitter:image"], meta[name="twitter:image:src"]')?.getAttribute('content')?.trim();
+    if (twitterImage && twitterImage.startsWith('http')) return twitterImage;
+
+    // 4. First visible large <img> in the page that is not an icon
+    const imgs = document.querySelectorAll('img[src]');
+    for (const img of imgs) {
+      if (img.naturalWidth >= 200 && img.naturalHeight >= 100 && !img.src.includes('icon') && !img.src.includes('logo')) {
+        return img.src;
+      }
+    }
+
+    return '';
+  }
+
   function getBestMediaSource(video) {
     if (video.currentSrc && !video.currentSrc.startsWith('blob:')) {
       return video.currentSrc;
@@ -757,9 +793,21 @@
             </div>
           </div>
 
-          <!-- Video Title Preview -->
-          <div style="font-size: 12px; font-weight: 600; color: #cbd5e1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 8px;" title="${rawTitle}">
-            ${rawTitle}
+          <!-- Video Title Preview with Thumbnail -->
+          <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+            ${(() => {
+              const thumb = getPageThumbnailUrl();
+              if (thumb) {
+                return `<div style="flex-shrink: 0; width: 72px; height: 42px; border-radius: 6px; overflow: hidden; background: #0f172a; border: 1px solid rgba(255,255,255,0.1);">
+                  <img src="${thumb}" onerror="this.src=this.src.replace('maxresdefault','hqdefault');this.onerror=null;" style="width:100%;height:100%;object-fit:cover;display:block;" />
+                </div>`;
+              }
+              return `<div style="flex-shrink: 0; width: 42px; height: 42px; border-radius: 6px; background: linear-gradient(135deg, rgba(37,99,235,0.2), rgba(6,182,212,0.2)); border: 1px solid rgba(6,182,212,0.2); display: flex; align-items: center; justify-content: center; font-size: 18px;">🎬</div>`;
+            })()}
+            <div style="min-width: 0; flex: 1;">
+              <div style="font-size: 12px; font-weight: 700; color: #f8fafc; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${rawTitle}">${rawTitle}</div>
+              <div style="font-size: 10px; color: #64748b; margin-top: 2px; font-family: monospace;">${window.location.hostname}</div>
+            </div>
           </div>
 
           <!-- Search Input Bar -->
@@ -1006,6 +1054,8 @@
       const isStreamSite = /youtube\.com|youtu\.be|googlevideo\.com|vimeo\.com|twitch\.tv|twitter\.com|x\.com|tiktok\.com|instagram\.com|facebook\.com|dailymotion\.com|reddit\.com|bilibili\.com|rumble\.com|bitchute\.com|odysee\.com/i.test(window.location.hostname);
       const targetUrl = (isStreamSite && !item.isDirectStream) ? window.location.href : (item.url || window.location.href);
 
+      const thumbnailUrl = getPageThumbnailUrl();
+
       const msg = {
         type: 'DOWNLOAD_URL',
         url: targetUrl,
@@ -1020,6 +1070,7 @@
         qualityLabel: item.badge || (item.height ? `${item.height}p` : undefined),
         clarity: item.badge || (item.height ? `${item.height}p` : undefined),
         resolution: item.resolution,
+        thumbnailUrl,
       };
 
       // Show the IDM-style Download File Info dialog box popup
@@ -1580,7 +1631,7 @@
         <div style="padding: 12px 14px; border-radius: 12px; background: rgba(2, 6, 23, 0.7); border: 1px solid rgba(51, 65, 85, 0.8); display: flex; align-items: center; gap: 14px;">
           ${thumbnailUrl ? `
             <div style="width: 80px; height: 54px; border-radius: 8px; overflow: hidden; background: #0f172a; border: 1px solid rgba(51, 65, 85, 0.8); flex-shrink: 0; position: relative;">
-              <img src="${thumbnailUrl}" style="width: 100%; height: 100%; object-fit: cover;" />
+              <img src="${thumbnailUrl}" onerror="this.src=this.src.replace('maxresdefault','hqdefault');this.onerror=null;" style="width: 100%; height: 100%; object-fit: cover;" />
               ${qualityBadge ? `<div style="position: absolute; bottom: 2px; right: 2px; padding: 1px 4px; border-radius: 4px; background: rgba(2, 6, 23, 0.9); font-size: 9px; font-weight: 800; color: #38bdf8; font-family: monospace;">${qualityBadge}</div>` : ''}
             </div>
           ` : `
