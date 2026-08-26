@@ -15,7 +15,6 @@ import {
 import { AppDatabase } from '../db/Database';
 import { DownloadStateMachine, DownloadLifecycleState } from './StateMachine';
 import { ServerPolicyEngine } from './ServerPolicyEngine';
-import { DynamicSegmentScheduler } from './DynamicSegmentScheduler';
 import { HttpDownloader } from './HttpDownloader';
 import { Http2Downloader } from './Http2Downloader';
 import { FtpDownloader } from './FtpDownloader';
@@ -233,6 +232,23 @@ export class DownloadEngine extends EventEmitter {
     checksum?: { algorithm: 'sha256' | 'sha512' | 'md5'; expected?: string };
     startImmediately?: boolean;
   }): Promise<DownloadItem> {
+    // Validate URL up-front: must be a string and must be a parseable http/https/ftp/ftps URL
+    if (!params.url || typeof params.url !== 'string' || !params.url.trim()) {
+      throw new Error('A valid URL is required');
+    }
+    const trimmedUrl = params.url.trim();
+    let parsedUrl: URL;
+    try {
+      parsedUrl = new URL(trimmedUrl);
+    } catch {
+      throw new Error(`Invalid URL: "${trimmedUrl}"`);
+    }
+    const allowedProtocols = new Set(['http:', 'https:', 'ftp:', 'ftps:']);
+    if (!allowedProtocols.has(parsedUrl.protocol)) {
+      throw new Error(`Unsupported protocol "${parsedUrl.protocol}". Only http, https, ftp, and ftps are allowed.`);
+    }
+    params = { ...params, url: trimmedUrl };
+
     const settings = this.db.getSettings();
 
     // Check duplicate
@@ -393,7 +409,7 @@ export class DownloadEngine extends EventEmitter {
       eta: 0,
       category,
       queueId,
-      priority: params.priority || 'normal',
+      priority,
       maxConnections: recommendedConns,
       activeConnections: 0,
       segments: [],
@@ -953,14 +969,17 @@ export class DownloadEngine extends EventEmitter {
               addCandidate(path.join(dir, item.filename));
             }
 
-            // Loose matching for stems (handles container conversions and yt-dlp intermediate chunks)
-            const stemsToMatch = [rawStem, cleanStem].filter((s) => s && s.length > 1);
+            // Loose matching for stems (handles container conversions and yt-dlp intermediate chunks).
+            // Only apply loose prefix matching when the stem is long enough (>= 8 chars) to avoid
+            // accidentally matching unrelated files whose names happen to start with a common prefix.
+            const SAFE_STEM_MIN_LEN = 8;
+            const stemsToMatch = [rawStem, cleanStem].filter((s) => s && s.length >= SAFE_STEM_MIN_LEN);
             try {
               const dirEntries = fs.readdirSync(dir);
               for (const entry of dirEntries) {
                 if (
                   entry === item.filename ||
-                  stemsToMatch.some((s) => entry === s || entry.startsWith(s))
+                  (stemsToMatch.length > 0 && stemsToMatch.some((s) => entry === s || entry.startsWith(s + '.')))
                 ) {
                   addCandidate(path.join(dir, entry));
                 }

@@ -43,10 +43,21 @@ export function createApiV1Router(engine: DownloadEngine, db: AppDatabase): Rout
 
   router.post('/downloads', async (req, res) => {
     try {
+      if (!req.body || typeof req.body.url !== 'string' || !req.body.url.trim()) {
+        return res.status(400).json({ error: 'url is required' });
+      }
       const item = await engine.addDownload(req.body);
       res.json(item);
     } catch (err: any) {
-      res.status(500).json({ error: err.message });
+      // Distinguish user-input errors (4xx) from unexpected server errors (5xx)
+      const msg: string = err.message || String(err);
+      const isClientError =
+        msg.toLowerCase().includes('invalid url') ||
+        msg.toLowerCase().includes('outside the permitted') ||
+        msg.toLowerCase().includes('skipped') ||
+        msg.toLowerCase().includes('already exists') ||
+        msg.toLowerCase().includes('outside the configured download directory');
+      res.status(isClientError ? 400 : 500).json({ error: msg });
     }
   });
 

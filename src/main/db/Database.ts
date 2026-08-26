@@ -576,8 +576,10 @@ export class AppDatabase {
 
   public getCrashLogs(limit = 50): CrashLogEntry[] {
     if (!this.db) return [];
+    // Clamp to a safe numeric range to prevent runaway SELECTs
+    const safeLimit = Math.max(1, Math.min(1000, Math.floor(Number(limit) || 50)));
     try {
-      const res = this.db.exec(`SELECT * FROM crash_logs ORDER BY timestamp DESC LIMIT ${limit}`);
+      const res = this.db.exec(`SELECT * FROM crash_logs ORDER BY timestamp DESC LIMIT ${safeLimit}`);
       if (res.length === 0) return [];
       const columns = res[0].columns;
       return res[0].values.map((val) => {
@@ -1265,5 +1267,37 @@ export class AppDatabase {
       this.db = null;
     }
     this.initPromise = null;
+  }
+
+  /**
+   * Execute a raw SQL statement (INSERT/CREATE/DELETE) against the underlying
+   * database. Used by subsystems such as RecoveryJournal that need ad-hoc
+   * table creation and inserts without exposing the full sql.js API.
+   *
+   * @returns true on success, false if the database is not initialised.
+   */
+  public runSql(sql: string, params?: any[]): boolean {
+    if (!this.db) return false;
+    try {
+      this.db.run(sql, params);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Execute a raw SQL SELECT and return the result rows. Used by subsystems
+   * that need to query tables not managed through the typed CRUD methods.
+   *
+   * @returns An array of result-set objects as returned by sql.js `exec()`.
+   */
+  public execSql(sql: string, params?: any[]): { columns: string[]; values: any[][] }[] {
+    if (!this.db) return [];
+    try {
+      return this.db.exec(sql, params) as { columns: string[]; values: any[][] }[];
+    } catch {
+      return [];
+    }
   }
 }

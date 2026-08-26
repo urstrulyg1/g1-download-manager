@@ -9,6 +9,9 @@ export interface WebhookConfig {
   triggerOnError: boolean;
 }
 
+/** Timeout for outbound webhook HTTP POST requests (10 s). */
+const WEBHOOK_TIMEOUT_MS = 10_000;
+
 export class WebhookTrigger {
   public static async executeTriggers(item: DownloadItem, config: WebhookConfig): Promise<{ webhookSent: boolean; scriptExecuted: boolean }> {
     let webhookSent = false;
@@ -18,29 +21,46 @@ export class WebhookTrigger {
 
     // 1. Send Webhook HTTP POST
     if (config.webhookUrl) {
+      // Basic sanity check — only allow http/https destinations
+      let parsedWebhookUrl: URL | null = null;
       try {
-        const payload = {
-          event: item.status === 'completed' ? 'download_completed' : 'download_failed',
-          download: {
-            id: item.id,
-            filename: item.filename,
-            url: item.url,
-            finalPath: item.finalPath,
-            totalBytes: item.totalBytes,
-            downloadedBytes: item.downloadedBytes,
-            durationMs: item.durationMs,
-          },
-          timestamp: Date.now(),
-        };
-
-        const res = await fetch(config.webhookUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        });
-        webhookSent = res.ok;
+        parsedWebhookUrl = new URL(config.webhookUrl);
       } catch {
-        webhookSent = false;
+        // malformed URL — skip
+      }
+
+      if (parsedWebhookUrl && (parsedWebhookUrl.protocol === 'http:' || parsedWebhookUrl.protocol === 'https:')) {
+        try {
+          const payload = {
+            event: item.status === 'completed' ? 'download_completed' : 'download_failed',
+            download: {
+              id: item.id,
+              filename: item.filename,
+              url: item.url,
+              finalPath: item.finalPath,
+              totalBytes: item.totalBytes,
+              downloadedBytes: item.downloadedBytes,
+              durationMs: item.durationMs,
+            },
+            timestamp: Date.now(),
+          };
+
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), WEBHOOK_TIMEOUT_MS);
+          try {
+            const res = await fetch(config.webhookUrl, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload),
+              signal: controller.signal,
+            });
+            webhookSent = res.ok;
+          } finally {
+            clearTimeout(timeoutId);
+          }
+        } catch {
+          webhookSent = false;
+        }
       }
     }
 

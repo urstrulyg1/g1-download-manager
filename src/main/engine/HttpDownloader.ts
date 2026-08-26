@@ -35,6 +35,9 @@ export class HttpDownloader extends EventEmitter {
   private minSplitThresholdBytes = 1024 * 1024; // 1MB minimum remaining to warrant splitting
   private nextSegmentId = 1;
 
+  /** Maximum number of HTTP redirects to follow before aborting. */
+  private static readonly MAX_REDIRECTS = 10;
+
   constructor(item: DownloadItem, rateLimiter?: TokenBucketRateLimiter) {
     super();
     this.item = item;
@@ -283,11 +286,19 @@ export class HttpDownloader extends EventEmitter {
       const req = reqModule.request(targetUrl, reqOptions, (res) => {
         const statusCode = res.statusCode || 200;
 
-        // Redirect handling
+        // Redirect handling — enforce a maximum depth to prevent infinite loops
         if (
           (statusCode === 301 || statusCode === 302 || statusCode === 303 || statusCode === 307 || statusCode === 308) &&
           res.headers.location
         ) {
+          if (this.item.serverCapabilities.redirectChain.length >= HttpDownloader.MAX_REDIRECTS) {
+            res.destroy();
+            this.activeSockets.delete(segment.id);
+            segment.status = 'failed';
+            segment.error = `Too many redirects (>${HttpDownloader.MAX_REDIRECTS})`;
+            resolve();
+            return;
+          }
           const newUrl = new URL(res.headers.location, targetUrl).href;
           this.item.serverCapabilities.redirectChain.push(newUrl);
           res.destroy();
@@ -480,10 +491,16 @@ export class HttpDownloader extends EventEmitter {
       const req = reqModule.request(targetUrl, reqOptions, (res) => {
         const statusCode = res.statusCode || 200;
 
+        // Redirect handling — enforce a maximum depth to prevent infinite loops
         if (
           (statusCode === 301 || statusCode === 302 || statusCode === 303 || statusCode === 307 || statusCode === 308) &&
           res.headers.location
         ) {
+          if (this.item.serverCapabilities.redirectChain.length >= HttpDownloader.MAX_REDIRECTS) {
+            res.destroy();
+            reject(new Error(`Too many redirects (>${HttpDownloader.MAX_REDIRECTS})`));
+            return;
+          }
           const newUrl = new URL(res.headers.location, targetUrl).href;
           this.item.serverCapabilities.redirectChain.push(newUrl);
           res.destroy();

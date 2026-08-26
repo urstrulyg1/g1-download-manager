@@ -1024,30 +1024,18 @@ export async function createUnifiedServer(port: number = 8055) {
   const { createApiV1Router } = require('./api/ApiV1');
   app.use('/api/v1', createApiV1Router(engine, db));
 
-  // Automation Rules Engine
-  const { RuleEngine } = require('./automation/RuleEngine');
-  const ruleEngine = new RuleEngine();
-
-  app.get('/api/rules', (req, res) => {
-    res.json(ruleEngine.getRules());
-  });
-
-  app.post('/api/rules', (req, res) => {
-    ruleEngine.setRules(req.body);
-    res.json(ruleEngine.getRules());
-  });
-
+  // Automation Rules Engine execution logs (engine.getRuleEngine() is the canonical instance)
   app.get('/api/rules/logs', (req, res) => {
-    res.json(ruleEngine.getExecutionLogs());
+    res.json(engine.getRuleEngine().getExecutionLogs());
   });
 
-  // Storage Pools
+  // Storage Pools — resolved fresh on each request so settings changes are reflected
   const { StoragePoolManager } = require('./storage/StoragePoolManager');
-  const appSettings = db.getSettings();
-  const storagePoolMgr = new StoragePoolManager([appSettings.general.defaultDownloadDir]);
 
   app.get('/api/storage/pools', (req, res) => {
-    res.json(storagePoolMgr.getAllPools());
+    const currentSettings = db.getSettings();
+    const poolMgr = new StoragePoolManager([currentSettings.general.defaultDownloadDir]);
+    res.json(poolMgr.getAllPools());
   });
 
   // Templates & Favorites

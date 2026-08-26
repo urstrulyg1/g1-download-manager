@@ -20,6 +20,23 @@ export interface RecoveryJournalEntry {
 }
 
 export class RecoveryJournal {
+  /** Ensure the recovery_journal table exists exactly once per database instance. */
+  private static tableEnsured = new WeakSet<AppDatabase>();
+
+  private static ensureTable(db: AppDatabase): void {
+    if (RecoveryJournal.tableEnsured.has(db)) return;
+    db.runSql(`
+      CREATE TABLE IF NOT EXISTS recovery_journal (
+        id TEXT PRIMARY KEY,
+        downloadId TEXT NOT NULL,
+        eventType TEXT NOT NULL,
+        payloadJson TEXT NOT NULL,
+        timestamp INTEGER NOT NULL
+      );
+    `);
+    RecoveryJournal.tableEnsured.add(db);
+  }
+
   public static logEvent(
     db: AppDatabase,
     downloadId: string,
@@ -34,35 +51,22 @@ export class RecoveryJournal {
       timestamp: Date.now(),
     };
 
-    // Stored in the DB memory/disk transaction journal
     try {
-      (db as any).db?.run(
-        `
-        CREATE TABLE IF NOT EXISTS recovery_journal (
-          id TEXT PRIMARY KEY,
-          downloadId TEXT NOT NULL,
-          eventType TEXT NOT NULL,
-          payloadJson TEXT NOT NULL,
-          timestamp INTEGER NOT NULL
-        );
-      `
-      );
-
-      (db as any).db?.run(
-        `
-        INSERT INTO recovery_journal (id, downloadId, eventType, payloadJson, timestamp)
-        VALUES (?, ?, ?, ?, ?)
-      `,
+      RecoveryJournal.ensureTable(db);
+      db.runSql(
+        `INSERT INTO recovery_journal (id, downloadId, eventType, payloadJson, timestamp)
+         VALUES (?, ?, ?, ?, ?)`,
         [entry.id, entry.downloadId, entry.eventType, entry.payloadJson, entry.timestamp]
       );
     } catch {
-      // ignore
+      // ignore — journal is best-effort
     }
   }
 
   public static getEventsForDownload(db: AppDatabase, downloadId: string): RecoveryJournalEntry[] {
     try {
-      const res = (db as any).db?.exec(
+      RecoveryJournal.ensureTable(db);
+      const res = db.execSql(
         'SELECT * FROM recovery_journal WHERE downloadId = ? ORDER BY timestamp ASC',
         [downloadId]
       );
@@ -71,7 +75,7 @@ export class RecoveryJournal {
       return res[0].values.map((v: any) => {
         const row: any = {};
         cols.forEach((c: string, i: number) => (row[c] = v[i]));
-        return row;
+        return row as RecoveryJournalEntry;
       });
     } catch {
       return [];
