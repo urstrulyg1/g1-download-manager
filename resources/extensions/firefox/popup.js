@@ -41,7 +41,20 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   openAppBtn.addEventListener('click', () => {
-    chrome.tabs.create({ url: 'http://127.0.0.1:8055' });
+    const runtimeTabs = (typeof browser !== 'undefined' && browser.tabs) ? browser.tabs : chrome.tabs;
+    runtimeTabs.query({}, (tabs) => {
+      const existing = tabs?.find((t) => t.url && (t.url.startsWith('http://127.0.0.1:8055') || t.url.startsWith('http://localhost:8055')));
+      if (existing && existing.id) {
+        runtimeTabs.update(existing.id, { active: true });
+        if (existing.windowId) {
+          chrome.windows.update(existing.windowId, { focused: true });
+        }
+        if (runtimeTabs.reload) runtimeTabs.reload(existing.id);
+      } else {
+        runtimeTabs.create({ url: 'http://127.0.0.1:8055' });
+      }
+      window.close();
+    });
   });
 
   // Query engine health

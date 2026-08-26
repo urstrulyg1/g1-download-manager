@@ -206,46 +206,40 @@ _add_browser() {
 
 if [[ "$OS_PLATFORM" == "Darwin" ]]; then
     if [ -d "/Applications/Google Chrome.app" ]; then
-        _add_browser "Google Chrome (with G1DM Companion)" "'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' --load-extension='${CHROME_EXT_DIR}'" "⚡" "ext"
+        _add_browser "Google Chrome (with G1DM Companion)" "Google Chrome" "⚡" "ext"
     fi
     if [ -d "/Applications/Brave Browser.app" ]; then
-        _add_browser "Brave Browser (with G1DM Companion)" "'/Applications/Brave Browser.app/Contents/MacOS/Brave Browser' --load-extension='${CHROME_EXT_DIR}'" "🦁" "ext"
+        _add_browser "Brave Browser (with G1DM Companion)" "Brave Browser" "🦁" "ext"
     fi
     if [ -d "/Applications/Microsoft Edge.app" ]; then
-        _add_browser "Microsoft Edge (with G1DM Companion)" "'/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge' --load-extension='${CHROME_EXT_DIR}'" "🌊" "ext"
+        _add_browser "Microsoft Edge (with G1DM Companion)" "Microsoft Edge" "🌊" "ext"
     fi
     if [ -d "/Applications/Firefox.app" ]; then
-        _add_browser "Firefox" "open -a '/Applications/Firefox.app'" "🦊" "plain"
+        _add_browser "Firefox" "Firefox" "🦊" "plain"
     fi
     if [ -d "/Applications/Safari.app" ]; then
-        _add_browser "Safari" "open -a '/Applications/Safari.app'" "🧭" "plain"
+        _add_browser "Safari" "Safari" "🧭" "plain"
     fi
 else
     for _bin in google-chrome google-chrome-stable chromium chromium-browser; do
         if command -v "$_bin" >/dev/null 2>&1; then
-            _add_browser "Google Chrome / Chromium" "${_bin} --load-extension='${CHROME_EXT_DIR}'" "⚡" "ext"
+            _add_browser "Google Chrome / Chromium" "${_bin}" "⚡" "ext"
             break
         fi
     done
     if command -v brave-browser >/dev/null 2>&1; then
-        _add_browser "Brave Browser" "brave-browser --load-extension='${CHROME_EXT_DIR}'" "🦁" "ext"
+        _add_browser "Brave Browser" "brave-browser" "🦁" "ext"
     fi
     if command -v microsoft-edge >/dev/null 2>&1 || command -v microsoft-edge-stable >/dev/null 2>&1; then
         _EDGE_BIN=$(command -v microsoft-edge-stable 2>/dev/null || command -v microsoft-edge)
-        _add_browser "Microsoft Edge" "${_EDGE_BIN} --load-extension='${CHROME_EXT_DIR}'" "🌊" "ext"
+        _add_browser "Microsoft Edge" "${_EDGE_BIN}" "🌊" "ext"
     fi
     if command -v firefox >/dev/null 2>&1; then
         _add_browser "Firefox" "firefox" "🦊" "plain"
     fi
 fi
 
-if [[ "$OS_PLATFORM" == "Darwin" ]]; then
-    _DEFAULT_OPEN="open"
-else
-    _DEFAULT_OPEN="xdg-open"
-fi
-
-_add_browser "Default System Browser" "$_DEFAULT_OPEN" "🌐" "plain"
+_add_browser "Default System Browser" "default" "🌐" "plain"
 _add_browser "Headless / Daemon Only (no browser window)" "" "🛡️" "headless"
 
 echo -e "  ${CYAN}${BOLD}🌐  SELECT LAUNCH TARGET${RESET}"
@@ -395,10 +389,99 @@ echo -e "  ${GREEN}│${RESET}"
 echo -e "  ${GREEN}└── ${EMERALD}${BOLD}ONLINE${RESET} ${DARK_GRAY}──────────────────────────────────────────────────────────────${RESET}"
 echo ""
 
-# Launch target browser
+launch_or_focus_browser() {
+    local target_app="$1"
+    local target_url="$2"
+
+    [ -z "$target_app" ] && return 0
+
+    if [[ "$OS_PLATFORM" == "Darwin" ]]; then
+        case "$target_app" in
+            "Google Chrome"|"Brave Browser"|"Microsoft Edge")
+                osascript 2>/dev/null <<EOF || open -a "${target_app}" "${target_url}" 2>/dev/null || open "${target_url}"
+tell application "${target_app}"
+    if it is running then
+        set foundTab to false
+        repeat with w in windows
+            set tabIndex to 1
+            repeat with t in tabs of w
+                set tUrl to URL of t
+                if tUrl starts with "http://127.0.0.1:${PORT}" or tUrl starts with "http://localhost:${PORT}" then
+                    set active tab index of w to tabIndex
+                    set index of w to 1
+                    tell t to reload
+                    set foundTab to true
+                    exit repeat
+                end if
+                set tabIndex to tabIndex + 1
+            end repeat
+            if foundTab then exit repeat
+        end repeat
+        if not foundTab then
+            open location "${target_url}"
+        end if
+        activate
+    else
+        open location "${target_url}"
+        activate
+    end if
+end tell
+EOF
+                ;;
+            "Safari")
+                osascript 2>/dev/null <<EOF || open -a "Safari" "${target_url}" 2>/dev/null || open "${target_url}"
+tell application "Safari"
+    if it is running then
+        set foundTab to false
+        repeat with w in windows
+            set tabIndex to 1
+            repeat with t in tabs of w
+                set tUrl to URL of t
+                if tUrl starts with "http://127.0.0.1:${PORT}" or tUrl starts with "http://localhost:${PORT}" then
+                    set current tab of w to t
+                    set index of w to 1
+                    set URL of t to "${target_url}"
+                    set foundTab to true
+                    exit repeat
+                end if
+                set tabIndex to tabIndex + 1
+            end repeat
+            if foundTab then exit repeat
+        end repeat
+        if not foundTab then
+            open location "${target_url}"
+        end if
+        activate
+    else
+        open location "${target_url}"
+        activate
+    end if
+end tell
+EOF
+                ;;
+            "Firefox")
+                open -a "/Applications/Firefox.app" "${target_url}" 2>/dev/null || open "${target_url}" 2>/dev/null || true
+                ;;
+            *)
+                open "${target_url}" 2>/dev/null || true
+                ;;
+        esac
+    else
+        case "$target_app" in
+            "google-chrome"|"brave-browser"|"microsoft-edge"|"chromium")
+                "${target_app}" "${target_url}" >/dev/null 2>&1 &
+                ;;
+            *)
+                xdg-open "${target_url}" >/dev/null 2>&1 || sensible-browser "${target_url}" >/dev/null 2>&1 || true
+                ;;
+        esac
+    fi
+}
+
+# Launch or focus target browser tab
 if [ -n "$OPEN_BROWSER_CMD" ]; then
     echo -e "  ${AQUA}✨  Connecting to ${WHITE}${BOLD}${SELECTED_BROWSER_NAME}${RESET}${AQUA}...${RESET}"
-    eval "$OPEN_BROWSER_CMD \"$URL\"" >/dev/null 2>&1 &
+    launch_or_focus_browser "$OPEN_BROWSER_CMD" "$URL" &
 fi
 
 echo -e "  ${DARK_GRAY}───────────────────────────────────────────────────────────────────────────────${RESET}"

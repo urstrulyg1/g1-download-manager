@@ -35,14 +35,18 @@ browser.runtime.onInstalled.addListener(() => {
 });
 
 function openOrFocusG1DMTab(url) {
-  chrome.tabs.query({ url: `http://127.0.0.1:${G1DM_PORT}/*` }, (tabs) => {
-    if (tabs && tabs.length > 0) {
-      chrome.tabs.update(tabs[0].id, { url, active: true });
-      if (tabs[0].windowId) {
-        chrome.windows.update(tabs[0].windowId, { focused: true });
+  chrome.tabs.query({}, (tabs) => {
+    const targetBase = `http://127.0.0.1:${G1DM_PORT}`;
+    const targetHost = `http://localhost:${G1DM_PORT}`;
+    const existing = tabs?.find((t) => t.url && (t.url.startsWith(targetBase) || t.url.startsWith(targetHost)));
+    if (existing && existing.id) {
+      chrome.tabs.update(existing.id, { url: url || existing.url, active: true });
+      if (existing.windowId) {
+        chrome.windows.update(existing.windowId, { focused: true });
       }
+      chrome.tabs.reload(existing.id);
     } else {
-      chrome.tabs.create({ url });
+      chrome.tabs.create({ url: url || targetBase });
     }
   });
 }
