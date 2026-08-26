@@ -1,6 +1,7 @@
 // G1DM Safari Companion Extension Background Service Worker
 const G1DM_PORT = 8055;
 const G1DM_API_BASE = `http://127.0.0.1:${G1DM_PORT}/api`;
+const DEFAULT_EXTENSIONS = ['zip', 'exe', 'iso', 'dmg', 'tar', 'gz', 'mp4', 'mkv', 'mp3', 'pdf', '7z', 'rar', 'msi', 'apk', 'deb', 'rpm'];
 
 browser.runtime.onInstalled.addListener(() => {
   browser.storage.local.get(['interceptionEnabled', 'interceptExtensions', 'excludeDomains'], (data) => {
@@ -99,6 +100,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   } else if (message.type === 'PROBE_URL') {
     probeUrl(message.url).then(sendResponse);
     return true; // async
+  } else if (message.type === 'SECURE_DETECT') {
+    secureDetectMedia(message.url).then(sendResponse);
+    return true; // async
   } else if (message.type === 'OPEN_G1DM_STUDIO') {
     const target = message.url ? `http://127.0.0.1:${G1DM_PORT}/#media?url=${encodeURIComponent(message.url)}` : `http://127.0.0.1:${G1DM_PORT}/#media`;
     openOrFocusG1DMTab(target);
@@ -108,6 +112,22 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true; // async
   }
 });
+
+async function secureDetectMedia(url) {
+  try {
+    const res = await fetch(`${G1DM_API_BASE}/media/secure-detect`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url }),
+    });
+    if (res.ok) {
+      return await res.json();
+    }
+  } catch (err) {
+    console.warn('[G1DM Companion] Secure detect request failed:', err);
+  }
+  return { error: 'Secure detect failed' };
+}
 
 async function probeUrl(url) {
   try {

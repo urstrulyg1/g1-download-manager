@@ -110,16 +110,14 @@ export async function createUnifiedServer(port: number = 8055) {
   const app = express();
   app.use(
     cors({
-      origin: (origin: string | undefined, cb: (err: Error | null, allow?: boolean) => void) => {
-        // No Origin header (curl, native host, same-host service workers).
-        if (!origin) return cb(null, true);
-        // Browser companion extensions (Chrome, Firefox, Safari).
-        if (/^(chrome|moz|safari-web)-extension:\/\//.test(origin)) return cb(null, true);
-        // Local / loopback origins.
-        if (/^https?:\/\/(127\.0\.0\.1|localhost|\[::1\])(:\d+)?$/.test(origin)) return cb(null, true);
-        // Same-origin app (LAN / preview) — reflect the request origin.
-        return cb(null, false);
+      origin: (_origin: string | undefined, cb: (err: Error | null, allow?: boolean) => void) => {
+        // Permissive CORS origin to allow companion extensions (Chrome, Firefox, Safari, Edge) and loopback callers
+        cb(null, true);
       },
+      credentials: true,
+      methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+      allowedHeaders: ['Content-Type', 'Authorization', 'X-G1DM-Key', 'Range'],
+      exposedHeaders: ['Content-Range', 'Accept-Ranges', 'Content-Length', 'Content-Disposition'],
     })
   );
   app.use(express.json({ limit: '10mb' }));

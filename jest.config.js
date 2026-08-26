@@ -11,6 +11,7 @@ module.exports = {
     '^.+\\.tsx?$': ['ts-jest', { tsconfig: 'tsconfig.json' }],
   },
   testTimeout: 30000,
+  setupFilesAfterEnv: ['<rootDir>/test/jest-setup.ts'],
   collectCoverageFrom: [
     'src/main/**/*.ts',
     'src/shared/**/*.ts',

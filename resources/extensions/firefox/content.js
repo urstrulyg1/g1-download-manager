@@ -308,27 +308,37 @@
     if (!pageUrl || !pageUrl.startsWith('http') || pageUrl === lastProbedUrl) return;
     lastProbedUrl = pageUrl;
 
-    fetch('http://127.0.0.1:8055/api/media/secure-detect', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url: pageUrl })
-    })
-      .then(res => res.json())
-      .then(data => {
-        if (data && !data.error) {
-          const recH = data.recommendedQuality?.height;
-          const availH = Array.isArray(data.availableVideoQualities) && data.availableVideoQualities.length > 0
-            ? Math.max(...data.availableVideoQualities.map(q => q.height || 0))
-            : 0;
-          const maxH = recH || availH;
-          if (maxH > 0) {
-            probedMaxResolution = maxH;
-            document.documentElement.setAttribute('data-g1dm-max-height', String(maxH));
-            updateAllOverlays();
-          }
+    const handleData = (data) => {
+      if (data && !data.error) {
+        const recH = data.recommendedQuality?.height;
+        const availH = Array.isArray(data.availableVideoQualities) && data.availableVideoQualities.length > 0
+          ? Math.max(...data.availableVideoQualities.map(q => q.height || 0))
+          : 0;
+        const maxH = recH || availH;
+        if (maxH > 0) {
+          probedMaxResolution = maxH;
+          document.documentElement.setAttribute('data-g1dm-max-height', String(maxH));
+          updateAllOverlays();
         }
+      }
+    };
+
+    if (runtimeApi && runtimeApi.sendMessage) {
+      runtimeApi.sendMessage({ type: 'SECURE_DETECT', url: pageUrl }, (response) => {
+        if (!chrome.runtime.lastError && response) {
+          handleData(response);
+        }
+      });
+    } else {
+      fetch('http://127.0.0.1:8055/api/media/secure-detect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: pageUrl })
       })
-      .catch(() => {});
+        .then(res => res.json())
+        .then(handleData)
+        .catch(() => {});
+    }
   }
 
   function detectMaxAvailableResolution(video) {
@@ -1098,13 +1108,38 @@
         startImmediately: startImmediately
       };
 
+      const startBtn = dialog.querySelector('#g1dm-btn-start');
+      const laterBtn = dialog.querySelector('#g1dm-btn-later');
+      if (startBtn) startBtn.disabled = true;
+      if (laterBtn) laterBtn.disabled = true;
+
+      const onSuccess = () => {
+        closeModal();
+        showDownloadToast(startImmediately ? '✓ Download Started' : '✓ Queued in G1DM', finalName);
+      };
+
+      const onError = (errMsg) => {
+        console.warn('[G1DM Extension] Submission notification:', errMsg);
+        closeModal();
+        showDownloadToast(startImmediately ? '✓ Download Started' : '✓ Queued in G1DM', finalName);
+        if (runtimeApi && runtimeApi.sendMessage) {
+          runtimeApi.sendMessage({
+            type: 'OPEN_G1DM_STUDIO',
+            url: finalUrl
+          });
+        }
+      };
+
       if (runtimeApi && runtimeApi.sendMessage) {
         runtimeApi.sendMessage({
           type: 'DOWNLOAD_URL',
           ...payload
-        }, () => {
-          closeModal();
-          showDownloadToast(startImmediately ? '✓ Download Started' : '✓ Queued in G1DM', finalName);
+        }, (res) => {
+          if (chrome.runtime.lastError || (res && res.success === false)) {
+            onError(res?.error || chrome.runtime.lastError?.message);
+          } else {
+            onSuccess();
+          }
         });
       } else {
         fetch('http://127.0.0.1:8055/api/downloads', {
@@ -1112,14 +1147,12 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
         })
-          .then(() => {
-            closeModal();
-            showDownloadToast(startImmediately ? '✓ Download Started' : '✓ Queued in G1DM', finalName);
+          .then((res) => {
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            return res.json();
           })
-          .catch(() => {
-            closeModal();
-            showDownloadToast(startImmediately ? '✓ Download Started' : '✓ Queued in G1DM', finalName);
-          });
+          .then(() => onSuccess())
+          .catch((err) => onError(err.message));
       }
     };
 
@@ -1143,6 +1176,40 @@
     };
     document.addEventListener('keydown', keyHandler);
   }
+
+  // Intercept downloadable link clicks
+  const DOWNLOAD_LINK_REGEX = /\.(zip|rar|7z|tar|gz|bz2|xz|iso|dmg|pkg|exe|msi|apk|deb|rpm|mp4|mkv|webm|avi|mov|mp3|flac|wav|aac|ogg|opus|pdf|epub|mobi)(\?.*)?$/i;
+
+  document.addEventListener('click', (e) => {
+    const link = e.target.closest('a');
+    if (!link || !link.href) return;
+    const href = link.href;
+    if (!href.startsWith('http://') && !href.startsWith('https://') && !href.startsWith('ftp://')) return;
+
+    const hasDownloadAttr = link.hasAttribute('download');
+    const isDownloadUrl = DOWNLOAD_LINK_REGEX.test(href);
+
+    if (hasDownloadAttr || isDownloadUrl) {
+      if (e.altKey || isDownloadUrl || hasDownloadAttr) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        let inferredName = '';
+        try {
+          const u = new URL(href);
+          const pathname = u.pathname;
+          const leaf = pathname.split('/').filter(Boolean).pop();
+          if (leaf) inferredName = decodeURIComponent(leaf);
+        } catch {}
+
+        showDownloadFileInfoModal({
+          url: href,
+          filename: inferredName || link.getAttribute('download') || 'download',
+          category: 'other'
+        });
+      }
+    }
+  }, true);
 
   function showDownloadToast(status, filename) {
     const existing = document.getElementById('g1dm-toast-root');

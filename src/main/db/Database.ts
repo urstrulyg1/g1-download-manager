@@ -1,6 +1,7 @@
 import initSqlJs, { Database as SqlJsDatabase } from 'sql.js';
 import * as fs from 'fs';
 import * as path from 'path';
+import * as os from 'os';
 import {
   DownloadItem,
   SegmentInfo,
@@ -50,7 +51,17 @@ export class AppDatabase {
   }
 
   private static resolveDefaultDownloadDir(): string {
-    return process.env.G1DM_DOWNLOAD_DIR || path.join(AppDatabase.resolveHomeDir(), 'Downloads');
+    if (process.env.G1DM_DOWNLOAD_DIR) {
+      return process.env.G1DM_DOWNLOAD_DIR;
+    }
+    if (process.env.NODE_ENV === 'test' || typeof (global as any).it === 'function') {
+      const testDir = path.join(os.tmpdir(), 'g1dm_test_downloads');
+      if (!fs.existsSync(testDir)) {
+        try { fs.mkdirSync(testDir, { recursive: true }); } catch {}
+      }
+      return testDir;
+    }
+    return path.join(AppDatabase.resolveHomeDir(), 'Downloads');
   }
 
   private readonly defaultSettings: AppSettings = {

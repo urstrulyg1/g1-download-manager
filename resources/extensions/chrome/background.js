@@ -85,6 +85,8 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
 // Context-menu/content-script actions submit URLs to G1DM before a browser
 // download is started; G1DM's DownloadEngine owns the transfer.
 
+const DEFAULT_EXTENSIONS = ['zip', 'exe', 'iso', 'dmg', 'tar', 'gz', 'mp4', 'mkv', 'mp3', 'pdf', '7z', 'rar', 'msi', 'apk', 'deb', 'rpm'];
+
 // Messages from content scripts / popup
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'DOWNLOAD_URL') {
@@ -110,6 +112,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     logToCore('info', `Probing video stream URL: ${message.url}`);
     probeUrl(message.url).then(sendResponse);
     return true; // async
+  } else if (message.type === 'SECURE_DETECT') {
+    secureDetectMedia(message.url).then(sendResponse);
+    return true; // async
   } else if (message.type === 'OPEN_G1DM_STUDIO') {
     logToCore('info', `Opening G1DM Studio for URL: ${message.url || 'general'}`);
     const target = message.url ? `http://127.0.0.1:${G1DM_PORT}/#media?url=${encodeURIComponent(message.url)}` : `http://127.0.0.1:${G1DM_PORT}/#media`;
@@ -120,6 +125,22 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true; // async
   }
 });
+
+async function secureDetectMedia(url) {
+  try {
+    const res = await fetch(`${G1DM_API_BASE}/media/secure-detect`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url }),
+    });
+    if (res.ok) {
+      return await res.json();
+    }
+  } catch (err) {
+    console.warn('[G1DM Companion] Secure detect request failed:', err);
+  }
+  return { error: 'Secure detect failed' };
+}
 
 async function probeUrl(url) {
   try {

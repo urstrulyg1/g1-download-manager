@@ -253,8 +253,25 @@ export function useDownloadEngine() {
     connectWebSocket();
     refreshAll();
 
+    // Background sync every 3s to guarantee extension & CLI downloads reconcile immediately
+    const pollInterval = setInterval(() => {
+      if (isMountedRef.current) {
+        refreshAll();
+      }
+    }, 3000);
+
+    // Sync on tab/window focus
+    const onFocus = () => {
+      if (isMountedRef.current) {
+        refreshAll();
+      }
+    };
+    window.addEventListener('focus', onFocus);
+
     return () => {
       isMountedRef.current = false;
+      clearInterval(pollInterval);
+      window.removeEventListener('focus', onFocus);
       if (reconnectTimerRef.current) {
         clearTimeout(reconnectTimerRef.current);
         reconnectTimerRef.current = null;

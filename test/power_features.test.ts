@@ -31,6 +31,13 @@ describe('G1DM Master Power Features Suite', () => {
     }
     db = new AppDatabase(':memory:');
     await db.init();
+    const settings = db.getSettings();
+    settings.general.defaultDownloadDir = tempDir;
+    db.saveSettings(settings);
+    for (const cat of db.getCategories()) {
+      cat.defaultDestination = tempDir;
+      db.saveCategory(cat);
+    }
     engine = new DownloadEngine(db);
     await engine.init();
   });
