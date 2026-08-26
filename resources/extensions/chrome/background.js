@@ -135,6 +135,48 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     const target = message.url ? `http://127.0.0.1:${G1DM_PORT}/#media?url=${encodeURIComponent(message.url)}` : `http://127.0.0.1:${G1DM_PORT}/#media`;
     openOrFocusG1DMTab(target);
     sendResponse({ success: true });
+  } else if (message.type === 'GET_DOWNLOAD_PROGRESS') {
+    fetch(`${G1DM_API_BASE}/downloads/${message.id}`)
+      .then((r) => r.json())
+      .then((data) => sendResponse({ success: true, data }))
+      .catch((err) => sendResponse({ success: false, error: err.message }));
+    return true;
+  } else if (message.type === 'PAUSE_DOWNLOAD') {
+    fetch(`${G1DM_API_BASE}/downloads/${message.id}/pause`, { method: 'POST' })
+      .then((r) => r.json())
+      .then((data) => sendResponse({ success: true, data }))
+      .catch((err) => sendResponse({ success: false, error: err.message }));
+    return true;
+  } else if (message.type === 'RESUME_DOWNLOAD') {
+    fetch(`${G1DM_API_BASE}/downloads/${message.id}/resume`, { method: 'POST' })
+      .then((r) => r.json())
+      .then((data) => sendResponse({ success: true, data }))
+      .catch((err) => sendResponse({ success: false, error: err.message }));
+    return true;
+  } else if (message.type === 'CANCEL_DOWNLOAD') {
+    fetch(`${G1DM_API_BASE}/downloads/${message.id}/cancel`, { method: 'POST' })
+      .then((r) => r.json())
+      .then((data) => sendResponse({ success: true, data }))
+      .catch((err) => sendResponse({ success: false, error: err.message }));
+    return true;
+  } else if (message.type === 'RETRY_DOWNLOAD') {
+    fetch(`${G1DM_API_BASE}/downloads/${message.id}/retry`, { method: 'POST' })
+      .then((r) => r.json())
+      .then((data) => sendResponse({ success: true, data }))
+      .catch((err) => sendResponse({ success: false, error: err.message }));
+    return true;
+  } else if (message.type === 'OPEN_DOWNLOAD_FILE') {
+    fetch(`${G1DM_API_BASE}/downloads/${message.id}/open-file`, { method: 'POST' })
+      .then((r) => r.json())
+      .then((data) => sendResponse({ success: true, data }))
+      .catch((err) => sendResponse({ success: false, error: err.message }));
+    return true;
+  } else if (message.type === 'OPEN_DOWNLOAD_FOLDER') {
+    fetch(`${G1DM_API_BASE}/downloads/${message.id}/open-folder`, { method: 'POST' })
+      .then((r) => r.json())
+      .then((data) => sendResponse({ success: true, data }))
+      .catch((err) => sendResponse({ success: false, error: err.message }));
+    return true;
   } else if (message.type === 'TEST_CONNECTION') {
     testG1DMConnection().then(sendResponse);
     return true; // async

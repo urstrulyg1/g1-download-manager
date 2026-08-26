@@ -1094,9 +1094,13 @@
       if (startBtn) startBtn.disabled = true;
       if (laterBtn) laterBtn.disabled = true;
 
-      const onSuccess = () => {
+      const onSuccess = (createdItem) => {
         closeModal();
-        showDownloadToast(startImmediately ? '✓ Download Started' : '✓ Queued in G1DM', finalName);
+        if (startImmediately) {
+          showInPageProgressModal(createdItem || payload, payload);
+        } else {
+          showDownloadToast('✓ Queued in G1DM', finalName);
+        }
       };
 
       const onError = (errMsg) => {
@@ -1113,7 +1117,7 @@
           if (chrome.runtime.lastError || (res && res.success === false)) {
             onError(res?.error || chrome.runtime.lastError?.message);
           } else {
-            onSuccess();
+            onSuccess(res?.result);
           }
         });
       } else {
@@ -1126,7 +1130,7 @@
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             return res.json();
           })
-          .then(() => onSuccess())
+          .then((createdItem) => onSuccess(createdItem))
           .catch((err) => onError(err.message));
       }
     };
@@ -1185,6 +1189,482 @@
       }
     }
   }, true);
+
+  // ── IN-PAGE LIVE IDM DOWNLOAD PROGRESS POPUP DIALOG ─────────────────────────
+  function showInPageProgressModal(initialItem, submitPayload) {
+    const existing = document.getElementById('g1dm-progress-overlay');
+    if (existing) existing.remove();
+    const existingPill = document.getElementById('g1dm-progress-pill');
+    if (existingPill) existingPill.remove();
+
+    let downloadId = initialItem?.id || initialItem?.downloadId;
+    let item = initialItem || {};
+    let pollInterval = null;
+
+    const overlay = document.createElement('div');
+    overlay.id = 'g1dm-progress-overlay';
+    overlay.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(2, 6, 23, 0.75);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      z-index: 2147483647;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      animation: g1dm-fade-in 0.2s ease-out;
+      box-sizing: border-box;
+    `;
+
+    const dialog = document.createElement('div');
+    dialog.id = 'g1dm-progress-dialog';
+    dialog.style.cssText = `
+      width: 620px;
+      max-width: 95vw;
+      background: #0f172a;
+      border: 1px solid rgba(51, 65, 85, 0.9);
+      border-radius: 18px;
+      box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.8), 0 0 35px rgba(14, 165, 233, 0.25);
+      color: #f8fafc;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      animation: g1dm-scale-in 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+      user-select: none;
+      position: relative;
+    `;
+
+    const formatBytes = (bytes) => {
+      if (!bytes || bytes <= 0 || isNaN(bytes)) return '0 B';
+      const k = 1024;
+      const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return `${(bytes / Math.pow(k, i)).toFixed(2)} ${sizes[i]}`;
+    };
+
+    const formatEta = (seconds) => {
+      if (!seconds || seconds <= 0 || !isFinite(seconds)) return '—';
+      const hrs = Math.floor(seconds / 3600);
+      const mins = Math.floor((seconds % 3600) / 60);
+      const secs = Math.floor(seconds % 60);
+      if (hrs > 0) {
+        return `${hrs}h ${String(mins).padStart(2, '0')}m ${String(secs).padStart(2, '0')}s`;
+      }
+      return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')} remaining`;
+    };
+
+    const title = item?.mediaMetadata?.title || item?.filename || submitPayload?.filename || 'Media Download';
+    const qualityBadge = item?.qualityLabel || item?.clarity || item?.resolution || submitPayload?.qualityLabel || submitPayload?.clarity || '';
+    const codecBadge = item?.codec || item?.mediaMetadata?.codec || submitPayload?.codec || '';
+    const filenameExt = (item?.filename || submitPayload?.filename || '').split('.').pop();
+    const containerBadge = (item?.container || submitPayload?.container || filenameExt || 'MKV').toUpperCase();
+    const thumbnailUrl = item?.thumbnailUrl || submitPayload?.thumbnailUrl || '';
+
+    dialog.innerHTML = `
+      <!-- Top Window Bar -->
+      <div id="g1dm-prog-drag-bar" style="padding: 12px 18px; border-bottom: 1px solid rgba(51, 65, 85, 0.8); background: rgba(2, 6, 23, 0.95); display: flex; align-items: center; justify-content: space-between; cursor: move;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <div style="width: 26px; height: 26px; border-radius: 8px; background: linear-gradient(135deg, #2563eb, #06b6d4); display: flex; align-items: center; justify-content: center; box-shadow: 0 0 12px rgba(6, 182, 212, 0.4);">
+            <span style="color: #fff; font-size: 14px; font-weight: 900;">⚡</span>
+          </div>
+          <span id="g1dm-prog-status-title" style="font-size: 12px; font-weight: 800; letter-spacing: 0.05em; color: #fff; text-transform: uppercase;">DOWNLOADING</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <button id="g1dm-prog-btn-min" title="Minimize" style="background: rgba(30, 41, 59, 0.8); border: 1px solid rgba(51, 65, 85, 0.8); border-radius: 8px; width: 28px; height: 28px; color: #94a3b8; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 14px; transition: all 0.15s ease;">−</button>
+          <button id="g1dm-prog-btn-close" title="Close" style="background: rgba(30, 41, 59, 0.8); border: 1px solid rgba(51, 65, 85, 0.8); border-radius: 8px; width: 28px; height: 28px; color: #94a3b8; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 13px; transition: all 0.15s ease;">✕</button>
+        </div>
+      </div>
+
+      <!-- Body Content -->
+      <div style="padding: 20px; display: flex; flex-direction: column; gap: 14px;">
+        <!-- Metadata Header Card -->
+        <div style="padding: 12px 14px; border-radius: 12px; background: rgba(2, 6, 23, 0.7); border: 1px solid rgba(51, 65, 85, 0.8); display: flex; align-items: center; gap: 14px;">
+          ${thumbnailUrl ? `
+            <div style="width: 80px; height: 54px; border-radius: 8px; overflow: hidden; background: #0f172a; border: 1px solid rgba(51, 65, 85, 0.8); flex-shrink: 0; position: relative;">
+              <img src="${thumbnailUrl}" style="width: 100%; height: 100%; object-fit: cover;" />
+              ${qualityBadge ? `<div style="position: absolute; bottom: 2px; right: 2px; padding: 1px 4px; border-radius: 4px; background: rgba(2, 6, 23, 0.9); font-size: 9px; font-weight: 800; color: #38bdf8; font-family: monospace;">${qualityBadge}</div>` : ''}
+            </div>
+          ` : `
+            <div style="width: 54px; height: 54px; border-radius: 12px; background: linear-gradient(135deg, rgba(37, 99, 235, 0.2), rgba(6, 182, 212, 0.2)); border: 1px solid rgba(6, 182, 212, 0.3); display: flex; align-items: center; justify-content: center; font-size: 24px; color: #38bdf8; flex-shrink: 0;">🎬</div>
+          `}
+          <div style="min-width: 0; flex: 1;">
+            <div id="g1dm-prog-title" style="font-size: 13px; font-weight: 700; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 6px;" title="${title}">${title}</div>
+            <div style="display: flex; flex-wrap: wrap; gap: 6px; font-family: monospace; font-size: 11px;">
+              ${qualityBadge ? `<span id="g1dm-prog-badge-res" style="padding: 2px 8px; border-radius: 6px; background: rgba(37, 99, 235, 0.2); border: 1px solid rgba(59, 130, 246, 0.4); color: #93c5fd; font-weight: 800;">${qualityBadge}</span>` : ''}
+              ${codecBadge ? `<span id="g1dm-prog-badge-codec" style="padding: 2px 8px; border-radius: 6px; background: rgba(147, 51, 234, 0.2); border: 1px solid rgba(168, 85, 247, 0.4); color: #d8b4fe; font-weight: 800;">${codecBadge}</span>` : ''}
+              ${containerBadge ? `<span id="g1dm-prog-badge-cont" style="padding: 2px 8px; border-radius: 6px; background: rgba(16, 185, 129, 0.2); border: 1px solid rgba(52, 211, 153, 0.4); color: #6ee7b7; font-weight: 800;">${containerBadge}</span>` : ''}
+            </div>
+          </div>
+        </div>
+
+        <!-- Info Grid -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-family: monospace; font-size: 11px;">
+          <div style="padding: 9px 12px; border-radius: 10px; background: rgba(2, 6, 23, 0.5); border: 1px solid rgba(51, 65, 85, 0.6);">
+            <span style="font-size: 10px; color: #64748b; text-transform: uppercase; display: block; margin-bottom: 2px;">Download ID</span>
+            <span id="g1dm-prog-id" style="font-weight: 700; color: #e2e8f0; word-break: break-all;">${downloadId || 'Initializing...'}</span>
+          </div>
+          <div style="padding: 9px 12px; border-radius: 10px; background: rgba(2, 6, 23, 0.5); border: 1px solid rgba(51, 65, 85, 0.6);">
+            <span style="font-size: 10px; color: #64748b; text-transform: uppercase; display: block; margin-bottom: 2px;">Status</span>
+            <span id="g1dm-prog-status-label" style="font-weight: 700; color: #38bdf8;">Downloading</span>
+          </div>
+          <div style="padding: 9px 12px; border-radius: 10px; background: rgba(2, 6, 23, 0.5); border: 1px solid rgba(51, 65, 85, 0.6);">
+            <span style="font-size: 10px; color: #64748b; text-transform: uppercase; display: block; margin-bottom: 2px;">Filename</span>
+            <span id="g1dm-prog-filename" style="font-weight: 700; color: #e2e8f0; word-break: break-all;">${item?.filename || submitPayload?.filename || ''}</span>
+          </div>
+          <div style="padding: 9px 12px; border-radius: 10px; background: rgba(2, 6, 23, 0.5); border: 1px solid rgba(51, 65, 85, 0.6);">
+            <span style="font-size: 10px; color: #64748b; text-transform: uppercase; display: block; margin-bottom: 2px;">File Type</span>
+            <span id="g1dm-prog-filetype" style="font-weight: 700; color: #e2e8f0;">${containerBadge}</span>
+          </div>
+        </div>
+
+        <!-- Size & Percentage Banner -->
+        <div style="display: flex; align-items: baseline; justify-content: space-between; font-family: monospace; font-size: 12px;">
+          <div style="display: flex; align-items: center; gap: 6px; color: #cbd5e1;">
+            <span id="g1dm-prog-downloaded" style="font-weight: 800; color: #fff; font-size: 13px;">0 B</span>
+            <span style="color: #64748b;">/</span>
+            <span id="g1dm-prog-total" style="color: #94a3b8;">Connecting...</span>
+          </div>
+          <div id="g1dm-prog-percent" style="font-size: 16px; font-weight: 900; color: #22d3ee; letter-spacing: -0.02em;">0.0%</div>
+        </div>
+
+        <!-- Progress Bar -->
+        <div style="width: 100%; height: 13px; background: #020617; border-radius: 8px; padding: 2px; border: 1px solid rgba(51, 65, 85, 0.9); box-shadow: inset 0 2px 6px rgba(0,0,0,0.6); overflow: hidden; box-sizing: border-box;">
+          <div id="g1dm-prog-bar" style="width: 0%; height: 100%; border-radius: 5px; background: linear-gradient(90deg, #2563eb, #06b6d4, #6366f1); transition: width 0.2s cubic-bezier(0.4, 0, 0.2, 1); box-shadow: 0 0 12px rgba(6, 182, 212, 0.5);"></div>
+        </div>
+
+        <!-- Telemetry Matrix -->
+        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; font-family: monospace; font-size: 11px;">
+          <div style="padding: 9px 10px; border-radius: 10px; background: rgba(2, 6, 23, 0.5); border: 1px solid rgba(51, 65, 85, 0.6);">
+            <span style="font-size: 9px; color: #64748b; text-transform: uppercase; display: block; margin-bottom: 2px;">Current Speed</span>
+            <span id="g1dm-prog-speed" style="font-weight: 800; color: #34d399; font-size: 11px;">↓ 0 B/s</span>
+          </div>
+          <div style="padding: 9px 10px; border-radius: 10px; background: rgba(2, 6, 23, 0.5); border: 1px solid rgba(51, 65, 85, 0.6);">
+            <span style="font-size: 9px; color: #64748b; text-transform: uppercase; display: block; margin-bottom: 2px;">Time Remaining</span>
+            <span id="g1dm-prog-eta" style="font-weight: 700; color: #e2e8f0; font-size: 11px;">—</span>
+          </div>
+          <div style="padding: 9px 10px; border-radius: 10px; background: rgba(2, 6, 23, 0.5); border: 1px solid rgba(51, 65, 85, 0.6);">
+            <span style="font-size: 9px; color: #64748b; text-transform: uppercase; display: block; margin-bottom: 2px;">Connections</span>
+            <span id="g1dm-prog-conns" style="font-weight: 700; color: #38bdf8; font-size: 11px;">— streams</span>
+          </div>
+          <div style="padding: 9px 10px; border-radius: 10px; background: rgba(2, 6, 23, 0.5); border: 1px solid rgba(51, 65, 85, 0.6);">
+            <span style="font-size: 9px; color: #64748b; text-transform: uppercase; display: block; margin-bottom: 2px;">Average Speed</span>
+            <span id="g1dm-prog-avgspeed" style="font-weight: 700; color: #cbd5e1; font-size: 11px;">—</span>
+          </div>
+        </div>
+
+        <!-- Destination Path -->
+        <div id="g1dm-prog-dest-box" style="padding: 8px 12px; border-radius: 10px; background: rgba(2, 6, 23, 0.4); border: 1px solid rgba(51, 65, 85, 0.4); font-family: monospace; font-size: 10.5px; color: #94a3b8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+          📁 <span id="g1dm-prog-dest-path">${item?.finalPath || item?.destinationDir || 'Saving to default downloads directory...'}</span>
+        </div>
+      </div>
+
+      <!-- Footer Action Buttons -->
+      <div style="padding: 12px 20px; border-top: 1px solid rgba(51, 65, 85, 0.8); background: rgba(2, 6, 23, 0.95); display: flex; align-items: center; justify-content: space-between;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <button id="g1dm-prog-btn-pause" style="padding: 7px 16px; border-radius: 9px; background: #d97706; border: none; color: #fff; font-size: 12px; font-weight: 800; cursor: pointer; display: flex; align-items: center; gap: 6px; box-shadow: 0 4px 12px rgba(217, 119, 6, 0.35); transition: all 0.15s ease;">
+            <span id="g1dm-prog-pause-icon">⏸</span> <span id="g1dm-prog-pause-text">Pause</span>
+          </button>
+          <button id="g1dm-prog-btn-open-file" style="display: none; padding: 7px 16px; border-radius: 9px; background: linear-gradient(135deg, #059669, #0d9488); border: none; color: #fff; font-size: 12px; font-weight: 800; cursor: pointer; align-items: center; gap: 6px; box-shadow: 0 4px 14px rgba(5, 150, 105, 0.4); transition: all 0.15s ease;">
+            <span>✓</span> <span>Open File</span>
+          </button>
+          <button id="g1dm-prog-btn-open-folder" style="display: none; padding: 7px 14px; border-radius: 9px; background: rgba(30, 41, 59, 0.9); border: 1px solid rgba(51, 65, 85, 0.9); color: #e2e8f0; font-size: 12px; font-weight: 700; cursor: pointer; align-items: center; gap: 6px; transition: all 0.15s ease;">
+            <span>📁</span> <span>Open Folder</span>
+          </button>
+        </div>
+
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <button id="g1dm-prog-btn-cancel" style="padding: 7px 14px; border-radius: 9px; background: rgba(30, 41, 59, 0.9); border: 1px solid rgba(51, 65, 85, 0.9); color: #cbd5e1; font-size: 12px; font-weight: 700; cursor: pointer; transition: all 0.15s ease;">Cancel</button>
+          <button id="g1dm-prog-btn-hide" style="padding: 7px 16px; border-radius: 9px; background: rgba(30, 41, 59, 0.9); border: 1px solid rgba(51, 65, 85, 0.9); color: #f8fafc; font-size: 12px; font-weight: 700; cursor: pointer; transition: all 0.15s ease;">Hide</button>
+        </div>
+      </div>
+    `;
+
+    overlay.appendChild(dialog);
+    (document.fullscreenElement || document.body || document.documentElement).appendChild(overlay);
+
+    const closeProgress = () => {
+      if (pollInterval) clearInterval(pollInterval);
+      overlay.style.opacity = '0';
+      overlay.style.transition = 'opacity 0.2s ease';
+      setTimeout(() => overlay.remove(), 200);
+      const pill = document.getElementById('g1dm-progress-pill');
+      if (pill) pill.remove();
+    };
+
+    // Minimized pill in bottom right
+    const minimizeProgress = () => {
+      overlay.style.display = 'none';
+      let pill = document.getElementById('g1dm-progress-pill');
+      if (!pill) {
+        pill = document.createElement('div');
+        pill.id = 'g1dm-progress-pill';
+        pill.style.cssText = `
+          position: fixed;
+          bottom: 24px;
+          right: 24px;
+          z-index: 2147483647;
+          background: linear-gradient(135deg, rgba(15, 23, 42, 0.96), rgba(30, 41, 59, 0.96));
+          border: 1px solid rgba(14, 165, 233, 0.5);
+          box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.8), 0 0 20px rgba(14, 165, 233, 0.35);
+          backdrop-filter: blur(16px);
+          -webkit-backdrop-filter: blur(16px);
+          border-radius: 12px;
+          padding: 10px 16px;
+          color: #fff;
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+          cursor: pointer;
+          animation: g1dm-scale-in 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+        `;
+        pill.innerHTML = `
+          <div style="width: 24px; height: 24px; border-radius: 6px; background: linear-gradient(135deg, #2563eb, #06b6d4); display: flex; align-items: center; justify-content: center; font-size: 13px;">⚡</div>
+          <div style="min-width: 140px; max-width: 200px;">
+            <div style="font-size: 11px; font-weight: 700; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${title}</div>
+            <div style="display: flex; align-items: center; justify-content: space-between; font-family: monospace; font-size: 10px; color: #22d3ee; margin-top: 2px;">
+              <span id="g1dm-pill-percent">0.0%</span>
+              <span id="g1dm-pill-speed" style="color: #34d399;">0 B/s</span>
+            </div>
+          </div>
+          <button id="g1dm-pill-close" style="background: none; border: none; color: #64748b; font-size: 14px; cursor: pointer; padding: 2px 4px; margin-left: 4px;">✕</button>
+        `;
+        (document.fullscreenElement || document.body || document.documentElement).appendChild(pill);
+
+        pill.addEventListener('click', (e) => {
+          if (e.target.id === 'g1dm-pill-close') {
+            closeProgress();
+          } else {
+            overlay.style.display = 'flex';
+            pill.remove();
+          }
+        });
+      }
+    };
+
+    dialog.querySelector('#g1dm-prog-btn-min').addEventListener('click', minimizeProgress);
+    dialog.querySelector('#g1dm-prog-btn-close').addEventListener('click', closeProgress);
+    dialog.querySelector('#g1dm-prog-btn-hide').addEventListener('click', closeProgress);
+
+    // Draggable dialog header
+    const dragBar = dialog.querySelector('#g1dm-prog-drag-bar');
+    let isDragging = false, startX, startY, initLeft, initTop;
+    dragBar.addEventListener('mousedown', (e) => {
+      if (e.target.tagName === 'BUTTON') return;
+      isDragging = true;
+      startX = e.clientX;
+      startY = e.clientY;
+      const rect = dialog.getBoundingClientRect();
+      initLeft = rect.left;
+      initTop = rect.top;
+      dialog.style.position = 'fixed';
+      dialog.style.left = `${initLeft}px`;
+      dialog.style.top = `${initTop}px`;
+      dialog.style.margin = '0';
+    });
+    window.addEventListener('mousemove', (e) => {
+      if (!isDragging) return;
+      dialog.style.left = `${initLeft + (e.clientX - startX)}px`;
+      dialog.style.top = `${initTop + (e.clientY - startY)}px`;
+    });
+    window.addEventListener('mouseup', () => { isDragging = false; });
+
+    // Action handlers
+    const pauseBtn = dialog.querySelector('#g1dm-prog-btn-pause');
+    const pauseText = dialog.querySelector('#g1dm-prog-pause-text');
+    const pauseIcon = dialog.querySelector('#g1dm-prog-pause-icon');
+    const cancelBtn = dialog.querySelector('#g1dm-prog-btn-cancel');
+    const openFileBtn = dialog.querySelector('#g1dm-prog-btn-open-file');
+    const openFolderBtn = dialog.querySelector('#g1dm-prog-btn-open-folder');
+
+    pauseBtn.addEventListener('click', () => {
+      if (!downloadId) return;
+      const isCurrentlyPaused = item.status === 'paused';
+      const actionType = isCurrentlyPaused ? 'RESUME_DOWNLOAD' : 'PAUSE_DOWNLOAD';
+      if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+        chrome.runtime.sendMessage({ type: actionType, id: downloadId });
+      } else {
+        fetch(`http://127.0.0.1:8055/api/downloads/${downloadId}/${isCurrentlyPaused ? 'resume' : 'pause'}`, { method: 'POST' }).catch(() => {});
+      }
+    });
+
+    cancelBtn.addEventListener('click', () => {
+      if (downloadId) {
+        if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+          chrome.runtime.sendMessage({ type: 'CANCEL_DOWNLOAD', id: downloadId });
+        } else {
+          fetch(`http://127.0.0.1:8055/api/downloads/${downloadId}/cancel`, { method: 'POST' }).catch(() => {});
+        }
+      }
+      closeProgress();
+    });
+
+    openFileBtn.addEventListener('click', () => {
+      if (!downloadId) return;
+      if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+        chrome.runtime.sendMessage({ type: 'OPEN_DOWNLOAD_FILE', id: downloadId });
+      } else {
+        fetch(`http://127.0.0.1:8055/api/downloads/${downloadId}/open-file`, { method: 'POST' }).catch(() => {});
+      }
+    });
+
+    openFolderBtn.addEventListener('click', () => {
+      if (!downloadId) return;
+      if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+        chrome.runtime.sendMessage({ type: 'OPEN_DOWNLOAD_FOLDER', id: downloadId });
+      } else {
+        fetch(`http://127.0.0.1:8055/api/downloads/${downloadId}/open-folder`, { method: 'POST' }).catch(() => {});
+      }
+    });
+
+    // Update UI from live item data
+    const updateUI = (data) => {
+      if (!data) return;
+      item = data;
+      if (!downloadId && data.id) downloadId = data.id;
+
+      const titleEl = dialog.querySelector('#g1dm-prog-status-title');
+      const statusLabel = dialog.querySelector('#g1dm-prog-status-label');
+      const progId = dialog.querySelector('#g1dm-prog-id');
+      const progName = dialog.querySelector('#g1dm-prog-filename');
+      const progDownloaded = dialog.querySelector('#g1dm-prog-downloaded');
+      const progTotal = dialog.querySelector('#g1dm-prog-total');
+      const progPercent = dialog.querySelector('#g1dm-prog-percent');
+      const progBar = dialog.querySelector('#g1dm-prog-bar');
+      const progSpeed = dialog.querySelector('#g1dm-prog-speed');
+      const progEta = dialog.querySelector('#g1dm-prog-eta');
+      const progConns = dialog.querySelector('#g1dm-prog-conns');
+      const progAvg = dialog.querySelector('#g1dm-prog-avgspeed');
+      const progDest = dialog.querySelector('#g1dm-prog-dest-path');
+
+      if (progId) progId.innerText = data.id || downloadId || '—';
+      if (progName && data.filename) progName.innerText = data.filename;
+      if (progDest && (data.finalPath || data.destinationDir)) progDest.innerText = data.finalPath || data.destinationDir;
+
+      const isCompleted = data.status === 'completed';
+      const isPaused = data.status === 'paused';
+      const isFailed = data.status === 'failed';
+      const isMerging = data.phase === 'merging';
+      const isVerifying = data.phase === 'verifying';
+
+      if (isCompleted) {
+        if (titleEl) titleEl.innerText = 'DOWNLOAD COMPLETE';
+        if (statusLabel) { statusLabel.innerText = 'Completed'; statusLabel.style.color = '#34d399'; }
+        if (progPercent) { progPercent.innerText = '100.0%'; progPercent.style.color = '#34d399'; }
+        if (progBar) {
+          progBar.style.width = '100%';
+          progBar.style.background = 'linear-gradient(90deg, #059669, #10b981)';
+        }
+        if (progSpeed) progSpeed.innerText = 'Finished';
+        if (progEta) progEta.innerText = 'Done';
+        pauseBtn.style.display = 'none';
+        cancelBtn.style.display = 'none';
+        openFileBtn.style.display = 'flex';
+        openFolderBtn.style.display = 'flex';
+        dialog.querySelector('#g1dm-prog-btn-hide').innerText = 'Close';
+      } else if (isMerging) {
+        if (titleEl) titleEl.innerText = 'MULTIPLEXING MEDIA';
+        if (statusLabel) { statusLabel.innerText = 'Muxing Video + Audio'; statusLabel.style.color = '#c084fc'; }
+        if (progSpeed) progSpeed.innerText = 'Processing';
+      } else if (isVerifying) {
+        if (titleEl) titleEl.innerText = 'VERIFYING CONTAINER';
+        if (statusLabel) { statusLabel.innerText = 'Verifying Container'; statusLabel.style.color = '#fbbf24'; }
+      } else if (isPaused) {
+        if (titleEl) titleEl.innerText = 'DOWNLOAD PAUSED';
+        if (statusLabel) { statusLabel.innerText = 'Paused'; statusLabel.style.color = '#fbbf24'; }
+        if (pauseIcon) pauseIcon.innerText = '▶';
+        if (pauseText) pauseText.innerText = 'Resume';
+        pauseBtn.style.background = '#059669';
+      } else if (isFailed) {
+        if (titleEl) titleEl.innerText = 'DOWNLOAD FAILED';
+        if (statusLabel) { statusLabel.innerText = data.error?.message || 'Failed'; statusLabel.style.color = '#f87171'; }
+      } else {
+        if (titleEl) titleEl.innerText = 'DOWNLOADING';
+        if (statusLabel) { statusLabel.innerText = 'Downloading'; statusLabel.style.color = '#38bdf8'; }
+        if (pauseIcon) pauseIcon.innerText = '⏸';
+        if (pauseText) pauseText.innerText = 'Pause';
+        pauseBtn.style.background = '#d97706';
+      }
+
+      if (progDownloaded && data.downloadedBytes !== undefined) {
+        progDownloaded.innerText = formatBytes(data.downloadedBytes);
+      }
+      if (progTotal) {
+        progTotal.innerText = data.totalBytes > 0 ? formatBytes(data.totalBytes) : 'Dynamic Stream';
+      }
+      if (progPercent && !isCompleted) {
+        const pct = data.progress !== undefined ? data.progress.toFixed(1) : '0.0';
+        progPercent.innerText = `${pct}%`;
+      }
+      if (progBar && !isCompleted) {
+        const pct = Math.max(0, Math.min(100, data.progress || 0));
+        progBar.style.width = `${pct}%`;
+      }
+      if (progSpeed && !isCompleted && !isPaused) {
+        progSpeed.innerText = data.speed > 0 ? `↓ ${formatBytes(data.speed)}/s` : '0 B/s';
+      }
+      if (progEta && !isCompleted) {
+        progEta.innerText = isPaused ? 'Paused' : formatEta(data.eta);
+      }
+      if (progConns && data.activeConnections !== undefined) {
+        progConns.innerText = `${data.activeConnections || 1} streams`;
+      }
+      if (progAvg && data.avgSpeed !== undefined) {
+        progAvg.innerText = data.avgSpeed > 0 ? `${formatBytes(data.avgSpeed)}/s` : '—';
+      }
+
+      // Update pill if minimized
+      const pillPct = document.getElementById('g1dm-pill-percent');
+      const pillSpd = document.getElementById('g1dm-pill-speed');
+      if (pillPct) pillPct.innerText = `${data.progress !== undefined ? data.progress.toFixed(1) : 0}%`;
+      if (pillSpd) pillSpd.innerText = data.speed > 0 ? `${formatBytes(data.speed)}/s` : (isCompleted ? 'Done' : '0 B/s');
+    };
+
+    // Live poller
+    const poll = () => {
+      if (!downloadId) {
+        // Look up newest download if ID not yet known
+        if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+          chrome.runtime.sendMessage({ type: 'TEST_CONNECTION' }, (res) => {
+            fetch('http://127.0.0.1:8055/api/downloads')
+              .then((r) => r.json())
+              .then((list) => {
+                if (Array.isArray(list) && list.length > 0) {
+                  const match = list.find((d) => d.url === submitPayload.url) || list[0];
+                  if (match) {
+                    downloadId = match.id;
+                    updateUI(match);
+                  }
+                }
+              })
+              .catch(() => {});
+          });
+        }
+        return;
+      }
+
+      if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+        chrome.runtime.sendMessage({ type: 'GET_DOWNLOAD_PROGRESS', id: downloadId }, (res) => {
+          if (res?.success && res.data) {
+            updateUI(res.data);
+          }
+        });
+      } else {
+        fetch(`http://127.0.0.1:8055/api/downloads/${downloadId}`)
+          .then((r) => r.json())
+          .then(updateUI)
+          .catch(() => {});
+      }
+    };
+
+    pollInterval = setInterval(poll, 350);
+    poll();
+  }
 
   function showDownloadToast(status, filename) {
     const existing = document.getElementById('g1dm-toast-root');
