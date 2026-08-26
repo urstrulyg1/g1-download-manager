@@ -1845,16 +1845,56 @@
     });
 
     cancelBtn.addEventListener('click', () => {
-      if (downloadId) {
-        safeSendMessage(
-          { type: 'CANCEL_DOWNLOAD', id: downloadId },
-          () => {},
-          () => {
-            fetch(`http://127.0.0.1:8055/api/downloads/${downloadId}/cancel`, { method: 'POST' }).catch(() => {});
-          }
-        );
-      }
-      closeProgress();
+      // Show an inline "Do you really want to delete?" confirmation
+      // instead of immediately canceling the download
+      const existingConfirm = dialog.querySelector('#g1dm-delete-confirm-bar');
+      if (existingConfirm) { existingConfirm.remove(); return; }
+
+      const confirmBar = document.createElement('div');
+      confirmBar.id = 'g1dm-delete-confirm-bar';
+      confirmBar.style.cssText = `
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 10px 16px;
+        background: rgba(159, 18, 57, 0.12);
+        border-top: 1px solid rgba(239, 68, 68, 0.3);
+        animation: g1dm-fade-in 0.15s ease-out;
+      `;
+      confirmBar.innerHTML = `
+        <span style="font-size: 12px; font-weight: 600; color: #fca5a5;">
+          ⚠️ Do you really want to cancel &amp; delete this download?
+        </span>
+        <div style="display: flex; gap: 8px; flex-shrink: 0;">
+          <button id="g1dm-delete-no" style="
+            padding: 5px 14px; border-radius: 8px; font-size: 11px; font-weight: 700;
+            background: rgba(30, 41, 59, 0.8); border: 1px solid rgba(100, 116, 139, 0.5);
+            color: #94a3b8; cursor: pointer;
+          ">Keep it</button>
+          <button id="g1dm-delete-yes" style="
+            padding: 5px 14px; border-radius: 8px; font-size: 11px; font-weight: 700;
+            background: rgba(220, 38, 38, 0.2); border: 1px solid rgba(239, 68, 68, 0.5);
+            color: #f87171; cursor: pointer;
+          ">Yes, Delete</button>
+        </div>
+      `;
+
+      dialog.appendChild(confirmBar);
+
+      confirmBar.querySelector('#g1dm-delete-no').addEventListener('click', () => confirmBar.remove());
+      confirmBar.querySelector('#g1dm-delete-yes').addEventListener('click', () => {
+        if (downloadId) {
+          safeSendMessage(
+            { type: 'CANCEL_DOWNLOAD', id: downloadId },
+            () => {},
+            () => {
+              fetch(`http://127.0.0.1:8055/api/downloads/${downloadId}/cancel`, { method: 'POST' }).catch(() => {});
+            }
+          );
+        }
+        closeProgress();
+      });
     });
 
     openFileBtn.addEventListener('click', () => {

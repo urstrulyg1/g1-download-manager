@@ -445,6 +445,12 @@ export default function Home() {
               lang={lang}
               onSelectDownload={(item) => setSelectedDownload(item)}
               onOpenIdmProgress={handleOpenDownloadPopup}
+              onDismissIdmProgress={() => {
+                if (activeIdmDownloadId) {
+                  setDismissedDownloadIds((prev) => new Set(prev).add(activeIdmDownloadId));
+                }
+                setActiveIdmDownloadId(null);
+              }}
               onRefresh={refreshAll}
             />
           )}

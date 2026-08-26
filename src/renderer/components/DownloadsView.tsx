@@ -46,6 +46,7 @@ interface DownloadsViewProps {
   lang: Language;
   onSelectDownload: (item: DownloadItem) => void;
   onOpenIdmProgress?: (item: DownloadItem) => void;
+  onDismissIdmProgress?: () => void;
   onRefresh?: () => void;
 }
 
@@ -71,6 +72,7 @@ const DownloadsViewComponent: React.FC<DownloadsViewProps> = ({
   lang,
   onSelectDownload,
   onOpenIdmProgress,
+  onDismissIdmProgress,
   onRefresh,
 }) => {
   const t = translations[lang] || translations.en;
@@ -809,6 +811,9 @@ const DownloadsViewComponent: React.FC<DownloadsViewProps> = ({
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
+                              // Dismiss any open progress popup so it doesn't
+                              // overlap with the delete confirmation dialog
+                              onDismissIdmProgress?.();
                               setItemToDelete(item);
                             }}
                             className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-950 text-slate-400 hover:text-rose-400 active:scale-95 transition-all shadow-sm"
