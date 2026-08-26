@@ -5,7 +5,7 @@ import * as os from 'os';
 const TEST_SANDBOX = path.join(os.tmpdir(), `g1dm_test_sandbox_${process.pid}`);
 
 // Set environment variables before any test suites run
-process.env.NODE_ENV = 'test';
+(process.env as any).NODE_ENV = 'test';
 process.env.G1DM_DOWNLOAD_DIR = TEST_SANDBOX;
 
 beforeAll(() => {

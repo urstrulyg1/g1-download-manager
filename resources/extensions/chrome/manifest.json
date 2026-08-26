@@ -18,8 +18,18 @@
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
+      "exclude_matches": [
+        "*://127.0.0.1/*",
+        "*://localhost/*"
+      ],
       "js": ["content.js"],
       "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["yt-bridge.js"],
+      "matches": ["<all_urls>"]
     }
   ],
   "action": {
