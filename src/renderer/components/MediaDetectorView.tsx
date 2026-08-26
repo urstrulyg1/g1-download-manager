@@ -34,12 +34,15 @@ export const MediaDetectorView: React.FC<MediaDetectorViewProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [analysis, setAnalysis] = useState<ComprehensiveMediaAnalysis | null>(null);
   const [isQualityModalOpen, setIsQualityModalOpen] = useState(false);
+  const [detectError, setDetectError] = useState<string | null>(null);
 
   const handleDetect = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!url.trim()) return;
 
     setIsLoading(true);
+    setDetectError(null);
+    setAnalysis(null);
     try {
       const res = await fetch('/api/media/secure-detect', {
         method: 'POST',
@@ -47,12 +50,16 @@ export const MediaDetectorView: React.FC<MediaDetectorViewProps> = ({
         body: JSON.stringify({ url: url.trim() }),
       });
       const data = await res.json();
+      if (!res.ok) {
+        setDetectError(data?.error || data?.message || `Server error ${res.status}`);
+        return;
+      }
       setAnalysis(data);
       if (data.availableVideoQualities?.length > 0) {
         setIsQualityModalOpen(true);
       }
     } catch (err: any) {
-      alert(`Media detection error: ${err.message}`);
+      setDetectError(err?.message || 'Media detection failed. Check the URL and try again.');
     } finally {
       setIsLoading(false);
     }
@@ -82,19 +89,27 @@ export const MediaDetectorView: React.FC<MediaDetectorViewProps> = ({
             type="url"
             placeholder="https://example.com/video or https://example.com/stream.m3u8 or https://example.com/manifest.mpd"
             value={url}
-            onChange={(e) => setUrl(e.target.value)}
+            onChange={(e) => { setUrl(e.target.value); setDetectError(null); }}
             className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-slate-200 font-mono text-xs focus:outline-none focus:border-amber-500"
             required
           />
           <button
             type="submit"
             disabled={isLoading || !url.trim()}
-            className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white text-xs font-bold shadow-lg shadow-amber-600/30 flex items-center gap-2"
+            className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white text-xs font-bold shadow-lg shadow-amber-600/30 flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
           >
             {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
             <span>Analyze Video Source</span>
           </button>
         </div>
+
+        {/* Inline detection error */}
+        {detectError && (
+          <div className="flex items-start gap-2 p-3 rounded-xl bg-rose-950/40 border border-rose-500/40 text-rose-200 text-xs animate-in fade-in duration-150">
+            <span className="shrink-0">⚠</span>
+            <span>{detectError}</span>
+          </div>
+        )}
       </form>
 
       {/* Analysis Output Summary */}

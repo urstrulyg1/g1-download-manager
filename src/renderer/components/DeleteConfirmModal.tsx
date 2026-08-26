@@ -1,7 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { Trash2, AlertTriangle, FileText, CheckSquare, Square, X, HardDrive } from 'lucide-react';
+import { Trash2, FileText, CheckSquare, Square, X, HardDrive } from 'lucide-react';
 import { DownloadItem } from '../../shared/types';
-import { formatBytes } from '../lib/utils';
+
+function formatBytes(bytes: number): string {
+  if (bytes <= 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return `${(bytes / Math.pow(k, i)).toFixed(2)} ${sizes[i]}`;
+}
 
 interface DeleteConfirmModalProps {
   isOpen: boolean;
@@ -40,10 +47,11 @@ export const DeleteConfirmModal: React.FC<DeleteConfirmModalProps> = ({
     if (e.key === 'Escape') {
       e.stopPropagation();
       onClose();
-    } else if (e.key === 'Enter') {
-      e.stopPropagation();
-      onConfirm(deleteFromDisk);
     }
+    // Intentionally no Enter shortcut: pressing Enter should only confirm
+    // when the user has explicitly focused and activated the confirm button.
+    // A global Enter handler on the overlay backdrop would fire the
+    // destructive delete action from any accidental keypress.
   };
 
   return (

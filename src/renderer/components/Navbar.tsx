@@ -1,25 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  Download,
   Pause,
   Play,
-  Square,
-  Gauge,
   Search,
-  Globe,
   Sun,
   Moon,
   Plus,
   Radio,
   Rocket,
-  ShieldCheck,
-  Briefcase,
-  Smartphone,
-  Gamepad2,
   Bell,
-  AlertTriangle,
-  Layers,
   ChevronDown,
+  Loader2,
 } from 'lucide-react';
 import { Language, translations } from '../lib/i18n';
 import { ProfileType, DownloadProfilesManager } from '../../main/engine/DownloadProfiles';
@@ -44,6 +35,10 @@ interface NavbarProps {
   onViewModeChange: (mode: ViewMode) => void;
   alertCount: number;
   onToggleActionCenter: () => void;
+  onPauseAll: () => Promise<void>;
+  onResumeAll: () => Promise<void>;
+  isPausingAll?: boolean;
+  isResumingAll?: boolean;
 }
 
 const NavbarComponent: React.FC<NavbarProps> = ({
@@ -62,18 +57,19 @@ const NavbarComponent: React.FC<NavbarProps> = ({
   onViewModeChange,
   alertCount,
   onToggleActionCenter,
+  onPauseAll,
+  onResumeAll,
+  isPausingAll = false,
+  isResumingAll = false,
 }) => {
   const t = translations[lang] || translations.en;
-  const [showSpeedMenu, setShowSpeedMenu] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showViewModeMenu, setShowViewModeMenu] = useState(false);
-  const [customSpeedInput, setCustomSpeedInput] = useState('');
 
   const viewModeRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
 
   const closeAllDropdowns = () => {
-    setShowSpeedMenu(false);
     setShowProfileMenu(false);
     setShowViewModeMenu(false);
   };
@@ -106,24 +102,15 @@ const NavbarComponent: React.FC<NavbarProps> = ({
 
   const profiles = DownloadProfilesManager.getProfiles();
 
-  const handleApplyCustomSpeed = (e: React.FormEvent) => {
-    e.preventDefault();
-    const val = parseInt(customSpeedInput, 10);
-    if (!isNaN(val) && val >= 0) {
-      onSpeedLimitChange(val * 1024);
-      setShowSpeedMenu(false);
-    }
-  };
-
   return (
     <header className="h-16 w-full shrink-0 bg-slate-900/90 dark:bg-slate-950/90 backdrop-blur-md border-b border-slate-800 px-4 flex items-center justify-between sticky top-0 z-30 select-none">
       {/* Left: Brand, Core Status & Mode */}
       <div className="flex items-center gap-3 shrink-0">
+        {/* Brand — clicking the logo navigates to dashboard, not add modal */}
         <div
           className="flex items-center gap-2.5 cursor-pointer"
           onClick={() => {
             closeAllDropdowns();
-            onOpenNewDownload();
           }}
         >
           <div className="w-10 h-10 flex items-center justify-center relative shrink-0">
@@ -163,7 +150,6 @@ const NavbarComponent: React.FC<NavbarProps> = ({
           <button
             onClick={() => {
               setShowProfileMenu(false);
-              setShowSpeedMenu(false);
               setShowViewModeMenu((prev) => !prev);
             }}
             className="flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-slate-300 text-[11px] font-semibold"
@@ -214,7 +200,6 @@ const NavbarComponent: React.FC<NavbarProps> = ({
           <button
             onClick={() => {
               setShowViewModeMenu(false);
-              setShowSpeedMenu(false);
               setShowProfileMenu((prev) => !prev);
             }}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-semibold transition-colors"
@@ -256,24 +241,36 @@ const NavbarComponent: React.FC<NavbarProps> = ({
         <button
           onClick={() => {
             closeAllDropdowns();
-            api.resumeAll();
+            void onResumeAll();
           }}
-          title="Resume all queued and paused downloads immediately"
-          className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 active:scale-95 transition-all"
+          disabled={isResumingAll}
+          title="Resume all queued and paused downloads immediately (Ctrl+R)"
+          aria-label="Resume all downloads"
+          className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          <Play className="w-3.5 h-3.5 text-emerald-400 fill-emerald-400" />
+          {isResumingAll ? (
+            <Loader2 className="w-3.5 h-3.5 text-emerald-400 animate-spin" />
+          ) : (
+            <Play className="w-3.5 h-3.5 text-emerald-400 fill-emerald-400" />
+          )}
           <span className="hidden md:inline">{t.resumeAll}</span>
         </button>
 
         <button
           onClick={() => {
             closeAllDropdowns();
-            api.pauseAll();
+            void onPauseAll();
           }}
-          title="Pause all currently active downloads"
-          className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 active:scale-95 transition-all"
+          disabled={isPausingAll}
+          title="Pause all currently active downloads (Ctrl+P)"
+          aria-label="Pause all downloads"
+          className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          <Pause className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
+          {isPausingAll ? (
+            <Loader2 className="w-3.5 h-3.5 text-amber-400 animate-spin" />
+          ) : (
+            <Pause className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
+          )}
           <span className="hidden md:inline">{t.pauseAll}</span>
         </button>
       </div>

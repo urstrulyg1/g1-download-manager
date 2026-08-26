@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   X,
   Play,
@@ -34,6 +34,7 @@ export const IdmProgressModal: React.FC<IdmProgressModalProps> = ({
 }) => {
   const dialogRef = useRef<HTMLDivElement | null>(null);
   const previouslyFocusedRef = useRef<HTMLElement | null>(null);
+  const [confirmCancel, setConfirmCancel] = useState(false);
 
   const formatBytes = (bytes: number) => {
     if (bytes <= 0) return '0 B';
@@ -97,6 +98,11 @@ export const IdmProgressModal: React.FC<IdmProgressModalProps> = ({
     []
   );
 
+  // Reset cancel confirmation when the item changes or modal closes
+  useEffect(() => {
+    setConfirmCancel(false);
+  }, [item?.id]);
+
   useEffect(() => {
     if (!item?.id) return;
     previouslyFocusedRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
@@ -149,6 +155,10 @@ export const IdmProgressModal: React.FC<IdmProgressModalProps> = ({
   };
 
   const handleCancel = () => {
+    if (!confirmCancel) {
+      setConfirmCancel(true);
+      return;
+    }
     api.cancelDownload(item.id);
     onClose();
   };
@@ -471,14 +481,35 @@ export const IdmProgressModal: React.FC<IdmProgressModalProps> = ({
           </div>
 
           <div className="flex items-center gap-2">
-            {!isCompleted && (
+            {!isCompleted && !confirmCancel && (
               <button
                 onClick={handleCancel}
                 className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-rose-900/60 hover:text-rose-200 text-slate-300 text-xs font-semibold transition-colors"
                 data-testid="idm-cancel-button"
+                title="Cancel this download"
               >
                 Cancel
               </button>
+            )}
+
+            {!isCompleted && confirmCancel && (
+              <div className="flex items-center gap-1.5 animate-in fade-in duration-100">
+                <span className="text-xs text-rose-300 font-semibold">Cancel download?</span>
+                <button
+                  onClick={handleCancel}
+                  className="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold transition-colors"
+                  data-testid="idm-cancel-confirm-button"
+                >
+                  Yes, Cancel
+                </button>
+                <button
+                  onClick={() => setConfirmCancel(false)}
+                  className="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs font-semibold transition-colors"
+                  data-testid="idm-cancel-abort-button"
+                >
+                  No, Keep
+                </button>
+              </div>
             )}
 
             <button

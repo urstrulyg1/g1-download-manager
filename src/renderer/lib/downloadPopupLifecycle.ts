@@ -18,8 +18,11 @@ export function chooseDownloadPopup(
   minimized: Set<string>,
   dismissed: Set<string>,
 ): { openId: string | null; restoreCompletedId?: string } {
-  // Restore a minimized download that just finished (any source)
-  const completed = downloads.find((item) => item.status === 'completed' && minimized.has(item.id));
+  // Restore a minimized download that just finished — but never restore if it
+  // has also been dismissed (e.g. the user dismissed it while it was minimized).
+  const completed = downloads.find(
+    (item) => item.status === 'completed' && minimized.has(item.id) && !dismissed.has(item.id),
+  );
   if (completed) return { openId: completed.id, restoreCompletedId: completed.id };
 
   if (currentId) return { openId: currentId };

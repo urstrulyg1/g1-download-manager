@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Download } from 'lucide-react';
 import { useDownloadEngine } from '../hooks/useDownloadEngine';
 import { Navbar } from '../components/Navbar';
@@ -60,6 +60,8 @@ export default function Home() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [queueFilter, setQueueFilter] = useState('all');
+  const [pauseAllPending, setPauseAllPending] = useState(false);
+  const [resumeAllPending, setResumeAllPending] = useState(false);
 
   const [theme, setTheme] = useState<ThemeMode>(() => getStoredTheme() || 'dark');
   const [resolvedTheme, setResolvedTheme] = useState<ThemeMode>(() => theme);
@@ -82,7 +84,7 @@ export default function Home() {
   const [isRetryingFailed, setIsRetryingFailed] = useState(false);
   const [retryFailedError, setRetryFailedError] = useState<string | null>(null);
 
-  const handleOpenDownloadPopup = React.useCallback((itemOrId: DownloadItem | string) => {
+  const handleOpenDownloadPopup = useCallback((itemOrId: DownloadItem | string) => {
     const id = typeof itemOrId === 'string' ? itemOrId : itemOrId.id;
     if (typeof itemOrId !== 'string') {
       setCachedActiveItem(itemOrId);
@@ -106,6 +108,9 @@ export default function Home() {
       next.delete(id);
       return next;
     });
+    // Navigate to downloads view so the popup always appears in its home context.
+    // If already on downloads the setActiveView call is effectively a no-op.
+    setActiveView('downloads');
     setActiveIdmDownloadId(id);
   }, [setDownloads]);
 
@@ -127,7 +132,11 @@ export default function Home() {
 
   // Deterministic popup lifecycle: newly active engine items open a popup;
   // minimizing never mutates the engine; completion restores a minimized item.
+  // The popup is intentionally restricted to the downloads page — it must never
+  // auto-open when the user is on a different tab.
   useEffect(() => {
+    if (activeView !== 'downloads') return;
+
     const popupDecision = chooseDownloadPopup(downloads, activeIdmDownloadId, minimizedDownloadIds, dismissedDownloadIds);
     const completedWhileMinimized = popupDecision.restoreCompletedId ? downloads.find((item) => item.id === popupDecision.restoreCompletedId) : undefined;
     if (completedWhileMinimized) {
@@ -139,7 +148,7 @@ export default function Home() {
       return;
     }
     if (!activeIdmDownloadId && popupDecision.openId) setActiveIdmDownloadId(popupDecision.openId);
-  }, [downloads, activeIdmDownloadId, minimizedDownloadIds, dismissedDownloadIds]);
+  }, [activeView, downloads, activeIdmDownloadId, minimizedDownloadIds, dismissedDownloadIds]);
 
   // Keep cached active item synchronized with live download state
   useEffect(() => {
@@ -258,9 +267,35 @@ export default function Home() {
     }
   };
 
-  const cycleTheme = () => {
+  const cycleTheme = useCallback(() => {
     handleThemeChange(theme === 'dark' ? 'light' : 'dark');
-  };
+  }, [theme, settings]);
+
+  const handlePauseAll = useCallback(async () => {
+    if (pauseAllPending) return;
+    setPauseAllPending(true);
+    try {
+      await api.pauseAll();
+      await refreshAll();
+    } catch (err) {
+      console.error('Pause all failed:', err);
+    } finally {
+      setPauseAllPending(false);
+    }
+  }, [pauseAllPending, refreshAll]);
+
+  const handleResumeAll = useCallback(async () => {
+    if (resumeAllPending) return;
+    setResumeAllPending(true);
+    try {
+      await api.resumeAll();
+      await refreshAll();
+    } catch (err) {
+      console.error('Resume all failed:', err);
+    } finally {
+      setResumeAllPending(false);
+    }
+  }, [resumeAllPending, refreshAll]);
 
   // Global Keyboard Shortcuts (Ctrl+K, Ctrl+N, Ctrl+P, Ctrl+R, Ctrl+F, Escape)
   useEffect(() => {
@@ -278,12 +313,12 @@ export default function Home() {
         setIsAddModalOpen(true);
       } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'p') {
         e.preventDefault();
-        api.pauseAll().then(refreshAll).catch(console.error);
+        void handlePauseAll();
       } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'r' && !e.shiftKey) {
         // Prevent accidental full page refresh if on downloads view
         if (activeView === 'downloads' || activeView === 'queues') {
           e.preventDefault();
-          api.resumeAll().then(refreshAll).catch(console.error);
+          void handleResumeAll();
         }
       } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f' && !isInput) {
         e.preventDefault();
@@ -298,13 +333,18 @@ export default function Home() {
         setIsCommandPaletteOpen(false);
         setIsActionCenterOpen(false);
         setSelectedDownload(null);
+        // Escape dismisses the progress popup — add to dismissed set so it
+        // doesn't auto-reopen on the next render cycle.
+        if (activeIdmDownloadId) {
+          setDismissedDownloadIds((previous) => new Set(previous).add(activeIdmDownloadId));
+        }
         setActiveIdmDownloadId(null);
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [activeView, refreshAll]);
+  }, [activeView, refreshAll, handlePauseAll, handleResumeAll, activeIdmDownloadId]);
 
   // Zero-Leakage Clipboard Sniffer on window focus
   useEffect(() => {
@@ -367,6 +407,22 @@ export default function Home() {
     if (status) setStatusFilter(status);
   };
 
+  // When leaving the downloads page, close any open progress popup so it
+  // never bleeds through to another tab.
+  const handleViewChange = useCallback((view: ActiveView) => {
+    if (view !== 'downloads') {
+      // Dismiss the popup — adding to dismissed set prevents auto-reopen
+      // when the user returns to the downloads view.
+      setActiveIdmDownloadId((currentId) => {
+        if (currentId) {
+          setDismissedDownloadIds((prev) => new Set(prev).add(currentId));
+        }
+        return null;
+      });
+    }
+    setActiveView(view);
+  }, []);
+
   return (
     <div
       className="theme-app h-screen flex flex-col overflow-hidden w-full"
@@ -390,6 +446,10 @@ export default function Home() {
         onViewModeChange={setViewMode}
         alertCount={alertCount}
         onToggleActionCenter={() => setIsActionCenterOpen(!isActionCenterOpen)}
+        onPauseAll={handlePauseAll}
+        onResumeAll={handleResumeAll}
+        isPausingAll={pauseAllPending}
+        isResumingAll={resumeAllPending}
       />
 
       {/* Main Layout */}
@@ -397,7 +457,7 @@ export default function Home() {
         {/* Left Sidebar */}
         <Sidebar
           activeView={activeView}
-          onViewChange={setActiveView}
+          onViewChange={handleViewChange}
           statusFilter={statusFilter}
           onStatusFilterChange={setStatusFilter}
           categoryFilter={categoryFilter}
@@ -605,30 +665,35 @@ export default function Home() {
         onClose={() => setSelectedDownload(null)}
       />
 
-      <IdmProgressModal
-        item={downloads.find((d) => d.id === activeIdmDownloadId) || (cachedActiveItem?.id === activeIdmDownloadId ? cachedActiveItem : null)}
-        onClose={() => {
-          if (activeIdmDownloadId) setDismissedDownloadIds((previous) => new Set(previous).add(activeIdmDownloadId));
-          setActiveIdmDownloadId(null);
-          setCachedActiveItem(null);
-        }}
-        onMinimize={() => {
-          if (activeIdmDownloadId) setMinimizedDownloadIds((previous) => new Set(previous).add(activeIdmDownloadId));
-          setActiveIdmDownloadId(null);
-        }}
-      />
+      {/* Download progress popup — only rendered on the Downloads page */}
+      {activeView === 'downloads' && (
+        <>
+          <IdmProgressModal
+            item={downloads.find((d) => d.id === activeIdmDownloadId) || (cachedActiveItem?.id === activeIdmDownloadId ? cachedActiveItem : null)}
+            onClose={() => {
+              if (activeIdmDownloadId) setDismissedDownloadIds((previous) => new Set(previous).add(activeIdmDownloadId));
+              setActiveIdmDownloadId(null);
+              setCachedActiveItem(null);
+            }}
+            onMinimize={() => {
+              if (activeIdmDownloadId) setMinimizedDownloadIds((previous) => new Set(previous).add(activeIdmDownloadId));
+              setActiveIdmDownloadId(null);
+            }}
+          />
 
-      {minimizedDownloadIds.size > 0 && (
-        <div className="fixed bottom-4 right-4 z-40 w-72 rounded-xl border border-blue-400/30 bg-slate-950/95 shadow-2xl shadow-blue-950/50 backdrop-blur p-2 animate-in fade-in slide-in-from-bottom-2 duration-150" data-testid="idm-minimized-center" aria-label="Minimized download progress">
-          <div className="px-2 pb-1.5 text-[10px] font-bold uppercase tracking-wider text-blue-300">G1DM Downloads · {minimizedDownloadIds.size}</div>
-          {downloads.filter((item) => minimizedDownloadIds.has(item.id)).map((item) => (
-            <button key={item.id} onClick={() => { setMinimizedDownloadIds((previous) => { const next = new Set(previous); next.delete(item.id); return next; }); setActiveIdmDownloadId(item.id); }} className="w-full rounded-lg px-2 py-2 text-left hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-cyan-400" aria-label={`Restore ${item.filename} progress popup`}>
-              <div className="flex justify-between gap-2 text-xs"><span className="truncate font-semibold text-slate-100">{item.filename}</span><span className="shrink-0 text-cyan-300">{item.progress.toFixed(0)}%</span></div>
-              <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-slate-800"><div className="h-full rounded-full bg-gradient-to-r from-blue-500 to-cyan-400 transition-[width] duration-200 motion-reduce:transition-none" style={{ width: `${Math.max(0, Math.min(100, item.progress))}%` }} /></div>
-              <div className="mt-1 text-[10px] text-slate-400">↓ {item.speed > 0 ? `${(item.speed / 1024 / 1024).toFixed(1)} MB/s` : 'Waiting'} · {item.status}</div>
-            </button>
-          ))}
-        </div>
+          {minimizedDownloadIds.size > 0 && (
+            <div className="fixed bottom-4 right-4 z-40 w-72 rounded-xl border border-blue-400/30 bg-slate-950/95 shadow-2xl shadow-blue-950/50 backdrop-blur p-2 animate-in fade-in slide-in-from-bottom-2 duration-150" data-testid="idm-minimized-center" aria-label="Minimized download progress">
+              <div className="px-2 pb-1.5 text-[10px] font-bold uppercase tracking-wider text-blue-300">G1DM Downloads · {minimizedDownloadIds.size}</div>
+              {downloads.filter((item) => minimizedDownloadIds.has(item.id)).map((item) => (
+                <button key={item.id} onClick={() => { setMinimizedDownloadIds((previous) => { const next = new Set(previous); next.delete(item.id); return next; }); setActiveIdmDownloadId(item.id); }} className="w-full rounded-lg px-2 py-2 text-left hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-cyan-400" aria-label={`Restore ${item.filename} progress popup`}>
+                  <div className="flex justify-between gap-2 text-xs"><span className="truncate font-semibold text-slate-100">{item.filename}</span><span className="shrink-0 text-cyan-300">{item.progress.toFixed(0)}%</span></div>
+                  <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-slate-800"><div className="h-full rounded-full bg-gradient-to-r from-blue-500 to-cyan-400 transition-[width] duration-200 motion-reduce:transition-none" style={{ width: `${Math.max(0, Math.min(100, item.progress))}%` }} /></div>
+                  <div className="mt-1 text-[10px] text-slate-400">↓ {item.speed > 0 ? `${(item.speed / 1024 / 1024).toFixed(1)} MB/s` : 'Waiting'} · {item.status}</div>
+                </button>
+              ))}
+            </div>
+          )}
+        </>
       )}
 
       <CommandPalette

@@ -85,6 +85,7 @@ const DownloadsViewComponent: React.FC<DownloadsViewProps> = ({
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
+  const [dropError, setDropError] = useState<string | null>(null);
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -99,13 +100,14 @@ const DownloadsViewComponent: React.FC<DownloadsViewProps> = ({
   const handleDrop = async (e: React.DragEvent) => {
     e.preventDefault();
     setIsDraggingOver(false);
+    setDropError(null);
     const text = e.dataTransfer.getData('text/plain') || e.dataTransfer.getData('text/uri-list');
     if (text && (text.startsWith('http://') || text.startsWith('https://') || text.startsWith('ftp://'))) {
       try {
         await api.addDownload({ url: text.trim(), startImmediately: true });
         if (onRefresh) onRefresh();
       } catch (err: any) {
-        alert(`Failed to add download: ${err.message}`);
+        setDropError(err?.message || 'Failed to add the dropped URL.');
       }
     }
   };
@@ -116,6 +118,16 @@ const DownloadsViewComponent: React.FC<DownloadsViewProps> = ({
     const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return `${(bytes / Math.pow(k, i)).toFixed(2)} ${sizes[i]}`;
+  };
+
+  const formatEta = (seconds: number) => {
+    if (!seconds || seconds <= 0 || !isFinite(seconds)) return '—';
+    const hrs = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+    const secs = Math.floor(seconds % 60);
+    if (hrs > 0) return `${hrs}h ${String(mins).padStart(2, '0')}m`;
+    if (mins > 0) return `${String(mins).padStart(2, '0')}m ${String(secs).padStart(2, '0')}s`;
+    return `${secs}s`;
   };
 
   const [pageSize, setPageSize] = useState<number>(50);
@@ -228,6 +240,20 @@ const DownloadsViewComponent: React.FC<DownloadsViewProps> = ({
           <Download className="w-16 h-16 text-blue-400 mb-4 animate-bounce" />
           <h3 className="text-xl font-bold text-white mb-2">Drop Link to Download</h3>
           <p className="text-sm text-blue-200">Release link or URL anywhere to start downloading immediately</p>
+        </div>
+      )}
+
+      {/* Inline drop error banner */}
+      {dropError && (
+        <div className="flex items-center justify-between gap-3 p-3 rounded-xl bg-rose-950/40 border border-rose-500/40 text-rose-200 text-xs animate-in fade-in duration-150">
+          <span><span className="font-bold">Drop failed:</span> {dropError}</span>
+          <button
+            onClick={() => setDropError(null)}
+            className="shrink-0 text-rose-400 hover:text-rose-200 transition-colors"
+            aria-label="Dismiss error"
+          >
+            ✕
+          </button>
         </div>
       )}
 
@@ -424,25 +450,25 @@ const DownloadsViewComponent: React.FC<DownloadsViewProps> = ({
                   />
                 </th>
                 <th className="p-3">Status</th>
-                <th className="p-3 cursor-pointer hover:text-slate-200" onClick={() => { setSortBy('filename'); setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc'); }}>
+                <th className="p-3 cursor-pointer hover:text-slate-200" onClick={() => { setSortBy('filename'); setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc'); setCurrentPage(1); }}>
                   <div className="flex items-center gap-1">
                     <span>File Name</span>
                     <ArrowUpDown className="w-3 h-3" />
                   </div>
                 </th>
-                <th className="p-3 cursor-pointer hover:text-slate-200" onClick={() => { setSortBy('size'); setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc'); }}>
+                <th className="p-3 cursor-pointer hover:text-slate-200" onClick={() => { setSortBy('size'); setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc'); setCurrentPage(1); }}>
                   <div className="flex items-center gap-1">
                     <span>Size</span>
                     <ArrowUpDown className="w-3 h-3" />
                   </div>
                 </th>
-                <th className="p-3 w-48 cursor-pointer hover:text-slate-200" onClick={() => { setSortBy('progress'); setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc'); }}>
+                <th className="p-3 w-48 cursor-pointer hover:text-slate-200" onClick={() => { setSortBy('progress'); setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc'); setCurrentPage(1); }}>
                   <div className="flex items-center gap-1">
                     <span>Progress (Segments)</span>
                     <ArrowUpDown className="w-3 h-3" />
                   </div>
                 </th>
-                <th className="p-3 cursor-pointer hover:text-slate-200" onClick={() => { setSortBy('speed'); setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc'); }}>
+                <th className="p-3 cursor-pointer hover:text-slate-200" onClick={() => { setSortBy('speed'); setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc'); setCurrentPage(1); }}>
                   <div className="flex items-center gap-1">
                     <span>Speed / ETA</span>
                     <ArrowUpDown className="w-3 h-3" />
@@ -694,7 +720,9 @@ const DownloadsViewComponent: React.FC<DownloadsViewProps> = ({
                         {item.status === 'downloading' ? (
                           <>
                             <div className="text-cyan-400 font-semibold">{formatBytes(item.speed)}/s</div>
-                            <div className="text-[10px] text-slate-400">ETA {item.eta}s</div>
+                            <div className="text-[10px] text-slate-400">
+                              {item.eta > 0 ? `ETA ${formatEta(item.eta)}` : 'Connecting…'}
+                            </div>
                           </>
                         ) : item.status === 'completed' ? (
                           <div className="text-slate-400 text-[11px]">
